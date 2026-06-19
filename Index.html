@@ -5171,160 +5171,14 @@ body{padding:14px;font-family:'Kanit',sans-serif;background:#ffffff;width:1123px
       } catch(e) { return null; }
     }
     // ============================================================
-    // ICS Settings + Deep Link UI (v34)
+    // ICS Settings + Deep Link UI (v34) — REMOVED in v3.31 (PB-4 cleanup)
+    // Dead code: _icsRenderControls / _icsSetMonths / _icsSetReminder
+    //            _icsSetPlatform / _icsRenderPlatformTabs
+    // (HTML containers icsActionArea/icsMonthsGroup/icsReminderGroup/icsPlatformTabs deleted earlier)
     // ============================================================
-    function _icsRenderControls() {
-      const cfg = window._icsConfig;
-      const monthOptions = [
-        { v: 1, label: '1 เดือน' },
-        { v: 3, label: '3 เดือน' },
-        { v: 6, label: '6 เดือน' },
-        { v: 12, label: '12 เดือน' }
-      ];
-      const remindOptions = [
-        { v: '', label: 'ไม่เตือน' },
-        { v: '60', label: '1 ชม.' },
-        { v: '60,1080', label: '1 ชม. + 18 ชม.' },
-        { v: '30,1440', label: '30 นาที + 1 วัน' }
-      ];
 
-      const mg = document.getElementById('icsMonthsGroup');
-      if (mg) {
-        mg.innerHTML = monthOptions.map(function(o) {
-          const active = cfg.months === o.v;
-          return '<button onclick="_icsSetMonths(' + o.v + ')" style="flex:1;min-width:60px;padding:5px 6px;font-size:10px;font-family:Kanit,sans-serif;border-radius:5px;cursor:pointer;border:1px solid ' + (active ? 'var(--accent)' : 'var(--border)') + ';background:' + (active ? 'var(--accent)' : 'transparent') + ';color:' + (active ? '#fff' : 'var(--text)') + ';font-weight:' + (active ? '600' : '500') + ';">' + o.label + '</button>';
-        }).join('');
-      }
-
-      const rg = document.getElementById('icsReminderGroup');
-      if (rg) {
-        rg.innerHTML = remindOptions.map(function(o) {
-          const active = cfg.reminder === o.v;
-          return '<button onclick="_icsSetReminder(\'' + o.v + '\')" style="flex:1;min-width:80px;padding:5px 6px;font-size:10px;font-family:Kanit,sans-serif;border-radius:5px;cursor:pointer;border:1px solid ' + (active ? 'var(--accent)' : 'var(--border)') + ';background:' + (active ? 'var(--accent)' : 'transparent') + ';color:' + (active ? '#fff' : 'var(--text)') + ';font-weight:' + (active ? '600' : '500') + ';">' + o.label + '</button>';
-        }).join('');
-      }
-    }
-
-    function _icsSetMonths(m) { window._icsConfig.months = m; _icsRenderControls(); _icsRenderAction(); }
-    function _icsSetReminder(r) { window._icsConfig.reminder = r; _icsRenderControls(); _icsRenderAction(); }
-    function _icsSetPlatform(p) { window._icsConfig.platform = p; _icsRenderPlatformTabs(); _icsRenderAction(); }
-
-    function _icsRenderPlatformTabs() {
-      const tabs = document.getElementById('icsPlatformTabs');
-      if (!tabs) return;
-      const cfg = window._icsConfig;
-      const platforms = [
-        { v: 'ios',     label: '📱 iPhone/iPad' },
-        { v: 'android', label: '🤖 Android' },
-        { v: 'macos',   label: '💻 Mac' },
-        { v: 'web',     label: '🌐 Web' }
-      ];
-      tabs.innerHTML = platforms.map(function(p) {
-        const active = cfg.platform === p.v;
-        return '<button onclick="_icsSetPlatform(\'' + p.v + '\')" style="flex:1;padding:6px 4px;font-size:10px;font-family:Kanit,sans-serif;border-radius:5px;cursor:pointer;border:1px solid ' + (active ? 'var(--accent)' : 'var(--border)') + ';background:' + (active ? 'var(--bg)' : 'transparent') + ';color:' + (active ? 'var(--accent)' : 'var(--sub)') + ';font-weight:' + (active ? '700' : '500') + ';">' + p.label + '</button>';
-      }).join('');
-    }
-
-    function _icsRenderAction() {
-      const area = document.getElementById('icsActionArea');
-      if (!area) return;
-      const person = _getTargetPerson();
-      if (!person) {
-        area.innerHTML = '<div style="color:var(--sub);font-style:italic;">กรุณาเลือกชื่อเภสัชกร 1 คน</div>';
-        return;
-      }
-      const cfg = window._icsConfig;
-      const baseUrl = _icsBuildUrlWithParams(person);
-      const webcalUrl = baseUrl.replace(/^https?:/, 'webcal:');
-      const googleAddUrl = 'https://calendar.google.com/calendar/u/0/r/settings/addcalendar?cid=' + encodeURIComponent(webcalUrl);
-
-      let content = '';
-      if (cfg.platform === 'ios') {
-        content =
-          '<div style="font-size:11px;font-weight:600;margin-bottom:6px;">วิธีติดตั้ง — iPhone/iPad</div>' +
-          '<ol style="padding-left:18px;margin:0 0 10px;font-size:10px;line-height:1.7;">' +
-            '<li>กดปุ่ม "เพิ่มเข้า Apple Calendar" ด้านล่าง</li>' +
-            '<li>Safari ถาม "Subscribe" — กด <b>Allow</b></li>' +
-            '<li>ตั้งค่า Save — ปฏิทินจะเป็น <b>ปฏิทินแยก</b> ลบ/แทนที่ได้</li>' +
-          '</ol>' +
-          '<a href="' + webcalUrl + '" style="display:block;text-align:center;padding:10px;background:var(--accent);color:#fff;text-decoration:none;border-radius:6px;font-weight:600;font-size:11px;">📅 เพิ่มเข้า Apple Calendar (1 คลิก)</a>' +
-          '<a href="' + googleAddUrl + '" target="_blank" style="display:block;text-align:center;padding:8px;margin-top:6px;background:transparent;color:var(--text);text-decoration:none;border:1px solid var(--border);border-radius:6px;font-weight:600;font-size:10px;">หรือเพิ่มเข้า Google Calendar</a>';
-      } else if (cfg.platform === 'android') {
-        content =
-          '<div style="font-size:11px;font-weight:600;margin-bottom:6px;">วิธีติดตั้ง — Android</div>' +
-          '<ol style="padding-left:18px;margin:0 0 10px;font-size:10px;line-height:1.7;">' +
-            '<li>กดปุ่ม "เพิ่มเข้า Google Calendar" — URL ถูกเติมแล้ว</li>' +
-            '<li>กด <b>"Add Calendar"</b></li>' +
-            '<li>เปิด Google Calendar app → เห็นปฏิทินใน "Other calendars"</li>' +
-          '</ol>' +
-          '<a href="' + googleAddUrl + '" target="_blank" style="display:block;text-align:center;padding:10px;background:var(--accent);color:#fff;text-decoration:none;border-radius:6px;font-weight:600;font-size:11px;">📅 เพิ่มเข้า Google Calendar (1 คลิก)</a>' +
-          '<div style="margin-top:8px;padding:6px 8px;background:#fef3c7;border:1px solid #fde68a;border-radius:5px;font-size:9px;color:#92400e;">' +
-            '⚠️ ถ้าเปิดไม่ขึ้น: เปิด Chrome → request desktop site → ทำตามขั้นตอน' +
-          '</div>';
-      } else if (cfg.platform === 'macos') {
-        content =
-          '<div style="font-size:11px;font-weight:600;margin-bottom:6px;">วิธีติดตั้ง — Mac</div>' +
-          '<ol style="padding-left:18px;margin:0 0 10px;font-size:10px;line-height:1.7;">' +
-            '<li>กดปุ่ม "เพิ่มเข้า Calendar" ด้านล่าง</li>' +
-            '<li>เลือก Calendar app (Apple) หรือ Google Calendar</li>' +
-            '<li>Allow subscribe → Save</li>' +
-          '</ol>' +
-          '<a href="' + webcalUrl + '" style="display:block;text-align:center;padding:10px;background:var(--accent);color:#fff;text-decoration:none;border-radius:6px;font-weight:600;font-size:11px;">📅 เพิ่มเข้า Apple Calendar</a>' +
-          '<a href="' + googleAddUrl + '" target="_blank" style="display:block;text-align:center;padding:8px;margin-top:6px;background:transparent;color:var(--text);text-decoration:none;border:1px solid var(--border);border-radius:6px;font-weight:600;font-size:10px;">หรือเพิ่มเข้า Google Calendar</a>';
-      } else {
-        content =
-          '<div style="font-size:11px;font-weight:600;margin-bottom:6px;">วิธีติดตั้ง — Google Calendar Web</div>' +
-          '<ol style="padding-left:18px;margin:0 0 10px;font-size:10px;line-height:1.7;">' +
-            '<li>กดปุ่ม "เพิ่มเข้า Google Calendar" — URL ถูกเติมแล้ว</li>' +
-            '<li>กด <b>"Add Calendar"</b></li>' +
-            '<li>ปฏิทินใหม่ปรากฏใน sidebar — เลือก/ลบ/sync ทุก devices</li>' +
-          '</ol>' +
-          '<a href="' + googleAddUrl + '" target="_blank" style="display:block;text-align:center;padding:10px;background:var(--accent);color:#fff;text-decoration:none;border-radius:6px;font-weight:600;font-size:11px;">📅 เพิ่มเข้า Google Calendar</a>';
-      }
-
-      content +=
-        '<div style="margin-top:12px;padding-top:10px;border-top:1px solid var(--border);">' +
-          '<div style="font-size:9px;color:var(--sub);margin-bottom:6px;">ทางเลือกอื่น</div>' +
-          '<div style="display:flex;gap:6px;">' +
-            '<button onclick="_icsDownloadFile()" style="flex:1;padding:7px;background:transparent;color:var(--text);border:1px solid var(--border);border-radius:5px;font-size:10px;font-weight:600;cursor:pointer;font-family:Kanit,sans-serif;">⬇️ ดาวน์โหลด .ics</button>' +
-            '<button onclick="_icsCopyUrl()" style="flex:1;padding:7px;background:transparent;color:var(--text);border:1px solid var(--border);border-radius:5px;font-size:10px;font-weight:600;cursor:pointer;font-family:Kanit,sans-serif;">📋 คัดลอก URL</button>' +
-          '</div>' +
-          '<div style="font-size:9px;color:var(--sub);margin-top:6px;line-height:1.5;">' +
-            'ปฏิทินอัพเดทอัตโนมัติทุก ~12 ชม. — ถ้าแก้เวรในระบบแล้วยังไม่เห็น ลบปฏิทินแล้วเพิ่มใหม่' +
-          '</div>' +
-        '</div>';
-      area.innerHTML = content;
-    }
-
-    function _icsBuildUrlWithParams(person) {
-      const base = window.gasScriptUrl || '';
-      if (!base) return '';
-      const cfg = window._icsConfig;
-      const params = ['name=' + encodeURIComponent(person)];
-      params.push('months=' + cfg.months);
-      if (cfg.reminder !== undefined) params.push('remind=' + encodeURIComponent(cfg.reminder));
-      return base + '?' + params.join('&');
-    }
-
-    function _icsDownloadFile() {
-      const person = _getTargetPerson();
-      if (!person) { alert('กรุณาเลือกชื่อเภสัชกร 1 คน'); return; }
-      window.open(_icsBuildUrlWithParams(person), '_blank');
-    }
-
-    function _icsCopyUrl() {
-      const person = _getTargetPerson();
-      if (!person) { alert('กรุณาเลือกชื่อเภสัชกร 1 คน'); return; }
-      const url = _icsBuildUrlWithParams(person);
-      if (navigator.clipboard && navigator.clipboard.writeText) {
-        navigator.clipboard.writeText(url).then(function() {
-          if (typeof _p2bShowToast === 'function') _p2bShowToast('✓ คัดลอก URL แล้ว', 'info');
-          else alert('คัดลอก URL แล้ว');
-        });
-      } else {
-        prompt('คัดลอก URL นี้:', url);
-      }
-    }
+    // v3.31 (PB-4 cleanup): _icsRenderAction removed (was dead code — no icsActionArea container)
+    // v3.31 (PB-4 cleanup): _icsBuildUrlWithParams / _icsDownloadFile / _icsCopyUrl removed
 
     // ============================================================
     // ICS GUIDE MODAL (v29) — instructions per platform
@@ -6948,74 +6802,7 @@ table.exp-tbl .tm{margin-left:3px;opacity:0.75;}
       document.getElementById('ecmPanel1').style.display = n === 1 ? 'block' : 'none';
       document.getElementById('ecmPanel2').style.display = n === 2 ? 'block' : 'none';
     }
-    function _ecmGetBaseUrl(cb) {
-      if (window.gasScriptUrl) { cb(window.gasScriptUrl); return; }
-      if (typeof google !== 'undefined' && google.script && google.script.run && typeof google.script.run.getScriptUrl === 'function') {
-        google.script.run
-          .withSuccessHandler(function(u) { window.gasScriptUrl = u; cb(u); })
-          .withFailureHandler(function(e) { alert('ไม่สามารถดึง URL: ' + e); })
-          .getScriptUrl();
-      } else {
-        alert('ไม่พบ Apps Script API — กรุณา reload หน้า');
-      }
-    }
-    function _ecmBuildWebcalUrl(base, person) {
-      if (base && base.endsWith('/dev')) base = base.replace('/dev', '/exec');
-      var sep = base.indexOf('?') >= 0 ? '&' : '?';
-      // v2.9: include Round 3 mode if active so backend ICS uses same dates
-      var r3 = '';
-      try {
-        if (localStorage.getItem(ROUND3_KEY) === 'next') r3 = '&round3=next';
-      } catch(e) {}
-      return base.replace(/^https/, 'webcal') + sep + 'action=ics&name=' + encodeURIComponent(person) + r3;
-    }
-    function ecmSubscribe() {
-      var person = _getTargetPerson(); if (!person) return;
-      _ecmGetBaseUrl(function(base) {
-        var webcalUrl = _ecmBuildWebcalUrl(base, person);
-        var gcalUrl = 'https://calendar.google.com/calendar/r?cid=' + encodeURIComponent(webcalUrl);
-        window.open(gcalUrl, '_blank');
-        closeExportCalendarModal();
-      });
-    }
-
-    // v3.15: Apple deeplink — webcal:// triggers iOS/macOS Calendar.app directly
-    // v3.18: Multi-fallback to escape GAS iframe sandbox
-    function ecmSubscribeApple() {
-      var person = _getTargetPerson(); if (!person) return;
-      _ecmGetBaseUrl(function(base) {
-        var webcalUrl = _ecmBuildWebcalUrl(base, person);
-        var navigated = false;
-        // Strategy 1: synthetic <a target="_top"> click (most reliable)
-        try {
-          var a = document.createElement('a');
-          a.href = webcalUrl;
-          a.target = '_top';
-          a.rel = 'noopener';
-          a.style.display = 'none';
-          document.body.appendChild(a);
-          a.click();
-          document.body.removeChild(a);
-          navigated = true;
-        } catch(e1) { console.warn('[ecmSubscribeApple] anchor click failed:', e1); }
-        // Strategy 2: top-window navigation
-        if (!navigated) {
-          try { window.top.location.href = webcalUrl; navigated = true; }
-          catch(e2) { console.warn('[ecmSubscribeApple] window.top.location failed:', e2); }
-        }
-        // Strategy 3: window.open
-        if (!navigated) {
-          try { window.open(webcalUrl, '_top'); navigated = true; }
-          catch(e3) { console.warn('[ecmSubscribeApple] window.open failed:', e3); }
-        }
-        // Strategy 4: own-window navigation (last resort)
-        if (!navigated) {
-          try { window.location.href = webcalUrl; }
-          catch(e4) { alert('ไม่สามารถเปิดลิงก์ได้: ' + webcalUrl); }
-        }
-        setTimeout(closeExportCalendarModal, 1500);
-      });
-    }
+    // v3.31 (PB-4 cleanup): subscribe via webcal removed — users use download .ics → import instead
     // v3.1: helper — convert "m_พฤษภาคม_2569" → "2026-5" for backend months param
     function _icsMonthIdToYM(monthId) {
       const THAI = ['มกราคม','กุมภาพันธ์','มีนาคม','เมษายน','พฤษภาคม','มิถุนายน',
@@ -7790,9 +7577,44 @@ table.exp-tbl .tm{margin-left:3px;opacity:0.75;}
       });
 
       rawLines.push('END:VCALENDAR');
-      // v3.25: skip line folding — liked reference file doesn't fold, parsers handle long lines fine
-      console.log('[ICS] built ' + added + ' events for ' + cleanPerson);
-      return rawLines.join('\r\n');
+      // v3.30 (PB-4): RFC 5545 line folding — Google Calendar เคร่งกฎกว่า Apple/Outlook
+      // ภาษาไทย UTF-8 = 3 byte/ตัว → DESCRIPTION ภาษาไทยยาวเกิน 75 byte ง่ายมาก
+      const _utf8Len = function(s) {
+        let n = 0;
+        for (let i = 0; i < s.length; i++) {
+          const c = s.charCodeAt(i);
+          if (c < 0x80) n += 1;
+          else if (c < 0x800) n += 2;
+          else if (c >= 0xD800 && c <= 0xDBFF) { n += 4; i++; }
+          else n += 3;
+        }
+        return n;
+      };
+      const _foldICSLine = function(line) {
+        if (!line || _utf8Len(line) <= 75) return line;
+        const parts = [];
+        let buf = '', bufBytes = 0, limit = 75;
+        for (let i = 0; i < line.length; i++) {
+          const code = line.charCodeAt(i);
+          let chBytes, advance = 1;
+          if (code < 0x80) chBytes = 1;
+          else if (code < 0x800) chBytes = 2;
+          else if (code >= 0xD800 && code <= 0xDBFF) { chBytes = 4; advance = 2; }
+          else chBytes = 3;
+          const ch = advance === 2 ? line.substring(i, i + 2) : line.charAt(i);
+          if (bufBytes + chBytes > limit) {
+            parts.push(buf);
+            buf = ch; bufBytes = chBytes; limit = 74;
+          } else {
+            buf += ch; bufBytes += chBytes;
+          }
+          if (advance === 2) i++;
+        }
+        if (buf) parts.push(buf);
+        return parts.join('\r\n ');
+      };
+      console.log('[ICS] built ' + added + ' events for ' + cleanPerson + ' (folded)');
+      return rawLines.join('\r\n').split('\r\n').map(_foldICSLine).join('\r\n');
     }
     function ecmExportPDF() {
       closeExportCalendarModal();
@@ -7812,17 +7634,7 @@ table.exp-tbl .tm{margin-left:3px;opacity:0.75;}
       if (typeof exportPDF === 'function') exportPDF('calendar');
     }
 
-    // Pre-fetch script URL on page load (for instant subscribe)
-    setTimeout(function() {
-      if (!window.gasScriptUrl && typeof google !== 'undefined' && google.script && google.script.run) {
-        try {
-          google.script.run
-            .withSuccessHandler(function(u) { window.gasScriptUrl = u; })
-            .withFailureHandler(function() {})
-            .getScriptUrl();
-        } catch(e) {}
-      }
-    }, 1500);
+    // v3.31 (PB-4 cleanup): pre-fetch gasScriptUrl removed — no longer needed (subscribe gone)
 
 
     // ============================================================
