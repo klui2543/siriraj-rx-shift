@@ -1,0 +1,501 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <base target="_top">
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <link href="https://cdnjs.cloudflare.com/ajax/libs/flowbite/2.3.0/flowbite.min.css" rel="stylesheet" />
+  <link href="https://fonts.googleapis.com/css2?family=Kanit:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+  <style>
+    body { background-color: #f3f4f6; font-family: 'Kanit', sans-serif; padding: 20px 10px; }
+    .loader { border: 3px solid #f3f3f3; border-top: 3px solid #1d4ed8; border-radius: 50%; width: 20px; height: 20px; animation: spin 1s linear infinite; display: inline-block; vertical-align: middle; }
+    @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+    .hide { display: none !important; }
+  </style>
+</head>
+<body>
+  <div class="max-w-3xl mx-auto">
+    <div class="flex justify-between items-center mb-6">
+      <h1 class="text-2xl md:text-3xl font-bold text-gray-800">ระบบจัดการหลังบ้าน (Admin)</h1>
+      <a id="homeLink" href="#" class="px-4 py-2 bg-gray-200 text-gray-700 rounded-lg text-sm font-bold hover:bg-gray-300">กลับหน้าตารางเวร</a>
+    </div>
+
+  <div id="loginSection" class="bg-white p-8 rounded-2xl shadow-sm border border-gray-200 max-w-md mx-auto">
+      <h2 class="text-xl font-bold mb-6 text-center text-gray-800">🔐 เข้าสู่ระบบ Admin</h2>
+      <p class="text-sm text-gray-500 mb-3 text-center">กรอกรหัสผ่าน Admin</p>
+      <input type="password" id="adminPassword" placeholder="รหัสผ่าน" onkeydown="if(event.key==='Enter') login()" class="w-full p-3 border border-gray-300 rounded-xl mb-6 outline-none focus:border-blue-500 text-center">
+      <button onclick="login()" id="loginBtn" class="w-full bg-blue-600 text-white font-bold py-3 rounded-xl hover:bg-blue-700 transition">เข้าสู่ระบบ</button>
+    </div>
+
+    <div id="adminPanel" class="hide space-y-6">
+      
+      <div class="bg-white p-6 rounded-2xl shadow-sm border border-gray-200">
+        <h2 class="text-lg font-bold mb-4 flex items-center gap-2">📂 อัปโหลดไฟล์ตารางเวร</h2>
+        <input type="file" id="fileInput" accept=".xlsx, .xls" multiple class="block w-full text-sm text-gray-500 file:mr-4 file:py-2.5 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100 mb-4 cursor-pointer">
+        <button onclick="uploadMultipleFiles()" id="uploadBtn" class="bg-blue-600 text-white px-6 py-2.5 rounded-xl font-bold hover:bg-blue-700 w-full transition">อัปโหลดเข้าสู่ระบบ</button>
+        <div id="uploadStatus" class="mt-3 text-sm font-bold"></div>
+        <label class="flex items-center gap-2 mt-3 pt-3 border-t border-gray-100 text-xs text-gray-600 cursor-pointer select-none">
+          <input type="checkbox" id="notifyFileUpload" onchange="updateNotifyPref('fileUpload', this.checked)" class="w-4 h-4 rounded cursor-pointer">
+          📱 แจ้งเตือนผ่าน LINE หลัง upload สำเร็จ
+        </label>
+      </div>
+
+      <div class="bg-white p-6 rounded-2xl shadow-sm border border-gray-200">
+        <h2 class="text-lg font-bold mb-2 flex items-center gap-2">🤖 ระบบดึงอีเมลอัตโนมัติ</h2>
+        <p class="text-gray-500 text-sm mb-4">ดึงไฟล์ที่ยังไม่ได้อ่านจาก Gmail ทันที</p>
+        <button onclick="syncGmail()" id="syncBtn" class="bg-green-600 text-white px-6 py-2.5 rounded-xl font-bold hover:bg-green-700 w-full shadow-sm">
+          🔄 ดึงข้อมูลจากอีเมลล่าสุดเดี๋ยวนี้
+        </button>
+        <label class="flex items-center gap-2 mt-3 pt-3 border-t border-gray-100 text-xs text-gray-600 cursor-pointer select-none">
+          <input type="checkbox" id="notifyManualSync" onchange="updateNotifyPref('manualSync', this.checked)" class="w-4 h-4 rounded cursor-pointer">
+          📱 แจ้งเตือนผ่าน LINE หลัง sync สำเร็จ
+        </label>
+      </div>
+
+         <div class="bg-white p-6 rounded-2xl shadow-sm border border-gray-200">
+        <h2 class="text-lg font-bold mb-2 flex items-center gap-2">🔥 Auto-Sync Email Trigger</h2>
+        <p class="text-gray-500 text-sm mb-4">ควบคุม trigger ดึงอีเมลอัตโนมัติ — เปิด/ปิด หรือตั้งเวลาล่วงหน้า</p>
+ 
+        <!-- Status display -->
+        <div id="phxHpStatus" class="bg-gray-50 border border-gray-200 rounded-lg p-3 mb-3 text-sm">
+          <div class="text-gray-400">กำลังโหลดสถานะ...</div>
+        </div>
+ 
+        <!-- Manual controls -->
+        <div class="grid grid-cols-2 gap-2 mb-4">
+          <button onclick="phxHpEnable()" class="bg-red-600 text-white px-4 py-2.5 rounded-xl font-bold hover:bg-red-700 transition text-sm">
+            🔥 เปิดทันที (ทุก 1 นาที)
+          </button>
+          <button onclick="phxHpDisable()" class="bg-gray-600 text-white px-4 py-2.5 rounded-xl font-bold hover:bg-gray-700 transition text-sm">
+            ❄️ ปิด Auto-Sync
+          </button>
+        </div>
+ 
+        <!-- Scheduled trigger -->
+        <div class="border-t border-gray-100 pt-4">
+          <div class="text-xs font-bold text-gray-600 mb-2">⏰ ตั้งเวลาเปิดอัตโนมัติ:</div>
+          <div class="flex gap-2 mb-2">
+            <input type="date" id="phxHpScheduleDate" class="flex-1 p-2 border border-gray-300 rounded-lg text-sm">
+            <input type="time" id="phxHpScheduleTime" class="flex-1 p-2 border border-gray-300 rounded-lg text-sm">
+          </div>
+          <div class="flex gap-2">
+            <button onclick="phxHpSchedule()" class="flex-1 bg-blue-600 text-white px-3 py-2 rounded-lg font-bold hover:bg-blue-700 text-sm">
+              📅 ตั้งเวลา
+            </button>
+            <button onclick="phxHpCancelSchedule()" class="px-3 py-2 border border-gray-300 text-gray-700 rounded-lg font-bold text-sm hover:bg-gray-50">
+              ยกเลิก
+            </button>
+          </div>
+          <p class="text-xs text-gray-400 mt-2 leading-relaxed">
+            💡 ตัวอย่าง: รู้ว่าฝ่ายเวรจะส่งตารางวันที่ 15 เวลา 14:00 → ตั้งเวลานี้ → ระบบจะ poll ทุก 1 นาทีตั้งแต่ 14:00 จนเจอเมล → sync + ปิด auto
+          </p>
+          <label class="flex items-center gap-2 mt-3 pt-3 border-t border-gray-100 text-xs text-gray-600 cursor-pointer select-none">
+            <input type="checkbox" id="notifyHotPolling" onchange="updateNotifyPref('hotPolling', this.checked)" class="w-4 h-4 rounded cursor-pointer">
+            📱 แจ้งเตือนผ่าน LINE หลัง Hot Polling จับตารางใหม่ได้
+          </label>
+        </div>
+ 
+        <!-- Message -->
+        <div id="phxHpMsg" class="mt-3 px-3 py-2 rounded-lg text-xs font-bold hidden"></div>
+      </div>
+
+      <div class="bg-white p-6 rounded-2xl shadow-sm border border-gray-200">
+        <h2 class="text-lg font-bold mb-2 flex items-center gap-2">🛡️ ตรวจสอบความถูกต้องทุกเดือน (Multi-Audit)</h2>
+        <p class="text-gray-500 text-sm mb-4">สแกนเปรียบเทียบฐานข้อมูลกับไฟล์ต้นฉบับย้อนหลังทุกเดือน เพื่อเช็กความเหลื่อมล้ำสะสม</p>
+        <div class="flex flex-col md:flex-row items-center gap-4">
+          <button onclick="runMultiAudit()" id="multiAuditBtn" class="bg-purple-600 text-white px-6 py-2.5 rounded-xl font-bold hover:bg-purple-700 w-full md:w-auto shadow-sm transition">
+            🔍 ตรวจสอบทุกเดือนเดี๋ยวนี้
+          </button>
+          <div id="auditStatus" class="text-sm font-bold text-gray-700"></div>
+        </div>
+      </div>
+
+      <div id="diagLog" class="bg-gray-900 p-6 rounded-2xl shadow-sm border border-gray-800">
+        <div class="flex flex-col md:flex-row md:items-center justify-between gap-2 mb-2 border-b border-gray-700 pb-3">
+          <div>
+            <h2 class="text-lg font-bold text-white flex items-center gap-2">💻 รายงานประมวลผล (Statistics)</h2>
+            <p class="text-gray-400 text-xs mt-0.5">แสดงสถานะคนเข้าใหม่ คนลาออก และความผิดปกติของไฟล์</p>
+          </div>
+          <a id="logSheetLink" href="https://docs.google.com/spreadsheets/d/1ycH3nUqukYBhKRxh7Es4JYnE2H1yLThba1ZK3bVUMDk" target="_blank" class="inline-flex items-center justify-center gap-1 bg-gray-800 hover:bg-gray-700 text-blue-400 hover:text-blue-300 text-xs font-mono py-1.5 px-3 rounded-lg border border-gray-700 transition w-max">
+            📊 เปิดดูตาราง Log สถิติเต็ม ↗
+          </a>
+        </div>
+        
+        <div id="diagContent" class="text-green-400 font-mono text-xs overflow-auto max-h-[400px] leading-relaxed pt-2">
+          <div class="loader"></div> กำลังโหลดสถิติล่าสุด...
+        </div>
+      </div>
+
+      <div class="bg-white p-6 rounded-2xl shadow-sm border border-gray-200">
+        <h2 class="text-lg font-bold mb-4">📋 รายการข้อมูลในระบบ</h2>
+        <div id="monthList" class="space-y-3">
+          <div class="loader"></div> กำลังโหลด...
+        </div>
+      </div>
+
+      <div class="bg-white p-6 rounded-2xl shadow-sm border border-gray-200">
+        <h2 class="text-lg font-bold mb-3 flex items-center gap-2">🔐 เปลี่ยนรหัสผ่าน Admin</h2>
+        <p class="text-gray-500 text-sm mb-4">ยืนยันรหัสเดิม + ใส่รหัสใหม่ 2 ครั้ง (อย่างน้อย 6 ตัวอักษร)</p>
+        <div class="space-y-2.5">
+          <input type="password" id="oldPassword" placeholder="รหัสผ่านเดิม" class="w-full p-2.5 border border-gray-300 rounded-lg outline-none focus:border-blue-500 text-sm">
+          <input type="password" id="newPassword" placeholder="รหัสผ่านใหม่" class="w-full p-2.5 border border-gray-300 rounded-lg outline-none focus:border-blue-500 text-sm">
+          <input type="password" id="confirmPassword" placeholder="ยืนยันรหัสผ่านใหม่" onkeydown="if(event.key==='Enter') changePassword()" class="w-full p-2.5 border border-gray-300 rounded-lg outline-none focus:border-blue-500 text-sm">
+          <button onclick="changePassword()" id="changePassBtn" class="w-full md:w-auto bg-indigo-600 text-white px-6 py-2.5 rounded-xl font-bold hover:bg-indigo-700 transition shadow-sm">บันทึกรหัสใหม่</button>
+          <div id="changePassStatus" class="text-sm font-bold mt-1"></div>
+        </div>
+      </div>
+
+      <div class="bg-red-50 p-6 rounded-2xl border border-red-200 shadow-sm">
+        <h2 class="text-lg font-bold text-red-800 mb-2 flex items-center gap-2">🚨 โซนอันตราย (Danger Zone)</h2>
+        <p class="text-red-600 text-sm mb-4">ปุ่มนี้จะเคลียร์ฐานข้อมูลตารางเวรที่เคยประมวลผลมาแล้วทั้งหมด (ไม่กระทบกับไฟล์ต้นฉบับ)</p>
+        <button onclick="confirmDeleteAll()" class="bg-red-600 text-white px-6 py-2.5 rounded-xl font-bold hover:bg-red-700 transition-colors shadow-sm w-full md:w-auto">
+          🔥 ล้างข้อมูลเดือนทั้งหมดในระบบ
+        </button>
+      </div>
+      
+      <div class="text-center mt-8 pb-10">
+        <button onclick="logout()" class="text-gray-500 hover:text-gray-800 font-bold underline">ออกจากระบบ (Logout)</button>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    window.onload = function() {
+      google.script.run.withSuccessHandler(url => { document.getElementById('homeLink').href = url; }).getScriptUrl();
+      checkLogin();
+    };
+
+    function checkLogin() {
+      const token = localStorage.getItem('admin_token');
+      if (token) {
+        document.getElementById('loginSection').classList.add('hide');
+        document.getElementById('adminPanel').classList.remove('hide');
+        loadData();
+      }
+    }
+
+    function login() {
+      const btn = document.getElementById('loginBtn');
+      const pass = document.getElementById('adminPassword').value;
+      if (!pass) return alert("กรุณาใส่รหัสผ่าน");
+      btn.innerHTML = '<div class="loader"></div>'; btn.disabled = true;
+      google.script.run.withSuccessHandler(res => {
+        if (res.success) {
+          localStorage.setItem('admin_token', res.token);
+          document.getElementById('adminPassword').value = '';
+          document.getElementById('loginSection').classList.add('hide');
+          document.getElementById('adminPanel').classList.remove('hide');
+          btn.innerHTML = 'เข้าสู่ระบบ'; btn.disabled = false;
+          loadData();
+        } else {
+          alert("❌ " + (res.message || "ข้อมูลไม่ถูกต้อง"));
+          btn.innerHTML = 'เข้าสู่ระบบ'; btn.disabled = false;
+        }
+      }).verifyAdminLogin(pass);
+    }
+
+    function logout() {
+      localStorage.removeItem('admin_token');
+      document.getElementById('adminPanel').classList.add('hide');
+      document.getElementById('loginSection').classList.remove('hide');
+      document.getElementById('adminPassword').value = '';
+      document.getElementById('oldPassword').value = '';
+      document.getElementById('newPassword').value = '';
+      document.getElementById('confirmPassword').value = '';
+    }
+
+    function loadData() {
+      google.script.run
+        .withSuccessHandler(months => {
+          const listDiv = document.getElementById('monthList');
+          if (!months || months.length === 0) { listDiv.innerHTML = '<p class="text-gray-500 text-sm">ไม่มีข้อมูลในระบบ</p>'; return; }
+          listDiv.innerHTML = months.map(m => `
+            <div class="flex items-center justify-between bg-gray-50 p-3 rounded-lg border border-gray-200">
+              <span class="font-bold text-blue-900">${m.label}</span>
+              <button onclick="deleteMonth('${m.id}')" class="text-red-600 hover:bg-red-50 px-2 py-1 rounded font-bold text-xs transition">ลบ</button>
+            </div>
+          `).join('');
+        })
+        .withFailureHandler(err => {
+          document.getElementById('monthList').innerHTML = `<p class="text-red-500 text-xs">❌ โหลดรายการเดือนล้มเหลว: ${err.message}</p>`;
+        })
+        .getAvailableMonths();
+
+      const contentDiv = document.getElementById('diagContent');
+      contentDiv.innerHTML = '<div class="loader" style="width:14px;height:14px;border-width:2px;"></div> <span class="text-gray-400">กำลังโหลดสถิติล่าสุด...</span>';
+
+      google.script.run
+        .withSuccessHandler(json => {
+          if (!json) { 
+            contentDiv.innerHTML = '<p class="text-gray-500 italic">ยังไม่มีประวัติการประมวลผลในระบบ...</p>'; 
+            return; 
+          }
+          try {
+            const d = JSON.parse(json);
+            let newNamesHtml = d.newNames && d.newNames.length > 0 ? `<br><span class="text-yellow-400">⚠️ คนใหม่ (ไม่มีใน Master):</span><br>` + d.newNames.map(n => `- ${n}`).join('<br>') : `<br><span class="text-green-500">✅ ไม่มีรายชื่อแปลกปลอมเพิ่มเข้ามา</span>`;
+            let missingNamesHtml = d.missingNames && d.missingNames.length > 0 ? `<br><span class="text-gray-400">👻 คนหาย (มีใน Master แต่ไม่ขึ้นเวรเดือนนี้):</span><br>` + d.missingNames.map(n => `- ${n}`).join('<br>') : "";
+
+            contentDiv.innerHTML = `
+              <strong>Month:</strong> <span class="text-white">${d.label || "N/A"}</span><br>
+              <strong>Time:</strong> <span class="text-white">${d.time || "-"}</span><br>
+              <strong>Master Data:</strong> <span class="text-blue-300">${d.masterStatus || "เชื่อมต่อสำเร็จ"}</span><br>
+              <span class="text-gray-600">----------------------------------------</span><br>
+              🟢 สกัดสำเร็จ: <span class="text-white font-bold">${d.totalRecords || 0}</span> เวร (<span class="text-white font-bold">${d.uniqueNames || 0}</span> คน)
+              ${newNamesHtml}
+              ${missingNamesHtml}
+            `;
+          } catch(e) { contentDiv.innerHTML = `<span class="text-red-400">❌ อ่านสถิติผิดพลาด: ${e.message}</span>`; }
+        })
+        .withFailureHandler(err => {
+          contentDiv.innerHTML = `<span class="text-red-400">❌ ดึงข้อมูลสถิติล้มเหลว: ${err.message || "เซิร์ฟเวอร์ไม่ตอบสนอง"}</span>`;
+          if (err.message && err.message.includes("ล็อกอินหมดอายุ")) logout();
+        })
+        .getLatestDiagnostics();
+        
+        phxHpRefreshStatus();
+        loadNotifyPrefs();
+    }
+
+    // ════ Phase H — Notification toggles ════
+    function loadNotifyPrefs() {
+      google.script.run
+        .withSuccessHandler(function(prefs) {
+          if (!prefs) return;
+          var ids = { fileUpload: 'notifyFileUpload', manualSync: 'notifyManualSync', hotPolling: 'notifyHotPolling' };
+          Object.keys(ids).forEach(function(k) {
+            var el = document.getElementById(ids[k]);
+            if (el) el.checked = !!prefs[k];
+          });
+        })
+        .withFailureHandler(function(err) { console.warn('notify prefs load:', err.message); })
+        .getNotifyPrefs(localStorage.getItem('admin_token'));
+    }
+
+    function updateNotifyPref(action, value) {
+      google.script.run
+        .withSuccessHandler(function(r) { console.log('notify pref saved:', action, value); })
+        .withFailureHandler(function(err) {
+          alert('บันทึกไม่สำเร็จ: ' + err.message);
+          loadNotifyPrefs();
+          if (err.message && err.message.includes('ล็อกอินหมดอายุ')) logout();
+        })
+        .setNotifyPref(localStorage.getItem('admin_token'), action, value);
+    }
+
+    function syncGmail() {
+      const btn = document.getElementById('syncBtn');
+      btn.disabled = true; btn.innerHTML = '<div class="loader" style="width:16px;height:16px;border-width:2px;border-color:#fff;border-top-color:transparent;"></div> กำลังซิงค์...';
+      google.script.run
+        .withSuccessHandler(res => { alert(res); loadData(); btn.disabled = false; btn.innerHTML = '🔄 ดึงข้อมูลจากอีเมลล่าสุดเดี๋ยวนี้'; })
+        .withFailureHandler(err => { alert("❌ ล้มเหลว: " + err.message); btn.disabled = false; btn.innerHTML = '🔄 ดึงข้อมูลจากอีเมลล่าสุดเดี๋ยวนี้'; if(err.message && err.message.includes("ล็อกอินหมดอายุ")) logout(); })
+        .autoUpdateFromGmail_Manual(localStorage.getItem('admin_token'));
+    }
+
+    function runMultiAudit() {
+      const btn = document.getElementById('multiAuditBtn');
+      const statusDiv = document.getElementById('auditStatus');
+      btn.disabled = true;
+      btn.innerHTML = '<div class="loader" style="width:14px;height:14px;border-width:2px;"></div> กำลังตรวจ...';
+      statusDiv.innerHTML = '<span class="text-purple-600">⏳ กำลังตรวจสอบเชิงลึก (~15s/เดือน)...</span>';
+      
+      google.script.run
+        .withSuccessHandler(res => {
+          btn.disabled = false;
+          btn.innerHTML = '🔍 ตรวจสอบทุกเดือนเดี๋ยวนี้';
+          statusDiv.innerHTML = `<span class="text-green-600">✅ ผ่าน ${res.passed}/${res.totalMonths} เดือน</span> · <span class="${res.failed > 0 ? 'text-red-600 font-extrabold' : 'text-gray-500'}">❌ ไม่ผ่าน ${res.failed} เดือน</span>`;
+        })
+        .withFailureHandler(err => {
+          btn.disabled = false;
+          btn.innerHTML = '🔍 ตรวจสอบทุกเดือนเดี๋ยวนี้';
+          statusDiv.innerHTML = `<span class="text-red-600">❌ ล้มเหลว: ${err.message}</span>`;
+          if (err.message && err.message.includes("ล็อกอินหมดอายุ")) logout();
+        })
+        .runAllMonthsAudit();
+    }
+
+    async function uploadMultipleFiles() {
+      const btn = document.getElementById('uploadBtn');
+      const status = document.getElementById('uploadStatus');
+      const files = document.getElementById('fileInput').files;
+      if (!files.length) return;
+
+      btn.disabled = true;
+      for(let i=0; i<files.length; i++) {
+        status.innerHTML = `กำลังอัปโหลดไฟล์ที่ ${i+1}/${files.length}...`;
+        const base64 = await new Promise(r => { const reader = new FileReader(); reader.onload = () => r(reader.result.split(',')[1]); reader.readAsDataURL(files[i]); });
+        await new Promise(r => google.script.run.withSuccessHandler(r).uploadLocalFile(base64, files[i].name, localStorage.getItem('admin_token')));
+      }
+      btn.disabled = false; status.innerHTML = "✅ อัปโหลดและประมวลผลเสร็จสิ้น"; loadData();
+    }
+
+    function deleteMonth(id) { 
+      if (confirm("ยืนยันการลบข้อมูลเดือนนี้?")) {
+        google.script.run
+          .withSuccessHandler(loadData)
+          .withFailureHandler(err => { 
+            alert("❌ ลบข้อมูลล้มเหลว: " + err.message); 
+            if (err.message && err.message.includes("ล็อกอินหมดอายุ")) logout(); 
+          })
+          .deleteMonth(id, localStorage.getItem('admin_token'));
+      }
+    }
+
+    function confirmDeleteAll() {
+      if (confirm("คุณแน่ใจหรือไม่ที่จะล้างข้อมูลเดือนทั้งหมด? (กระบวนการนี้ไม่สามารถย้อนกลับได้)")) {
+        google.script.run
+          .withSuccessHandler(msg => { 
+            alert(msg); 
+            loadData();
+          })
+          .withFailureHandler(err => { 
+            alert("❌ ล้มเหลว: " + err.message); 
+            if(err.message && err.message.includes("ล็อกอินหมดอายุ")) logout(); 
+          })
+          .deleteAllData(localStorage.getItem('admin_token'));
+      }
+    }
+
+    function changePassword() {
+      const oldP = document.getElementById('oldPassword').value;
+      const newP = document.getElementById('newPassword').value;
+      const conP = document.getElementById('confirmPassword').value;
+      const status = document.getElementById('changePassStatus');
+      const btn = document.getElementById('changePassBtn');
+
+      status.innerHTML = '';
+      if (!oldP || !newP || !conP) { status.innerHTML = '<span class="text-red-600">⚠️ กรุณากรอกให้ครบทั้ง 3 ช่อง</span>'; return; }
+      if (newP !== conP) { status.innerHTML = '<span class="text-red-600">⚠️ รหัสใหม่ทั้ง 2 ช่องไม่ตรงกัน</span>'; return; }
+      if (newP.length < 6) { status.innerHTML = '<span class="text-red-600">⚠️ รหัสใหม่ต้องอย่างน้อย 6 ตัวอักษร</span>'; return; }
+      if (oldP === newP) { status.innerHTML = '<span class="text-red-600">⚠️ รหัสใหม่ต้องไม่เหมือนรหัสเดิม</span>'; return; }
+
+      btn.disabled = true; btn.innerText = 'กำลังบันทึก...';
+      google.script.run
+        .withSuccessHandler(res => {
+          if (res.success) {
+            status.innerHTML = '<span class="text-green-600">✅ เปลี่ยนรหัสสำเร็จ — ระบบจะ logout ใน 2 วินาที</span>';
+            document.getElementById('oldPassword').value = '';
+            document.getElementById('newPassword').value = '';
+            document.getElementById('confirmPassword').value = '';
+            setTimeout(function() { logout(); }, 2000);
+          }
+        })
+        .withFailureHandler(err => {
+          btn.disabled = false; btn.innerText = 'บันทึกรหัสใหม่';
+          status.innerHTML = '<span class="text-red-600">❌ ' + (err.message || err) + '</span>';
+          if (err.message && err.message.includes("ล็อกอินหมดอายุ")) logout();
+        })
+        .changeAdminPassword(localStorage.getItem('admin_token'), oldP, newP);
+    }
+
+    // ════════════════════════════════════════════════════════════════
+    // 🔥 PHASE G — Hot Polling Controls
+    // (ID ตรงกับ HTML: phxHpStatus, phxHpScheduleDate, phxHpScheduleTime, phxHpMsg)
+    // (Backend ไม่ต้องการ token — เป็น public functions)
+    // ════════════════════════════════════════════════════════════════
+
+    function _phxHpShowMsg(text, kind) {
+      var el = document.getElementById('phxHpMsg');
+      if (!el) return;
+      el.classList.remove('hidden');
+      el.className = 'mt-3 px-3 py-2 rounded-lg text-xs font-bold';
+      if (kind === 'ok')       el.className += ' bg-green-100 text-green-800';
+      else if (kind === 'err') el.className += ' bg-red-100 text-red-800';
+      else                     el.className += ' bg-blue-100 text-blue-800';
+      el.textContent = text;
+      setTimeout(function() { el.classList.add('hidden'); }, 4500);
+    }
+
+    function phxHpRefreshStatus() {
+      google.script.run
+        .withSuccessHandler(function(s) {
+          var el = document.getElementById('phxHpStatus');
+          if (!el || !s) return;
+          var html = '';
+          if (s.active) {
+            html += '<div class="text-red-600 font-bold">🔥 Auto-Sync เปิดอยู่ — เช็คทุก 1 นาที</div>';
+            if (s.hoursActive !== null) {
+              html += '<div class="text-xs text-gray-500 mt-1">เปิดมาแล้ว <b>' + s.hoursActive + ' ชม.</b> — auto-revert ที่ 24 ชม.</div>';
+            }
+            html += '<div class="text-xs text-gray-400 mt-1">Active triggers: ' + s.autoSyncTriggers + '</div>';
+          } else {
+            html += '<div class="text-gray-600 font-bold">❄️ Auto-Sync ปิดอยู่</div>';
+            html += '<div class="text-xs text-gray-500 mt-1">ไม่มี trigger ทำงาน — ระบบจะไม่ poll Gmail</div>';
+          }
+          if (s.scheduledAt) {
+            var d = new Date(s.scheduledAt);
+            html += '<div class="mt-2 p-2 bg-blue-50 border border-blue-200 rounded text-xs text-blue-800">📅 ตั้งเวลาเปิดอัตโนมัติ: <b>' + d.toLocaleString('th-TH') + '</b></div>';
+          }
+          el.innerHTML = html;
+        })
+        .withFailureHandler(function(err) {
+          var el = document.getElementById('phxHpStatus');
+          if (el) el.innerHTML = '<span class="text-red-600">โหลดสถานะไม่ได้: ' + err.message + '</span>';
+        })
+        .getPollingStatus();
+    }
+
+    function phxHpEnable() {
+      if (!confirm('เปิด Auto-Sync ทันที?\n\nระบบจะเช็ค Gmail ทุก 1 นาที จนกว่าจะเจอตารางใหม่ หรือครบ 24 ชม.')) return;
+      google.script.run
+        .withSuccessHandler(function(r) {
+          _phxHpShowMsg('🔥 เปิดแล้ว — กำลัง poll ทุก 1 นาที', 'ok');
+          phxHpRefreshStatus();
+        })
+        .withFailureHandler(function(e) {
+          _phxHpShowMsg('❌ ' + e.message, 'err');
+          if (e.message && e.message.includes("ล็อกอินหมดอายุ")) logout();
+        })
+        .enableHotPolling();
+    }
+
+    function phxHpDisable() {
+      if (!confirm('ปิด Auto-Sync?\n\nTrigger จะถูกลบทั้งหมด ระบบจะไม่ poll Gmail จนกว่าจะเปิดใหม่')) return;
+      google.script.run
+        .withSuccessHandler(function(r) {
+          _phxHpShowMsg('❄️ ปิดแล้ว (ลบ ' + (r ? r.deleted : 0) + ' trigger)', 'ok');
+          phxHpRefreshStatus();
+        })
+        .withFailureHandler(function(e) {
+          _phxHpShowMsg('❌ ' + e.message, 'err');
+          if (e.message && e.message.includes("ล็อกอินหมดอายุ")) logout();
+        })
+        .disableHotPolling();
+    }
+
+    function phxHpSchedule() {
+      var date = document.getElementById('phxHpScheduleDate').value;
+      var time = document.getElementById('phxHpScheduleTime').value;
+      if (!date || !time) { _phxHpShowMsg('กรุณาเลือกวันที่และเวลา', 'err'); return; }
+      var target = new Date(date + 'T' + time + ':00');
+      if (target.getTime() <= Date.now()) { _phxHpShowMsg('ต้องตั้งเวลาในอนาคต', 'err'); return; }
+      if (!confirm('ตั้งเวลาเปิด Auto-Sync ที่:\n' + target.toLocaleString('th-TH') + '\n\nระบบจะ enable hot polling ตอนถึงเวลา')) return;
+      google.script.run
+        .withSuccessHandler(function(r) {
+          _phxHpShowMsg('📅 ตั้งเวลาแล้ว — ' + new Date(r.scheduledAt).toLocaleString('th-TH'), 'ok');
+          document.getElementById('phxHpScheduleDate').value = '';
+          document.getElementById('phxHpScheduleTime').value = '';
+          phxHpRefreshStatus();
+        })
+        .withFailureHandler(function(e) {
+          _phxHpShowMsg('❌ ' + e.message, 'err');
+          if (e.message && e.message.includes("ล็อกอินหมดอายุ")) logout();
+        })
+        .scheduleHotPolling(target.toISOString());
+    }
+
+    function phxHpCancelSchedule() {
+      if (!confirm('ยกเลิกตารางที่ตั้งไว้?')) return;
+      google.script.run
+        .withSuccessHandler(function(r) {
+          _phxHpShowMsg('ยกเลิกตารางแล้ว', 'ok');
+          phxHpRefreshStatus();
+        })
+        .withFailureHandler(function(e) {
+          _phxHpShowMsg('❌ ' + e.message, 'err');
+          if (e.message && e.message.includes("ล็อกอินหมดอายุ")) logout();
+        })
+        .cancelScheduledHotPolling();
+    }
+  </script>
+</body>
+</html>
