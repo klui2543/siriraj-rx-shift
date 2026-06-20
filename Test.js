@@ -119,4 +119,3 @@ function devTraceB3bSkip() {
 
   Logger.log('=== END TRACE ===');
 }
-

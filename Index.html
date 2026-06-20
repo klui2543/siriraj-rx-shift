@@ -1723,12 +1723,7 @@
                   <button id="startDay-sun" class="pill-btn" onclick="setCalStartDay('sun')" style="flex:1; justify-content:center; padding:5px 0; font-size:11px;">อา.</button>
                   <button id="startDay-sat" class="pill-btn" onclick="setCalStartDay('sat')" style="flex:1; justify-content:center; padding:5px 0; font-size:11px;">ส.</button>
                 </div>
-
-                <div class="settings-col-title" style="margin-top:8px;">เวรรอบ 3 แสดงในวัน</div>
-                <div style="display:flex; gap:3px;">
-                  <button id="round3-start" class="pill-btn active" onclick="setRound3Mode('start')" style="flex:1; justify-content:center; padding:5px 0; font-size:10px;">วันเริ่ม</button>
-                  <button id="round3-next" class="pill-btn" onclick="setRound3Mode('next')" style="flex:1; justify-content:center; padding:5px 0; font-size:10px;">วันถัดไป</button>
-                </div>
+                <!-- v3.36: Round 3 toggle moved to Export Calendar Modal -->
               </div>
 
               <!-- Column 3: Overlay edits — notice moved to info icon (i) -->
@@ -6636,12 +6631,23 @@ table.exp-tbl .tm{margin-left:3px;opacity:0.75;}
           </div>
         </div>
 
+        <!-- 🌙 v3.36: Round 3 night shift toggle -->
+        <div class="ecm-card" style="padding-top:10px; padding-bottom:10px;">
+          <label style="display:flex; align-items:center; justify-content:space-between; cursor:pointer; gap:8px; margin:0;">
+            <div style="flex:1;">
+              <div style="font-size:13px; font-weight:600; color:var(--text);">เลื่อนเวรรอบ 3 ไปวันถัดไป</div>
+              <div style="font-size:10px; color:var(--sub); margin-top:2px;">เวรกลางคืน (รอบ 3) ในปฏิทินจะแสดงเป็นวันถัดไป — ตรงกับวันที่ทำงานจริง</div>
+            </div>
+            <input type="checkbox" id="ecmRound3Toggle" onchange="_ecmToggleRound3(this.checked)" style="width:18px; height:18px; cursor:pointer; flex-shrink:0;">
+          </label>
+        </div>
+
         <!-- 📅 Phase H F3: Day picker (opt-in) -->
         <div class="ecm-card" style="padding-top:10px; padding-bottom:10px;">
           <label style="display:flex; align-items:center; justify-content:space-between; cursor:pointer; gap:8px; margin:0;">
             <div style="flex:1;">
-              <div style="font-size:13px; font-weight:600; color:var(--text);">เลือกเฉพาะบางวัน</div>
-              <div style="font-size:10px; color:var(--sub); margin-top:2px;">ถ้าปิดไว้ = ส่งออกทั้งเดือน (default)</div>
+              <div style="font-size:13px; font-weight:600; color:var(--text);">ส่งออกเฉพาะบางรายการ</div>
+              <div style="font-size:10px; color:var(--sub); margin-top:2px;">เว้นช่องนี้ หากต้องการส่งออกทั้งเดือน (default)</div>
             </div>
             <input type="checkbox" id="ecmDayPickerToggle" onchange="_ecmToggleDayPicker(this.checked)" style="width:18px; height:18px; cursor:pointer; flex-shrink:0;">
           </label>
@@ -6710,6 +6716,8 @@ table.exp-tbl .tm{margin-left:3px;opacity:0.75;}
       if (dpWrap) dpWrap.style.display = 'none';
       // v3.15: render platform-specific calendar action
       try { _ecmRenderPlatformAction(); } catch(e) {}
+      // v3.36: load Round 3 toggle state from preferences
+      try { _ecmLoadRound3State(); } catch(e) {}
     }
 
     // v3.15: device detection — Apple family (iPhone/iPad/iPod/Mac) vs everything else
@@ -7297,6 +7305,24 @@ table.exp-tbl .tm{margin-left:3px;opacity:0.75;}
       window._ecmShiftPickerShifts = [];
     }
 
+    // ─── v3.36: Round 3 toggle in export modal ───
+    function _ecmLoadRound3State() {
+      const cb = document.getElementById('ecmRound3Toggle');
+      if (!cb) return;
+      try {
+        const prefs = (typeof phxGetPrefs === 'function') ? phxGetPrefs() : {};
+        cb.checked = (prefs.round3Mode === 'next');
+      } catch(e) { cb.checked = false; }
+    }
+
+    function _ecmToggleRound3(checked) {
+      try {
+        if (typeof phxSetPref === 'function') {
+          phxSetPref('round3Mode', checked ? 'next' : 'start');
+        }
+      } catch(e) {}
+    }
+
     // v3.20: Build ICS client-side from local data — reflects all overlays (local + synced)
     // v3.23: Strict RFC 5545 — UTC dates, no VTIMEZONE, line folding, shift-type alarms
     // v3.24: Match preferred format — VTIMEZONE, SUMMARY=pos+type, clean DESCRIPTION, LOCATION
@@ -7312,6 +7338,9 @@ table.exp-tbl .tm{margin-left:3px;opacity:0.75;}
 
       // Feature 2 (B3): load user's reminder settings (cached) — applied to all non-clinic ICS alarms
       const _userReminderSettings = _phxGetCachedReminderSettings();
+      // v3.36: Round 3 export mode — read from preferences (set via export modal toggle)
+      const _userPrefsForExport = (typeof phxGetPrefs === 'function') ? phxGetPrefs() : { round3Mode: 'start' };
+      const _shiftRound3 = (_userPrefsForExport.round3Mode === 'next');
 
       // Get effective shifts for this person
       const usedMap = (typeof OverlayManager !== 'undefined') ? OverlayManager.getUsedMap(mid, person) : {};
@@ -7441,10 +7470,21 @@ table.exp-tbl .tm{margin-left:3px;opacity:0.75;}
           const day = parseInt(dayMatch[1], 10);
           if (!day || day < 1 || day > 31) return;
 
+          // v3.36: If Round 3 export toggle ON + shift is Round 3 → display day +1
+          // (UID still uses original day so re-export updates event, not duplicates)
+          let effYear = year, effMonth = month, effDay = day;
+          if (_shiftRound3 && typeof _isRound3Shift === 'function' && _isRound3Shift(s)) {
+            const _d = new Date(year, month - 1, day);
+            _d.setDate(_d.getDate() + 1);
+            effYear = _d.getFullYear();
+            effMonth = _d.getMonth() + 1;
+            effDay = _d.getDate();
+          }
+
           // Patch ZZ4-D: clinic shifts → all-day VEVENT + 1-day + 12-hour alarms
           if (isClinic(s)) {
-            const dateStr = year + pad(month) + pad(day);
-            const nextDay = new Date(year, month - 1, day + 1);
+            const dateStr = effYear + pad(effMonth) + pad(effDay);
+            const nextDay = new Date(effYear, effMonth - 1, effDay + 1);
             const nextDateStr = nextDay.getFullYear() + pad(nextDay.getMonth() + 1) + pad(nextDay.getDate());
             let uid;
             if (s._ghost && s._ghostActionId) {
@@ -7505,8 +7545,9 @@ table.exp-tbl .tm{margin-left:3px;opacity:0.75;}
           const startM = r.start % 60;
           const endH = Math.floor(r.end / 60);
           const endM = r.end % 60;
-          const startDate = new Date(year, month - 1, day, startH, startM, 0);
-          const endDate = new Date(year, month - 1, day, endH, endM, 0);
+          // v3.36: Use effDay (may be shifted +1 for Round 3 when export toggle ON)
+          const startDate = new Date(effYear, effMonth - 1, effDay, startH, startM, 0);
+          const endDate = new Date(effYear, effMonth - 1, effDay, endH, endM, 0);
 
           // UID: stable across day-picker selection / re-export
           //   Regular: sirx-<year>-<MMDD>-<safePos>@siriraj-rx-shift
@@ -8632,9 +8673,8 @@ table.exp-tbl .tm{margin-left:3px;opacity:0.75;}
                   '• font ตาราง → 11.0\n' +
                   '• font ปฏิทิน → 9.5\n' +
                   '• เริ่มสัปดาห์ → จันทร์\n' +
-                  '• เวรรอบ 3 → วันเริ่ม\n' +
                   '• ซ่อนเวรขีดฆ่า → off\n\n' +
-                  'หมายเหตุ: การแก้ไขเวร / Prefs Sync / Theme ไม่ถูกเปลี่ยน';
+                  'หมายเหตุ: การแก้ไขเวร / Prefs Sync / Theme / ตัวเลือก Export ไม่ถูกเปลี่ยน';
       if (!confirm(msg)) return;
 
       try {
@@ -8652,12 +8692,7 @@ table.exp-tbl .tm{margin-left:3px;opacity:0.75;}
         // 2) Calendar start day → Monday
         if (typeof setCalStartDay === 'function') setCalStartDay('mon');
 
-        // 3) Round 3 mode → start (defensive: setRound3Mode alerts if rawData not ready)
-        if (typeof rawData !== 'undefined' && Array.isArray(rawData) && rawData.length > 0) {
-          if (typeof setRound3Mode === 'function') setRound3Mode('start');
-        } else {
-          try { localStorage.setItem(ROUND3_KEY, 'start'); } catch(e) {}
-        }
+        // 3) v3.36: Round 3 mode removed from reset — now an export-only preference
 
         // 4) Hide struck → off
         const hsToggle = document.getElementById('hideStruckToggle');
@@ -8744,17 +8779,8 @@ table.exp-tbl .tm{margin-left:3px;opacity:0.75;}
         } else {
           document.body.classList.remove('dark-theme');
         }
-        // round3Mode — DEFENSIVE: write localStorage, defer setter until rawData ready
-        if (prefs.round3Mode === 'start' || prefs.round3Mode === 'next') {
-          try {
-            if (typeof ROUND3_KEY !== 'undefined') {
-              localStorage.setItem(ROUND3_KEY, prefs.round3Mode);
-            } else {
-              localStorage.setItem('siriraj_round3_mode', prefs.round3Mode);
-            }
-          } catch(e) {}
-          _phxApplyRound3WhenReady(prefs.round3Mode);
-        }
+        // v3.36: round3Mode no longer applied to main UI — pref is read directly by
+        // _ecmBuildClientICS at export time only. Main UI always shows original dates.
         // calStartDay — DEFENSIVE: write localStorage + window var, only re-render if target exists
         if (prefs.calStartDay === 'mon' || prefs.calStartDay === 'sun' || prefs.calStartDay === 'sat') {
           try { localStorage.setItem('calStartDay', prefs.calStartDay); } catch(e) {}
