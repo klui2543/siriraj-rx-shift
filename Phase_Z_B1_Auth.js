@@ -390,46 +390,58 @@ function _phxRenderHTML(title, message, isSuccess) {
     font-family: 'Kanit', sans-serif;
     background: linear-gradient(135deg, #eff6ff 0%, #dbeafe 100%);
     min-height: 100vh;
-    display: flex; align-items: center; justify-content: center;
-    padding: 20px;
+    display: flex; flex-direction: column;
+    align-items: center; justify-content: center;
+    padding: 32px 20px;
+    text-align: center;
   }
   .card {
-    background: white;
-    border-radius: 16px;
-    box-shadow: 0 10px 40px rgba(0,0,0,0.1);
-    padding: 32px 28px;
-    max-width: 420px;
     width: 100%;
-    text-align: center;
+    max-width: 560px;
   }
   .badge {
     display: inline-block;
     background: ${bgColor};
     color: ${color};
-    border: 2px solid ${borderColor};
-    padding: 16px 20px;
-    border-radius: 12px;
-    font-size: 28px;
+    border: 4px solid ${borderColor};
+    padding: 40px 56px;
+    border-radius: 28px;
+    font-size: 48px;
     font-weight: 700;
-    margin-bottom: 20px;
+    margin-bottom: 40px;
+    box-shadow: 0 12px 36px rgba(0,0,0,0.08);
   }
-  h1 { font-size: 20px; color: #1e293b; margin-bottom: 12px; }
-  p { color: #475569; font-size: 15px; line-height: 1.6; margin-bottom: 24px; }
+  h1 { font-size: 34px; color: #1e293b; margin-bottom: 24px; }
+  p {
+    color: #1e293b; font-size: 24px; line-height: 1.65; font-weight: 500;
+    margin-bottom: 52px;
+    max-width: 520px;
+    margin-left: auto; margin-right: auto;
+  }
+  p b { font-weight: 700; color: #0f172a; }
   a.btn, button.btn {
     display: inline-block;
     background: #2563eb;
     color: white;
-    padding: 12px 24px;
-    border-radius: 8px;
+    padding: 24px 72px;
+    border-radius: 14px;
     text-decoration: none;
-    font-weight: 500;
-    font-size: 15px;
+    font-weight: 700;
+    font-size: 24px;
     border: 0;
     cursor: pointer;
     font-family: inherit;
+    box-shadow: 0 12px 28px rgba(37,99,235,0.35);
   }
   a.btn:hover, button.btn:hover { background: #1d4ed8; }
-  .meta { margin-top: 20px; font-size: 12px; color: #94a3b8; }
+  .meta { margin-top: 56px; font-size: 15px; color: #94a3b8; }
+  @media (max-width: 500px) {
+    body { padding: 24px 16px; }
+    .badge { padding: 32px 36px; font-size: 38px; border-width: 3px; }
+    h1 { font-size: 28px; }
+    p { font-size: 21px; margin-bottom: 40px; }
+    a.btn, button.btn { padding: 22px 52px; font-size: 22px; width: 100%; max-width: 360px; font-weight: 700; }
+  }
 </style>
 </head>
 <body>
@@ -516,4 +528,37 @@ function debugScheduleIndexDups() {
       Logger.log('  ' + t + ': ' + (sh ? (sh.getLastRow() - 1) : 'MISSING') + ' rows');
     });
   });
+}
+
+/**
+ * Returns all registered user names from PHX_Pharmacists (col A).
+ * ใช้ใน search dropdown — รวม users ที่ register แล้วแม้ไม่มีเวรเดือนนี้
+ */
+function phxListAllUsers() {
+  try {
+    var sheet = _phxGetSheet('PHX_Pharmacists');
+    if (!sheet) return { success: false, names: [], error: 'sheet not found' };
+    var lastRow = sheet.getLastRow();
+    if (lastRow < 2) return { success: true, names: [] };
+    var data = sheet.getRange(2, 1, lastRow - 1, 1).getValues();
+    var names = [];
+    for (var i = 0; i < data.length; i++) {
+      var n = String(data[i][0] || '').trim();
+      if (n) names.push(n);
+    }
+    return { success: true, names: names };
+  } catch(e) {
+    return { success: false, names: [], error: String(e.message || e) };
+  }
+}
+
+/**
+ * Test wrapper สำหรับ phxListAllUsers — รันใน GAS Editor เพื่อดูผล
+ */
+function devTestPhxListAllUsers() {
+  var r = phxListAllUsers();
+  Logger.log('success: ' + r.success);
+  Logger.log('count: ' + (r.names ? r.names.length : 0));
+  Logger.log('first 10: ' + (r.names || []).slice(0, 10).join(' | '));
+  if (r.error) Logger.log('error: ' + r.error);
 }

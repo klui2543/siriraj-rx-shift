@@ -4574,13 +4574,14 @@ window.allPharmacistNames = [];
           const row = e.target.closest('[data-ms-name]');
           if (!row) return;
           const name = row.getAttribute('data-ms-name');
+          // Tab-mode: add chip if new, set active, close dropdown
           window.selectedPharmacists = window.selectedPharmacists || [];
-          if (window.selectedPharmacists.includes(name)) {
-            window.selectedPharmacists = window.selectedPharmacists.filter(x => x !== name);
-          } else {
+          if (!window.selectedPharmacists.includes(name)) {
             window.selectedPharmacists.push(name);
           }
-          renderPharmacistMultiList(search.value);
+          window.activePharmacist = name;
+          if (search) search.value = '';
+          closeMultiSelect();
           updateLabel();
           if (window.renderChipsAndClearBtn) window.renderChipsAndClearBtn();
           if (typeof triggerUpdate === 'function') triggerUpdate();
@@ -7987,8 +7988,17 @@ table.exp-tbl .tm{margin-left:3px;opacity:0.75;}
         if (!name) { phxShowFormMsg('กรุณาเลือกชื่อ', false); return; }
       }
 
-      if (!emailLocal) { phxShowFormMsg('กรุณากรอกชื่ออีเมล (ส่วนหน้า @mahidol.ac.th)', false); return; }
-      if (!/^[a-z0-9._-]+$/.test(emailLocal)) { phxShowFormMsg('อีเมลผิดรูปแบบ — ใช้ได้เฉพาะ a-z, 0-9, จุด, ขีดกลาง', false); return; }
+      if (!emailLocal) { phxShowFormMsg('กรุณากรอกชื่ออีเมล หรือ full email', false); return; }
+      // Test-mode aware: allow full email (with @) or local part only (defaults to @mahidol)
+      if (emailLocal.indexOf('@') >= 0) {
+        if (!/^[a-z0-9._+-]+@[a-z0-9.-]+\.[a-z]{2,}$/i.test(emailLocal)) {
+          phxShowFormMsg('อีเมลผิดรูปแบบ', false); return;
+        }
+      } else {
+        if (!/^[a-z0-9._-]+$/.test(emailLocal)) {
+          phxShowFormMsg('อีเมลผิดรูปแบบ — ใช้ได้เฉพาะ a-z, 0-9, จุด, ขีดกลาง', false); return;
+        }
+      }
       if (!pw) { phxShowFormMsg('กรุณาตั้งรหัสผ่าน', false); return; }
       if (pw.length < 4) { phxShowFormMsg('รหัสต้องมีอย่างน้อย 4 ตัว', false); return; }
       if (pw !== pw2) { phxShowFormMsg('รหัสยืนยันไม่ตรงกัน', false); return; }
@@ -10397,7 +10407,7 @@ table.exp-tbl .tm{margin-left:3px;opacity:0.75;}
         <input type="password" id="phxLoginPw" class="phx-input" placeholder="รหัสผ่าน" autocomplete="current-password">
         <button onclick="phxSubmitLogin()" class="phx-btn-primary">เข้าสู่ระบบ</button>
         <div style="display:flex; justify-content:space-between; margin-top:10px;">
-          <button onclick="phxSwitchTab('register')" class="phx-link-btn">สมัครใหม่</button>
+          <button onclick="phxSwitchTab('register')" class="phx-link-btn">ลงทะเบียน</button>
           <button onclick="phxSwitchTab('forgot')" class="phx-link-btn">ลืมรหัส / ตั้งรหัสใหม่</button>
         </div>
       </div>
@@ -10408,24 +10418,24 @@ table.exp-tbl .tm{margin-left:3px;opacity:0.75;}
           <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><polyline points="15 18 9 12 15 6"/></svg>
           กลับไปเข้าสู่ระบบ
         </button>
-        <h3 style="font-size:15px; font-weight:600; margin:0 0 16px; color:var(--text); text-align:center;">สมัครใหม่</h3>
+        <h3 style="font-size:15px; font-weight:600; margin:0 0 16px; color:var(--text); text-align:center;">ลงทะเบียน</h3>
         <select id="phxRegNameSelect" class="phx-select" onchange="phxOnRegNameChange()">
-          <option value="">เลือกชื่อ</option>
+          <option value="">เลือกชื่อของท่าน</option>
         </select>
         <!-- v3.19: Custom name input (revealed when "ไม่พบชื่อ" selected) -->
         <input type="text" id="phxRegCustomName" class="phx-input" placeholder="ชื่อและนามสกุล เช่น สมศรี ใจดี" style="display:none; margin-top:6px;" autocomplete="off">
         <div id="phxRegCustomHint" style="display:none; font-size:10px; color:var(--sub); margin:4px 0 8px; line-height:1.5;">
-          💡 ชื่อจะถูกเพิ่มเข้าระบบโดยอัตโนมัติ — admin จะตรวจสอบภายหลัง
+          💡 ชื่อที่กรอกจะถูกนำเข้าระบบภายหลังลงทะเบียนในทันที
         </div>
         <div class="phx-email-wrap">
-          <input type="text" id="phxRegEmailLocal" placeholder="ชื่อ+สกุล 3 ตัวแรก (เช่น steve.job)" autocomplete="off" spellcheck="false">
+          <input type="text" id="phxRegEmailLocal" placeholder="กรุณากรอกอีเมลล์มหิดลของท่าน" autocomplete="off" spellcheck="false">
           <div class="phx-email-suffix">@mahidol.ac.th</div>
         </div>
         <input type="password" id="phxRegPw" class="phx-input" placeholder="ตั้งรหัสผ่าน (อย่างน้อย 4 ตัว)" autocomplete="new-password">
         <input type="password" id="phxRegPw2" class="phx-input" placeholder="ยืนยันรหัสผ่าน" autocomplete="new-password">
         <button onclick="phxSubmitRegister()" class="phx-btn-primary">ส่งอีเมลยืนยัน</button>
         <div class="phx-notice-warn">
-          ⚠️ <b>1 ชื่อ : 1 อีเมล</b> — หากกรอกผิด ต้องติดต่อ admin เท่านั้น ระบบไม่อนุญาตให้แก้เอง
+          ⚠️ หากเลือกชื่อผิดและต้องการแก้ไขในภายหลัง โปรดติดต่อ admin
         </div>
       </div>
 
@@ -12523,6 +12533,215 @@ table.exp-tbl .tm{margin-left:3px;opacity:0.75;}
     }, true);  // capture phase
 
     console.log('[Phase J] Position note popup ready');
+  </script>
+
+  <script>
+    // ──────────────────────────────────────────────────────────────
+    // Tab-mode for search bar chips (additive)
+    // chips = tabs · click body = switch active · click ✕ = remove
+    // ──────────────────────────────────────────────────────────────
+    (function _phxTabMode() {
+      try {
+        const style = document.createElement('style');
+        style.textContent =
+          '.chip { user-select: none; }' +
+          '.chip.active { background: var(--accent) !important; color: #fff !important; border-color: var(--accent) !important; box-shadow: 0 2px 6px rgba(37,99,235,0.35); }' +
+          'body.dark-theme .chip.active { color: #fff !important; }' +
+          '.chip .chip-body { cursor: pointer; padding: 1px 2px; }' +
+          '.chip .chip-x { cursor: pointer; padding: 1px 5px; border-radius: 4px; }' +
+          '.chip .chip-x:hover { opacity: 1; background: rgba(0,0,0,0.1); }' +
+          '.chip.active .chip-x { opacity: 0.85; color: rgba(255,255,255,0.95); }' +
+          '.chip.active .chip-x:hover { background: rgba(255,255,255,0.2); }';
+        document.head.appendChild(style);
+      } catch(e) {}
+
+      window.activePharmacist = window.activePharmacist || null;
+
+      function _syncActive() {
+        if (!window.selectedPharmacists) window.selectedPharmacists = [];
+        if (window.activePharmacist && window.selectedPharmacists.indexOf(window.activePharmacist) < 0) {
+          window.activePharmacist = window.selectedPharmacists[0] || null;
+        }
+        if (!window.activePharmacist && window.selectedPharmacists.length > 0) {
+          window.activePharmacist = window.selectedPharmacists[0];
+        }
+      }
+
+      // Wrap renderChipsAndClearBtn → rewrite chip markup w/ active highlight + 2 click zones
+      if (typeof window.renderChipsAndClearBtn === 'function') {
+        const _origRender = window.renderChipsAndClearBtn;
+        window.renderChipsAndClearBtn = function() {
+          _syncActive();
+          _origRender.apply(this, arguments);
+          const chipsDiv = document.getElementById('selectedChips');
+          if (!chipsDiv) return;
+          const arr = window.selectedPharmacists || [];
+          const active = window.activePharmacist;
+          chipsDiv.innerHTML = arr.map(function(n) {
+            const safe = String(n).replace(/"/g, '&quot;');
+            const isActive = (n === active);
+            return '<span class="chip' + (isActive ? ' active' : '') + '">' +
+                     '<span class="chip-body" data-tab-switch="' + safe + '">' + n + '</span>' +
+                     '<span class="chip-x" data-tab-remove="' + safe + '">✕</span>' +
+                   '</span>';
+          }).join('');
+          chipsDiv.querySelectorAll('[data-tab-switch]').forEach(function(el) {
+            el.addEventListener('click', function(e) {
+              e.stopPropagation();
+              window.activePharmacist = el.getAttribute('data-tab-switch');
+              window.renderChipsAndClearBtn();
+              if (typeof triggerUpdate === 'function') triggerUpdate();
+            });
+          });
+          chipsDiv.querySelectorAll('[data-tab-remove]').forEach(function(el) {
+            el.addEventListener('click', function(e) {
+              e.stopPropagation();
+              const name = el.getAttribute('data-tab-remove');
+              window.selectedPharmacists = (window.selectedPharmacists || []).filter(function(x) { return x !== name; });
+              if (window.activePharmacist === name) {
+                window.activePharmacist = window.selectedPharmacists[0] || null;
+              }
+              const search = document.getElementById('searchInput');
+              window.renderChipsAndClearBtn();
+              if (window.renderPharmacistMultiList) window.renderPharmacistMultiList(search ? search.value : '');
+              if (typeof triggerUpdate === 'function') triggerUpdate();
+            });
+          });
+        };
+      }
+
+      // Wrap triggerUpdate → restrict filter to active chip only
+      if (typeof window.triggerUpdate === 'function') {
+        const _origUpdate = window.triggerUpdate;
+        window.triggerUpdate = function() {
+          _syncActive();
+          const _saved = window.selectedPharmacists;
+          const _active = window.activePharmacist;
+          if (_active && _saved && _saved.length > 1) {
+            window.selectedPharmacists = [_active];
+            try { _origUpdate.apply(this, arguments); }
+            finally { window.selectedPharmacists = _saved; }
+            if (window.renderChipsAndClearBtn) window.renderChipsAndClearBtn();
+          } else {
+            _origUpdate.apply(this, arguments);
+          }
+        };
+      }
+
+      console.log('[Tab-mode] hooks installed');
+    })();
+  </script>
+
+</body>
+  
+  <script>
+    // ──────────────────────────────────────────────────────────────
+    // Remember last logged-in username (additive — no existing fn modified)
+    // ──────────────────────────────────────────────────────────────
+    (function _phxRememberLastUser() {
+      const LS_KEY = 'siriraj_last_login_user';
+
+      // 1) Pre-fill username when login modal opens (wrap phxOpenLoginModal)
+      if (typeof window.phxOpenLoginModal === 'function') {
+        const _origOpen = window.phxOpenLoginModal;
+        window.phxOpenLoginModal = function(initialTab) {
+          _origOpen.apply(this, arguments);
+          if (!initialTab || initialTab === 'login') {
+            try {
+              const _last = localStorage.getItem(LS_KEY);
+              if (_last) {
+                const _inp = document.getElementById('phxLoginEmailLocal');
+                if (_inp && !_inp.value) {
+                  _inp.value = _last;
+                  setTimeout(function() {
+                    const _pw = document.getElementById('phxLoginPw');
+                    if (_pw) _pw.focus();
+                  }, 120);
+                }
+              }
+            } catch(e) {}
+          }
+        };
+      }
+
+      // 2) Save username on successful login (wrap phxAuthSetSession)
+      if (typeof window.phxAuthSetSession === 'function') {
+        const _origSet = window.phxAuthSetSession;
+        window.phxAuthSetSession = function(name, hash, role) {
+          const _r = _origSet.apply(this, arguments);
+          try {
+            const _inp = document.getElementById('phxLoginEmailLocal');
+            const _val = _inp ? (_inp.value || '').trim().toLowerCase() : '';
+            if (_val) localStorage.setItem(LS_KEY, _val);
+          } catch(e) {}
+          return _r;
+        };
+      }
+      console.log('[Remember-User] hooks installed');
+    })();
+  </script>
+
+  <script>
+    // ──────────────────────────────────────────────────────────────
+    // Include registered users (PHX_Pharmacists) in search results
+    // ──────────────────────────────────────────────────────────────
+    (function _phxIncludeRegisteredUsers() {
+      let _registeredUsers = [];
+      let _isFetched = false;
+
+      function _doMerge() {
+        if (typeof rawData === 'undefined' || !rawData) return;
+        const schedule = [...new Set(rawData.map(function(i){ return i.name; }).filter(Boolean))];
+        const people = (typeof P2B !== 'undefined' && P2B && P2B._peopleNames) ? P2B._peopleNames : [];
+        const merged = {};
+        schedule.forEach(function(n) { merged[n] = true; });
+        people.forEach(function(n) { merged[n] = true; });
+        _registeredUsers.forEach(function(n) { merged[n] = true; });
+        window.allPharmacistNames = Object.keys(merged).sort(function(a, b) { return a.localeCompare(b, 'th'); });
+        if (typeof renderNameDropdown === 'function') renderNameDropdown('');
+        if (window.renderPharmacistMultiList) {
+          const s = document.getElementById('searchInput');
+          window.renderPharmacistMultiList(s ? s.value : '');
+        }
+      }
+
+      function _fetch(retries) {
+        retries = retries || 0;
+        if (typeof google === 'undefined' || !google.script || !google.script.run) {
+          if (retries < 10) setTimeout(function() { _fetch(retries + 1); }, 500);
+          return;
+        }
+        google.script.run
+          .withSuccessHandler(function(res) {
+            if (res && res.success) {
+              _registeredUsers = res.names || [];
+              _isFetched = true;
+              _doMerge();
+              console.log('[Include-Registered] loaded ' + _registeredUsers.length + ' registered users');
+            } else {
+              console.warn('[Include-Registered] backend returned:', res);
+            }
+          })
+          .withFailureHandler(function(err) {
+            console.warn('[Include-Registered] fetch failed:', err && err.message);
+            if (retries < 2) setTimeout(function() { _fetch(retries + 1); }, 5000);
+          })
+          .phxListAllUsers();
+      }
+
+      // Wrap handleDataReceived → re-merge after each rawData update
+      if (typeof window.handleDataReceived === 'function') {
+        const _orig = window.handleDataReceived;
+        window.handleDataReceived = function() {
+          const r = _orig.apply(this, arguments);
+          if (_isFetched) _doMerge();
+          return r;
+        };
+      }
+
+      setTimeout(function() { _fetch(); }, 1500);
+      console.log('[Include-Registered-Users] hook installed');
+    })();
   </script>
 
 </body>

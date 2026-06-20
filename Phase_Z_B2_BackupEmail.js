@@ -229,7 +229,16 @@ function _phxMonthIdToFrontendKey(monthId) {
   return monthId;
 }
 
-/** Parse shift's absolute start datetime (handles cross-day for night shifts) */
+/** Round 3 detection by shift label (สำเนามาจาก ICS backend เดิม) */
+function _phxIsRound3Shift(shift) {
+  try {
+    if (!shift || !shift.shift) return false;
+    var sh = String(shift.shift).toLowerCase();
+    return sh.indexOf('รอบ 3') >= 0 || sh.indexOf('รอบ3') >= 0;
+  } catch(e) { return false; }
+}
+
+/** Parse shift's absolute start datetime (handles cross-day for night shifts + Round 3) */
 function _phxParseShiftStartTime(shift) {
   if (!shift || !shift.range) return null;
   const rangeMatch = String(shift.range).match(/^(\d{1,2}):(\d{2})/);
@@ -237,19 +246,26 @@ function _phxParseShiftStartTime(shift) {
   const startHour = parseInt(rangeMatch[1], 10);
   const startMin = parseInt(rangeMatch[2], 10);
 
+  // 🆕 Round 3: ทำงานจริง = เช้ามืดวันถัดไป
+  const isR3 = _phxIsRound3Shift(shift);
+
   // Prefer timestamp (YYYYMMDD integer) for date
   if (shift.timestamp) {
     const ts = shift.timestamp;
     const y = Math.floor(ts / 10000);
     const m = Math.floor((ts % 10000) / 100) - 1;
     const d = ts % 100;
-    return new Date(y, m, d, startHour, startMin, 0);
+    const dt = new Date(y, m, d, startHour, startMin, 0);
+    if (isR3) dt.setDate(dt.getDate() + 1);
+    return dt;
   }
   // Fallback: parse from date string + current month
   const dayMatch = String(shift.date || '').match(/^(\d{1,2})/);
   if (!dayMatch) return null;
   const now = new Date();
-  return new Date(now.getFullYear(), now.getMonth(), parseInt(dayMatch[1], 10), startHour, startMin, 0);
+  const dt = new Date(now.getFullYear(), now.getMonth(), parseInt(dayMatch[1], 10), startHour, startMin, 0);
+  if (isR3) dt.setDate(dt.getDate() + 1);
+  return dt;
 }
 
 /** Build {userName: email} map (backup wins over primary, Master-active only) */
@@ -317,15 +333,27 @@ function _phxScanShiftsByUserForDate(targetDate) {
   res.schedule.forEach(function(s) {
     if (!s.date || !s.name) return;
     let matches = false;
+    // 🆕 Round 3: shift จริงๆ ทำงานวันถัดไป → match กับวันที่ +1
+    const isR3 = _phxIsRound3Shift(s);
     if (s.timestamp) {
       const ts = s.timestamp;
-      const y = Math.floor(ts / 10000);
-      const m = Math.floor((ts % 10000) / 100) - 1;
-      const d = ts % 100;
+      let y = Math.floor(ts / 10000);
+      let m = Math.floor((ts % 10000) / 100) - 1;
+      let d = ts % 100;
+      if (isR3) {
+        const adj = new Date(y, m, d);
+        adj.setDate(adj.getDate() + 1);
+        y = adj.getFullYear(); m = adj.getMonth(); d = adj.getDate();
+      }
       matches = (y === targetYear && m === targetMonth && d === targetDay);
     } else {
       const dayMatch = String(s.date).match(/^(\d{1,2})/);
-      matches = dayMatch && (parseInt(dayMatch[1], 10) === targetDay);
+      if (dayMatch) {
+        let d = parseInt(dayMatch[1], 10);
+        // 🆕 Round 3 fallback path: simple +1 (skip cross-month edge case — timestamp path เป็นหลัก)
+        if (isR3) d = d + 1;
+        matches = (d === targetDay);
+      }
     }
     if (!matches) return;
     if (!byUser[s.name]) byUser[s.name] = [];
@@ -378,11 +406,25 @@ function _phxBuildEveningEmailContent(userName, shifts) {
     : 'พรุ่งนี้คุณมีเวร ' + n + ' เวร' + (dateStr ? ' [' + dateStr + ']' : '');
 
   let body = 'สวัสดีคุณ ' + userName + '\n\n';
-  body += 'แจ้งเตือนว่าพรุ่งนี้ ' + dateStr + ' คุณมีเวร:\n\n';
+  body += 'แจ้งเตือนว่าพรุ่งนี้คุณมีเวร:\n\n';
   shifts.forEach(function(s, i) {
-    body += (n > 1 ? (i + 1) + '. ' : '') + 'ตำแหน่ง ' + (s.pos || '-');
-    if (s.range && s.range !== '-') body += ' เวลา ' + s.range;
-    if (s.room) body += ' (ห้อง ' + s.room + ')';
+    const prefix = (n > 1 ? (i + 1) + '. ' : '');
+    // 🆕 Round 3: แสดงทั้งวันที่ใน schedule + วันที่ทำงานจริง
+    if (_phxIsRound3Shift(s)) {
+      const origDayMatch = String(s.date || '').match(/^(\d{1,2})/);
+      const origDay = origDayMatch ? origDayMatch[1] : '?';
+      const actualDate = _phxParseShiftStartTime(s);
+      const actualDay = actualDate ? actualDate.getDate() : '?';
+      body += prefix + 'เวร ' + (s.pos || '-') + ' วันที่ ' + origDay +
+              ' (ทำงานจริง วันที่ ' + actualDay;
+      if (s.range && s.range !== '-') body += ' เวลา ' + s.range;
+      body += ')';
+      if (s.room) body += ' ห้อง ' + s.room;
+    } else {
+      body += prefix + 'ตำแหน่ง ' + (s.pos || '-');
+      if (s.range && s.range !== '-') body += ' เวลา ' + s.range;
+      if (s.room) body += ' (ห้อง ' + s.room + ')';
+    }
     body += '\n';
   });
   body += '\n— Siriraj Rx Shift';
@@ -394,10 +436,25 @@ function _phxBuildHoursBeforeEmailContent(userName, shift, leadHours) {
   const dateStr = shift.date || '';
   const subject = 'อีก ' + leadHours + ' ชม. เริ่มเวร ' + (shift.pos || '') + (dateStr ? ' [' + dateStr + ']' : '');
   let body = 'สวัสดีคุณ ' + userName + '\n\n';
-  body += 'อีก ' + leadHours + ' ชั่วโมง คุณจะเริ่มเวรในวัน ' + dateStr + ':\n';
-  body += '- ตำแหน่ง: ' + (shift.pos || '-') + '\n';
-  if (shift.range && shift.range !== '-') body += '- เวลา: ' + shift.range + '\n';
-  if (shift.room) body += '- ห้อง: ' + shift.room + '\n';
+
+  // 🆕 Round 3: แสดงทั้ง schedule date + วันทำงานจริง
+  if (_phxIsRound3Shift(shift)) {
+    const actualDate = _phxParseShiftStartTime(shift);
+    const actualDay = actualDate ? actualDate.getDate() : '?';
+    body += 'อีก ' + leadHours + ' ชั่วโมง คุณจะเริ่มเวร:\n';
+    body += '- ตำแหน่ง: ' + (shift.pos || '-') + '\n';
+    body += '- วันที่ใน schedule: ' + dateStr + '\n';
+    body += '- ทำงานจริง: วันที่ ' + actualDay;
+    if (shift.range && shift.range !== '-') body += ' เวลา ' + shift.range;
+    body += '\n';
+    if (shift.room) body += '- ห้อง: ' + shift.room + '\n';
+    body += '\n[เวรรอบ 3 — เริ่มเวรเช้ามืดของวันถัดไป]';
+  } else {
+    body += 'อีก ' + leadHours + ' ชั่วโมง คุณจะเริ่มเวรในวัน ' + dateStr + ':\n';
+    body += '- ตำแหน่ง: ' + (shift.pos || '-') + '\n';
+    if (shift.range && shift.range !== '-') body += '- เวลา: ' + shift.range + '\n';
+    if (shift.room) body += '- ห้อง: ' + shift.room + '\n';
+  }
   body += '\n— Siriraj Rx Shift';
   return { subject: subject, body: body };
 }

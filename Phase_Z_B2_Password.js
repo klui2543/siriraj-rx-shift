@@ -101,44 +101,78 @@ function phxChangePassword(rawName, oldPassword, newPassword) {
 // ════════════════════════════════════════════════════════════
 // 🌐 Public: Request password reset (queues email)
 // ════════════════════════════════════════════════════════════
-function phxRequestPasswordReset(rawName) {
+function phxRequestPasswordReset(rawName, targetEmailArg) {
   try {
     const name = String(rawName || '').trim();
     if (!name) return { success: false, error: 'กรุณาใส่ชื่อ' };
 
-    // User must exist in PHX_Pharmacists (i.e., already registered)
     const pharmaRow = _phxFindPharmacistRow(name);
     if (!pharmaRow) {
       return { success: false, error: 'ไม่พบชื่อนี้ในระบบ — กรุณาลงทะเบียนก่อน' };
     }
 
-    // Get approved email from Master
     const masterRow = _phxFindMasterRow(name);
     if (!masterRow || !masterRow.approvedEmail || masterRow.approvedEmail.indexOf('@') < 0) {
       return { success: false, error: 'ไม่พบอีเมลสำหรับชื่อนี้ — โปรดติดต่อ admin' };
     }
 
-    // Clean up old pending resets for this name
+    // Determine target email + label
+    // Default: send to Master's approvedEmail (label = "หลัก")
+    // Optional: caller may specify targetEmailArg (must match approvedEmail or backupEmail)
+    let targetEmail = String(targetEmailArg || '').trim().toLowerCase();
+    let emailLabel = 'หลัก';
+    if (targetEmail) {
+      const approvedLc = String(masterRow.approvedEmail || '').trim().toLowerCase();
+      const backupLc = _phxGetBackupEmailRaw(name).toLowerCase();
+      if (targetEmail === approvedLc) {
+        emailLabel = 'หลัก';
+      } else if (backupLc && targetEmail === backupLc) {
+        emailLabel = 'สำรอง';
+      } else {
+        return { success: false, error: 'อีเมลไม่ตรงกับที่ระบบบันทึกไว้สำหรับชื่อนี้' };
+      }
+    } else {
+      targetEmail = String(masterRow.approvedEmail || '').trim().toLowerCase();
+    }
+
     _phxClearPendingResetsByName(name);
 
-    // Insert new pending row
     const token = _phxGenerateToken();
     const expiresAt = new Date(Date.now() + _B2_TOKEN_EXPIRY_MS);
     const sh = _phxGetSheet('PHX_PendingResets');
-    // Cols: token | name | approvedEmail | expiresAt | createdAt
-    sh.appendRow([token, name, masterRow.approvedEmail, expiresAt, new Date()]);
+    // Cols: token | name | targetEmail | expiresAt | createdAt
+    sh.appendRow([token, name, targetEmail, expiresAt, new Date()]);
 
-    // Queue email
-    _phxQueueResetEmail(name, masterRow.approvedEmail, token);
+    _phxQueueResetEmail(name, targetEmail, token);
 
     return {
       success: true,
-      message: 'ส่งอีเมลรีเซ็ตไปยัง ' + _phxMaskEmail(masterRow.approvedEmail) + ' แล้ว — กรุณาตรวจกล่องจดหมาย'
+      message: 'ส่งอีเมลรีเซ็ตไปยัง ' + _phxMaskEmail(targetEmail) + ' (อีเมล' + emailLabel + ') แล้ว — กรุณาตรวจกล่องจดหมาย'
     };
   } catch (e) {
     console.error('phxRequestPasswordReset error: ' + e.message);
     return { success: false, error: 'เกิดข้อผิดพลาด: ' + e.message };
   }
+}
+
+
+// ────────────────────────────────────────────────────────────
+// Helper: read backupEmail from PHX_Pharmacists col E (no auth)
+//   Used by reset flow which can't verify password (user forgot it)
+// ────────────────────────────────────────────────────────────
+function _phxGetBackupEmailRaw(name) {
+  try {
+    const sh = _phxGetSheet('PHX_Pharmacists');
+    if (sh.getLastRow() < 2) return '';
+    const data = sh.getRange(2, 1, sh.getLastRow() - 1, 5).getValues();
+    const target = String(name).trim();
+    for (let i = 0; i < data.length; i++) {
+      if (String(data[i][0]).trim() === target) {
+        return String(data[i][4] || '').trim();  // col E (0-indexed = 4)
+      }
+    }
+    return '';
+  } catch (e) { return ''; }
 }
 
 
@@ -283,47 +317,86 @@ function _phxRenderResetForm(token, name) {
   body {
     font-family: 'Kanit', sans-serif;
     background: linear-gradient(135deg, #eff6ff 0%, #dbeafe 100%);
-    min-height: 100vh; display: flex; align-items: center; justify-content: center;
-    padding: 20px;
+    min-height: 100vh;
+    display: flex; flex-direction: column;
+    align-items: center; justify-content: center;
+    padding: 32px 20px;
   }
   .card {
-    background: white; border-radius: 16px; box-shadow: 0 10px 40px rgba(0,0,0,0.1);
-    padding: 32px 28px; max-width: 420px; width: 100%;
+    width: 100%;
+    max-width: 520px;
+    text-align: center;
   }
-  .header { text-align: center; margin-bottom: 24px; }
+  .header { margin-bottom: 36px; }
   .badge {
-    display: inline-block; background: #eff6ff; color: #2563eb; border: 2px solid #93c5fd;
-    padding: 12px 18px; border-radius: 12px; font-size: 22px; font-weight: 700;
-    margin-bottom: 16px;
+    display: inline-block;
+    background: #eff6ff; color: #2563eb;
+    border: 4px solid #93c5fd;
+    padding: 30px 40px; border-radius: 24px;
+    font-size: 36px; font-weight: 700;
+    margin-bottom: 20px;
+    box-shadow: 0 12px 36px rgba(0,0,0,0.08);
   }
   .badge.success { background: #f0fdf4; color: #16a34a; border-color: #86efac; }
   .badge.error   { background: #fef2f2; color: #dc2626; border-color: #fca5a5; }
-  h1 { font-size: 20px; color: #1e293b; margin-bottom: 8px; }
-  .who { color: #475569; font-size: 14px; }
-  .who b { color: #1e293b; }
-  .field { margin-bottom: 14px; }
-  label { display: block; font-size: 13px; color: #475569; margin-bottom: 6px; font-weight: 500; }
-  input[type=password] {
-    width: 100%; padding: 11px 12px; border: 1.5px solid #cbd5e1; border-radius: 8px;
-    font-size: 15px; font-family: inherit; transition: border-color 0.15s;
+  h1 { font-size: 26px; color: #1e293b; margin-bottom: 10px; }
+  .who {
+    color: #1e293b; font-size: 20px; font-weight: 500;
+    margin-top: 12px;
   }
-  input[type=password]:focus { outline: none; border-color: #2563eb; }
+  .who b { color: #0f172a; font-weight: 700; }
+  .field { margin-bottom: 20px; text-align: left; }
+  label {
+    display: block; font-size: 16px; color: #334155;
+    margin-bottom: 10px; font-weight: 600;
+  }
+  input[type=password] {
+    width: 100%; padding: 18px 20px;
+    border: 2px solid #cbd5e1; border-radius: 12px;
+    font-size: 18px; font-family: inherit; background: white;
+    transition: border-color 0.15s, box-shadow 0.15s;
+  }
+  input[type=password]:focus {
+    outline: none; border-color: #2563eb;
+    box-shadow: 0 0 0 4px rgba(37,99,235,0.12);
+  }
   button {
     width: 100%; background: #2563eb; color: white; border: 0;
-    padding: 12px; border-radius: 8px; font-size: 15px; font-weight: 600;
-    cursor: pointer; font-family: inherit; margin-top: 8px;
+    padding: 22px; border-radius: 14px;
+    font-size: 22px; font-weight: 700;
+    cursor: pointer; font-family: inherit; margin-top: 16px;
+    box-shadow: 0 12px 28px rgba(37,99,235,0.35);
   }
   button:hover:not(:disabled) { background: #1d4ed8; }
-  button:disabled { background: #94a3b8; cursor: not-allowed; }
-  #msg { margin-top: 14px; font-size: 13px; color: #dc2626; min-height: 18px; text-align: center; }
+  button:disabled { background: #94a3b8; cursor: not-allowed; box-shadow: none; }
+  #msg {
+    margin-top: 20px; font-size: 17px; color: #dc2626;
+    min-height: 22px; text-align: center; font-weight: 500;
+  }
   #msg.ok { color: #16a34a; }
-  .meta { margin-top: 20px; font-size: 12px; color: #94a3b8; text-align: center; }
+  .meta { margin-top: 48px; font-size: 14px; color: #94a3b8; text-align: center; }
   .btn-link {
-    display: inline-block; background: #2563eb; color: white; padding: 12px 24px;
-    border-radius: 8px; text-decoration: none; font-weight: 500; font-size: 15px; margin-top: 12px;
+    display: inline-block; background: #2563eb; color: white;
+    padding: 22px 56px; border-radius: 14px;
+    text-decoration: none; font-weight: 700; font-size: 22px;
+    margin-top: 16px;
+    box-shadow: 0 12px 28px rgba(37,99,235,0.35);
   }
   .btn-link:hover { background: #1d4ed8; }
-  p.msg { color: #475569; font-size: 15px; line-height: 1.6; margin-bottom: 16px; text-align: center; }
+  p.msg {
+    color: #1e293b; font-size: 22px; line-height: 1.65; font-weight: 500;
+    margin-bottom: 28px; text-align: center;
+  }
+  @media (max-width: 500px) {
+    body { padding: 24px 16px; }
+    .badge { padding: 24px 30px; font-size: 28px; border-width: 3px; }
+    .who { font-size: 18px; }
+    label { font-size: 15px; }
+    input[type=password] { padding: 16px 18px; font-size: 17px; }
+    button { padding: 20px; font-size: 20px; }
+    .btn-link { padding: 20px 44px; font-size: 20px; }
+    p.msg { font-size: 19px; }
+  }
 </style>
 </head>
 <body>
