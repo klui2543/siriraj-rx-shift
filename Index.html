@@ -2430,10 +2430,21 @@ window.allPharmacistNames = [];
       }
     };
 
-    // v3.37 Patch 7c: clean pastel (saturation back up, lightness still bright)
+    // v3.40: Tailwind 500 curated palette — 14 vibrant colors, distinct neighbors
+    // Order arranged so adjacent pair indices land far apart on color wheel:
+    // red → blue → green → purple → amber → cyan → pink → lime → indigo → orange → teal → fuchsia → sky → yellow
+    // Index 14+ falls back to golden angle (won't normally happen — no one swaps 14+ pairs/month)
+    const SWAP_PAIR_PALETTE = [
+      '#ef4444', '#3b82f6', '#22c55e', '#a855f7',
+      '#f59e0b', '#06b6d4', '#ec4899', '#84cc16',
+      '#6366f1', '#f97316', '#14b8a6', '#d946ef',
+      '#0ea5e9', '#eab308'
+    ];
     function swapPairColor(idx) {
-      const hue = Math.round((idx * 137.508) % 360);
-      return 'hsl(' + hue + ', 75%, 65%)';
+      if (idx < SWAP_PAIR_PALETTE.length) return SWAP_PAIR_PALETTE[idx];
+      // Fallback (idx >= 14): golden angle so still unique
+      const hue = Math.round(((idx - SWAP_PAIR_PALETTE.length) * 137.508) % 360);
+      return 'hsl(' + hue + ', 75%, 60%)';
     }
 
     function getCurrentMonthId() {
@@ -8911,282 +8922,6 @@ table.exp-tbl .tm{margin-left:3px;opacity:0.75;}
         .phxSetBackupEmail(u.name, u.hash, email);
     }
 
-
-    // ════════════════════════════════════════════════════════════
-    // 🔔 F1 — Announce Prefs (LINE always-on, Email opt-out)
-    // ════════════════════════════════════════════════════════════
-    function phxOpenAnnouncePrefsModal() {
-      if (typeof phxCloseUserMenu === 'function') phxCloseUserMenu();
-      const m = document.getElementById('phxAnnouncePrefsModal');
-      if (!m) return;
-      m.classList.remove('hidden');
-      phxLoadAnnounceChannels();
-    }
-
-    function phxCloseAnnouncePrefsModal() {
-      const m = document.getElementById('phxAnnouncePrefsModal');
-      if (m) m.classList.add('hidden');
-    }
-
-    function phxLoadAnnounceChannels() {
-      const status = document.getElementById('phxAnnouncePrefsStatus');
-      const cb = document.getElementById('phxAnnounceEmailCheckbox');
-      if (!status || !cb) return;
-
-      const u = (typeof phxAuthGetUser === 'function') ? phxAuthGetUser() : null;
-      if (!u || !u.name || !u.hash) {
-        status.textContent = 'กรุณา login ก่อน';
-        status.style.color = '#dc2626';
-        return;
-      }
-
-      status.textContent = 'กำลังโหลด...';
-      status.style.color = 'var(--sub)';
-      cb.disabled = true;
-
-      google.script.run
-        .withSuccessHandler(function(r) {
-          cb.disabled = false;
-          if (r && r.success) {
-            cb.checked = !!r.emailOn;
-            if (r.emailOn) {
-              status.textContent = '✓ รับการแจ้งเตือนผ่าน Email';
-              status.style.color = 'var(--accent)';
-            } else {
-              status.textContent = 'ปิดการแจ้งเตือนผ่าน Email)';
-              status.style.color = 'var(--sub)';
-            }
-          } else {
-            status.textContent = (r && r.error) || 'โหลดไม่ได้';
-            status.style.color = '#dc2626';
-          }
-        })
-        .withFailureHandler(function(e) {
-          cb.disabled = false;
-          status.textContent = 'error: ' + ((e && e.message) || e);
-          status.style.color = '#dc2626';
-        })
-        .phxGetAnnounceChannels(u.name, u.hash);
-    }
-
-    function phxSaveAnnounceChannels() {
-      const status = document.getElementById('phxAnnouncePrefsStatus');
-      const btn = document.getElementById('phxAnnouncePrefsSave');
-      const cb = document.getElementById('phxAnnounceEmailCheckbox');
-      if (!status || !btn || !cb) return;
-
-      const u = (typeof phxAuthGetUser === 'function') ? phxAuthGetUser() : null;
-      if (!u || !u.name || !u.hash) {
-        status.textContent = 'กรุณา login ก่อน';
-        status.style.color = '#dc2626';
-        return;
-      }
-
-      const csv = cb.checked ? 'line,email' : 'line';
-
-      btn.disabled = true;
-      const _origText = btn.textContent;
-      btn.textContent = '...';
-      status.textContent = '';
-
-      google.script.run
-        .withSuccessHandler(function(r) {
-          btn.disabled = false;
-          btn.textContent = _origText;
-          if (r && r.success) {
-            if (typeof phxShowToast === 'function') {
-              phxShowToast(cb.checked ? 'รับทั้ง LINE + Email ✓' : 'รับเฉพาะ LINE ✓', 'success');
-            }
-            setTimeout(phxCloseAnnouncePrefsModal, 600);
-          } else {
-            status.textContent = (r && r.error) || 'บันทึกไม่ได้';
-            status.style.color = '#dc2626';
-          }
-        })
-        .withFailureHandler(function(e) {
-          btn.disabled = false;
-          btn.textContent = _origText;
-          status.textContent = 'error: ' + ((e && e.message) || e);
-          status.style.color = '#dc2626';
-        })
-        .phxSetAnnounceChannels(u.name, u.hash, csv);
-    }
-
-
-    // ════════════════════════════════════════════════════════════
-    // 🔔 B3b — Pre-shift Reminder Settings
-    // ════════════════════════════════════════════════════════════
-    function phxOpenReminderModal() {
-      if (typeof phxCloseUserMenu === 'function') phxCloseUserMenu();
-      const m = document.getElementById('phxReminderModal');
-      if (!m) return;
-      m.classList.remove('hidden');
-      phxLoadReminderSettings();
-    }
-
-    function phxCloseReminderModal() {
-      const m = document.getElementById('phxReminderModal');
-      if (m) m.classList.add('hidden');
-    }
-
-    function phxReminderToggleEvening() {
-      const cb = document.getElementById('phxReminderEveningCb');
-      const inp = document.getElementById('phxReminderEveningTime');
-      if (!cb || !inp) return;
-      inp.disabled = !cb.checked;
-      if (cb.checked && !inp.value) inp.value = '18:00';
-    }
-
-    function phxReminderToggleHours() {
-      const cb = document.getElementById('phxReminderHoursCb');
-      const inp = document.getElementById('phxReminderHoursVal');
-      if (!cb || !inp) return;
-      inp.disabled = !cb.checked;
-      if (cb.checked && !inp.value) inp.value = '5';
-    }
-
-    function phxLoadReminderSettings() {
-      const status = document.getElementById('phxReminderStatus');
-      const eveningCb = document.getElementById('phxReminderEveningCb');
-      const eveningInp = document.getElementById('phxReminderEveningTime');
-      const hoursCb = document.getElementById('phxReminderHoursCb');
-      const hoursInp = document.getElementById('phxReminderHoursVal');
-      if (!status || !eveningCb || !eveningInp || !hoursCb || !hoursInp) return;
-
-      const u = (typeof phxAuthGetUser === 'function') ? phxAuthGetUser() : null;
-      if (!u || !u.name || !u.hash) {
-        status.textContent = 'กรุณา login ก่อน';
-        status.style.color = '#dc2626';
-        return;
-      }
-
-      status.textContent = 'กำลังโหลด...';
-      status.style.color = 'var(--sub)';
-      eveningCb.disabled = true;
-      hoursCb.disabled = true;
-
-      google.script.run
-        .withSuccessHandler(function(r) {
-          eveningCb.disabled = false;
-          hoursCb.disabled = false;
-          if (r && r.success) {
-            // Evening
-            if (r.eveningReminderTime) {
-              eveningCb.checked = true;
-              eveningInp.value = r.eveningReminderTime;
-              eveningInp.disabled = false;
-            } else {
-              eveningCb.checked = false;
-              eveningInp.disabled = true;
-            }
-            // Hours
-            if (r.hoursBeforeReminder) {
-              hoursCb.checked = true;
-              hoursInp.value = r.hoursBeforeReminder;
-              hoursInp.disabled = false;
-            } else {
-              hoursCb.checked = false;
-              hoursInp.disabled = true;
-            }
-            if (r.anyEnabled) {
-              status.textContent = 'เปิดใช้งานอยู่';
-              status.style.color = 'var(--accent)';
-            } else {
-              status.textContent = 'ยังไม่เปิดใช้งาน';
-              status.style.color = 'var(--sub)';
-            }
-            // Note: ICS cache fed by phxGetIcsReminderSettings, not email endpoint
-          } else {
-            status.textContent = (r && r.error) || 'โหลดไม่ได้';
-            status.style.color = '#dc2626';
-          }
-        })
-        .withFailureHandler(function(e) {
-          eveningCb.disabled = false;
-          hoursCb.disabled = false;
-          status.textContent = 'error: ' + ((e && e.message) || e);
-          status.style.color = '#dc2626';
-        })
-        .phxGetReminderSettings(u.name, u.hash);
-    }
-
-    function phxSaveReminderSettings() {
-      const status = document.getElementById('phxReminderStatus');
-      const btn = document.getElementById('phxReminderSave');
-      const eveningCb = document.getElementById('phxReminderEveningCb');
-      const eveningInp = document.getElementById('phxReminderEveningTime');
-      const hoursCb = document.getElementById('phxReminderHoursCb');
-      const hoursInp = document.getElementById('phxReminderHoursVal');
-      if (!status || !btn || !eveningCb || !eveningInp || !hoursCb || !hoursInp) return;
-
-      const u = (typeof phxAuthGetUser === 'function') ? phxAuthGetUser() : null;
-      if (!u || !u.name || !u.hash) {
-        status.textContent = 'กรุณา login ก่อน';
-        status.style.color = '#dc2626';
-        return;
-      }
-
-      // Build payload: empty string = disable
-      const eveningTime = eveningCb.checked ? (eveningInp.value || '').trim() : '';
-      const hoursBefore = hoursCb.checked ? (hoursInp.value || '').trim() : '';
-
-      // Client-side validation (backend re-validates)
-      if (eveningCb.checked) {
-        if (!eveningTime) {
-          status.textContent = 'กรุณาเลือกเวลาแจ้งเตือน';
-          status.style.color = '#dc2626';
-          return;
-        }
-        if (!/^([01]?[0-9]|2[0-3]):[0-5][0-9]$/.test(eveningTime)) {
-          status.textContent = 'รูปแบบเวลาไม่ถูกต้อง (HH:MM)';
-          status.style.color = '#dc2626';
-          return;
-        }
-      }
-      if (hoursCb.checked) {
-        const n = parseInt(hoursBefore, 10);
-        if (!hoursBefore || isNaN(n) || n < 1 || n > 24) {
-          status.textContent = 'จำนวนชั่วโมงต้องอยู่ระหว่าง 1-24';
-          status.style.color = '#dc2626';
-          return;
-        }
-      }
-
-      btn.disabled = true;
-      const _origText = btn.textContent;
-      btn.textContent = '...';
-      status.textContent = '';
-
-      google.script.run
-        .withSuccessHandler(function(r) {
-          btn.disabled = false;
-          btn.textContent = _origText;
-          if (r && r.success) {
-            if (typeof phxShowToast === 'function') {
-              const anyOn = !!(eveningTime || hoursBefore);
-              phxShowToast(anyOn ? 'บันทึกการตั้งค่าแล้ว ✓' : 'ปิดการแจ้งเตือนแล้ว ✓', 'success');
-            }
-            // Refresh ICS cache — if ICS uses email fallback (col I empty),
-            // changing F/G affects ICS effective values too
-            if (typeof _phxFetchAndCacheReminderSettings === 'function') {
-              _phxFetchAndCacheReminderSettings();
-            }
-            setTimeout(phxCloseReminderModal, 600);
-          } else {
-            status.textContent = (r && r.error) || 'บันทึกไม่ได้';
-            status.style.color = '#dc2626';
-          }
-        })
-        .withFailureHandler(function(e) {
-          btn.disabled = false;
-          btn.textContent = _origText;
-          status.textContent = 'error: ' + ((e && e.message) || e);
-          status.style.color = '#dc2626';
-        })
-        .phxSetReminderSettings(u.name, u.hash, eveningTime, hoursBefore);
-    }
-
-
     // ════════════════════════════════════════════════════════════
     // 🔔 Email Notifications Modal — combines B3b (col F/G) + F1 (col H email)
     // Replaces two separate menu items: "แจ้งเตือนเวรผ่านอีเมล" + "แจ้งเตือนประกาศ"
@@ -11425,43 +11160,7 @@ table.exp-tbl .tm{margin-left:3px;opacity:0.75;}
     </div>
   </div>
 
-  <!-- 🔔 B3b PRE-SHIFT REMINDER MODAL -->
-  <div id="phxReminderModal" class="hidden" style="position:fixed; inset:0; background:rgba(0,0,0,0.55); backdrop-filter:blur(4px); z-index:5500; display:flex; align-items:center; justify-content:center; padding:20px;">
-    <div class="modal-box" style="background:var(--surface); border-radius:16px; padding:24px; max-width:420px; width:100%; box-shadow:0 20px 60px rgba(0,0,0,0.25); position:relative;">
-      <button onclick="phxCloseReminderModal()" style="position:absolute; top:14px; right:14px; background:none; border:none; color:#94a3b8; font-size:18px; cursor:pointer; padding:4px; line-height:1;">✕</button>
-      <h3 style="font-size:15px; font-weight:600; margin:0 0 8px; color:var(--text);">แจ้งเตือนเวรผ่านอีเมลล์</h3>
-      <p style="font-size:11px; color:var(--sub); margin:0 0 16px; line-height:1.5;">
-        ระบบจะส่งอีเมลแจ้งเตือนตามที่ตั้งไว้ (หากไม่ได้ตั้งอีเมลสำรอง จะส่งไปยัง @mahidol)<br>
-      </p>
-      <div id="phxReminderStatus" style="font-size:11px; padding:8px 10px; border-radius:6px; background:var(--bg); color:var(--sub); margin-bottom:14px; text-align:center;">กำลังโหลด...</div>
-
-      <!-- Option 1: Evening before -->
-      <div style="border:1px solid var(--border); border-radius:10px; padding:12px; margin-bottom:10px;">
-        <label style="display:flex; align-items:center; gap:8px; cursor:pointer; margin-bottom:8px;">
-          <input type="checkbox" id="phxReminderEveningCb" onchange="phxReminderToggleEvening()" style="width:16px; height:16px; cursor:pointer; flex-shrink:0;">
-          <span style="font-size:13px; font-weight:600; color:var(--text);">ก่อนเข้าเวร 1 วัน</span>
-        </label>
-        <div style="display:flex; align-items:center; gap:8px; padding-left:24px;">
-          <span style="font-size:11px; color:var(--sub);">เวลา</span>
-          <input type="time" id="phxReminderEveningTime" value="18:00" disabled style="padding:6px 10px; border:1px solid var(--border); border-radius:6px; font-family:'Kanit',sans-serif; font-size:13px; background:var(--bg); color:var(--text); outline:none;">
-        </div>
-      </div>
-
-      <!-- Option 2: Hours before -->
-      <div style="border:1px solid var(--border); border-radius:10px; padding:12px; margin-bottom:16px;">
-        <label style="display:flex; align-items:center; gap:8px; cursor:pointer; margin-bottom:8px;">
-          <input type="checkbox" id="phxReminderHoursCb" onchange="phxReminderToggleHours()" style="width:16px; height:16px; cursor:pointer; flex-shrink:0;">
-          <span style="font-size:13px; font-weight:600; color:var(--text);">ก่อนเวลาเริ่มเวร</span>
-        </label>
-        <div style="display:flex; align-items:center; gap:8px; padding-left:24px;">
-          <input type="number" id="phxReminderHoursVal" min="1" max="24" value="5" disabled style="width:70px; padding:6px 10px; border:1px solid var(--border); border-radius:6px; font-family:'Kanit',sans-serif; font-size:13px; background:var(--bg); color:var(--text); outline:none; text-align:center;">
-          <span style="font-size:11px; color:var(--sub);">ชั่วโมง (1-24)</span>
-        </div>
-      </div>
-
-      <button id="phxReminderSave" onclick="phxSaveReminderSettings()" class="phx-btn-primary">บันทึก</button>
-    </div>
-  </div>
+  
 
   <!-- 🔔 EMAIL NOTIFICATIONS MODAL — combines B3b pre-shift reminder + F1 announce email opt-in -->
   <div id="phxEmailNotifModal" class="hidden" style="position:fixed; inset:0; background:rgba(0,0,0,0.55); backdrop-filter:blur(4px); z-index:5500; display:flex; align-items:center; justify-content:center; padding:20px;">
@@ -11609,25 +11308,7 @@ table.exp-tbl .tm{margin-left:3px;opacity:0.75;}
     </div>
   </div>
 
-  <!-- 🔔 F1 ANNOUNCE PREFS MODAL -->
-  <div id="phxAnnouncePrefsModal" class="hidden" style="position:fixed; inset:0; background:rgba(0,0,0,0.55); backdrop-filter:blur(4px); z-index:5500; display:flex; align-items:center; justify-content:center; padding:20px;">
-    <div class="modal-box" style="background:var(--surface); border-radius:16px; padding:24px; max-width:400px; width:100%; box-shadow:0 20px 60px rgba(0,0,0,0.25); position:relative;">
-      <button onclick="phxCloseAnnouncePrefsModal()" style="position:absolute; top:14px; right:14px; background:none; border:none; color:#94a3b8; font-size:18px; cursor:pointer; padding:4px; line-height:1;">✕</button>
-      <h3 style="font-size:15px; font-weight:600; margin:0 0 8px; color:var(--text);">🔔 แจ้งเตือนประกาศ</h3>
-      <p style="font-size:11px; color:var(--sub); margin:0 0 14px; line-height:1.5;">
-        รับข้อความผ่านอีเมลล์เมื่อมีการประกาศตารางเดือนใหม่<br>
-      </p>
-      <div id="phxAnnouncePrefsStatus" style="font-size:11px; padding:8px 10px; border-radius:6px; background:var(--bg); color:var(--sub); margin-bottom:10px; text-align:center;">กำลังโหลด...</div>
-      <label style="display:flex; align-items:flex-start; gap:10px; padding:10px 12px; border:1px solid var(--border); border-radius:10px; cursor:pointer; margin-bottom:10px;">
-        <input type="checkbox" id="phxAnnounceEmailCheckbox" checked style="width:16px; height:16px; cursor:pointer; flex-shrink:0; margin-top:2px;">
-        <span style="flex:1;">
-          <span style="display:block; font-size:13px; font-weight:600; color:var(--text);">รับผ่าน Email</span>
-          <span style="display:block; font-size:10px; color:var(--sub); margin-top:2px; line-height:1.5;">ส่งไปยังอีเมลล์สำรองที่ตั้งไว้ (หากไม่ได้ตั้งจะส่งไป @mahidol) </span>
-        </span>
-      </label>
-      <button id="phxAnnouncePrefsSave" onclick="phxSaveAnnounceChannels()" class="phx-btn-primary">บันทึก</button>
-    </div>
-  </div>
+  
 
   <!-- Toast notification container (v3.5) -->
   <div id="phxToastContainer" class="phx-toast-container"></div>
