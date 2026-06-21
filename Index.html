@@ -19,9 +19,9 @@
       --navy: #1e3a8a;
     }
     body.dark-theme {
-      --bg: #0b0f19; --surface: #111827; --text: #f1f5f9; --sub: #94a3b8; --muted: #64748b;
-      --border: #1f2937; --accent: #3b82f6; --accent-bg: #1e3a5f; --accent-border: #1d4ed8;
-      --navy: #0f172a;
+      --bg: #111827; --surface: #1f2937; --text: #f1f5f9; --sub: #94a3b8; --muted: #64748b;
+      --border: #374151; --accent: #3b82f6; --accent-bg: #1e3a5f; --accent-border: #1d4ed8;
+      --navy: #0a0f1e;
     }
 
     * { box-sizing: border-box; }
@@ -219,7 +219,6 @@
       color: var(--muted); text-transform: uppercase; letter-spacing: 0.02em; text-align: center;
     }
     #tableContainer tr { border-bottom: 1px solid var(--border); }
-    body.dark-theme #tableContainer tr { border-color: #1f2937; }
     #tableContainer td {
       padding: 6px 4px; font-size: var(--table-font-size); text-align: center; vertical-align: middle;
     }
@@ -794,7 +793,8 @@
     /* Ghost row (received from swap or add) */
     .shift-ghost-received td:first-child { border-left: 3px solid #22c55e; }
     .shift-ghost-received { background: #f0fdf4 !important; }
-    body.dark-theme .shift-ghost-received { background: #052e16 !important; }
+    body.dark-theme .shift-ghost-received { background: rgba(34,197,94,0.07) !important; }
+    body.dark-theme .shift-ghost-received td:first-child { border-left-color: #15803d; }
     .ghost-label {
       display: inline-block; font-size: 90%; color: #16a34a;
       font-weight: 700; margin-left: 3px;
@@ -807,10 +807,12 @@
     /* Ghost conflict variants (v8) */
     .shift-ghost-adjacent td:first-child { border-left: 3px solid #f59e0b; }
     .shift-ghost-adjacent { background: #fffbeb !important; }
-    body.dark-theme .shift-ghost-adjacent { background: #422006 !important; }
+    body.dark-theme .shift-ghost-adjacent { background: rgba(245,158,11,0.08) !important; }
+    body.dark-theme .shift-ghost-adjacent td:first-child { border-left-color: #b45309; }
     .shift-ghost-overlap td:first-child { border-left: 3px solid #dc2626; }
     .shift-ghost-overlap { background: #fef2f2 !important; }
-    body.dark-theme .shift-ghost-overlap { background: #450a0a !important; }
+    body.dark-theme .shift-ghost-overlap { background: rgba(220,38,38,0.10) !important; }
+    body.dark-theme .shift-ghost-overlap td:first-child { border-left-color: #991b1b; }
     .ghost-label.label-adjacent { color: #d97706 !important; }
     body.dark-theme .ghost-label.label-adjacent { color: #fbbf24 !important; }
     .ghost-label.label-overlap { color: #dc2626 !important; }
@@ -1557,14 +1559,11 @@
               <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="4" width="20" height="16" rx="2"/><polyline points="2,7 12,13 22,7"/></svg>
               อีเมลสำรอง
             </button>
-            <button onclick="phxOpenReminderModal()" class="phx-menu-item">
+            <button onclick="phxOpenEmailNotifModal()" class="phx-menu-item">
               <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 8A6 6 0 006 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 01-3.46 0"/></svg>
-              แจ้งเตือนก่อนเข้าเวร
+              การแจ้งเตือนผ่านอีเมล
             </button>
-            <button onclick="phxOpenAnnouncePrefsModal()" class="phx-menu-item">
-              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 5L6 9H2v6h4l5 4V5z"/><path d="M19.07 4.93a10 10 0 010 14.14M15.54 8.46a5 5 0 010 7.07"/></svg>
-              แจ้งเตือนประกาศ
-            </button>
+            
             <button onclick="phxLogout()" class="phx-menu-item danger">
               <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M9 21H5a2 2 0 01-2-2V5a2 2 0 012-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
               ออกจากระบบ
@@ -1577,14 +1576,7 @@
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="rgba(255,255,255,0.85)" stroke-width="2.5" stroke-linecap="round"><circle cx="12" cy="5" r="1.5"/><circle cx="12" cy="12" r="1.5"/><circle cx="12" cy="19" r="1.5"/></svg>
           </button>
           <div id="hangingMenu" class="hanging-menu hidden">
-            <!-- Phase J Chunk 3: Night mode toggle (moved here from brand-header) -->
-            <label class="hanging-menu-switch" onclick="event.stopPropagation()">
-              <span class="hanging-menu-switch-label"> โหมดถนอมสายตา</span>
-              <span class="switch" style="pointer-events:none;">
-                <input type="checkbox" id="themeSlider" onchange="toggleThemeNative()">
-                <span class="slider"></span>
-              </span>
-            </label>
+            
             <a href="https://docs.google.com/document/d/YOUR_DOC_ID/edit" target="_blank" onclick="closeDropdownMenu()">คู่มือการใช้ระบบ</a>
             <a href="https://docs.google.com/forms/d/YOUR_FORM_ID/viewform" target="_blank" onclick="closeDropdownMenu()">แจ้งปัญหาการใช้งาน</a>
             <a id="adminShortcut" href="#" onclick="openAdminPanel(event); closeDropdownMenu(); return false;" style="display:none;">🔑 แอดมิน</a>
@@ -2438,10 +2430,10 @@ window.allPharmacistNames = [];
       }
     };
 
-    // v14: golden-angle hue rotation → unique non-repeating colors
+    // v3.37 Patch 7c: clean pastel (saturation back up, lightness still bright)
     function swapPairColor(idx) {
       const hue = Math.round((idx * 137.508) % 360);
-      return 'hsl(' + hue + ', 65%, 50%)';
+      return 'hsl(' + hue + ', 75%, 65%)';
     }
 
     function getCurrentMonthId() {
@@ -3527,16 +3519,7 @@ window.allPharmacistNames = [];
     // ==========================================
     // 🌟 UI HELPERS
     // ==========================================
-    function toggleThemeNative() {
-      const isDark = document.getElementById('themeSlider').checked;
-      if (isDark) {
-        document.body.classList.add('dark-theme');
-        localStorage.setItem('theme', 'dark');
-      } else {
-        document.body.classList.remove('dark-theme');
-        localStorage.setItem('theme', 'light');
-      }
-    }
+    
 
     function showError(m) {
       document.getElementById('loading').innerHTML =
@@ -3879,12 +3862,11 @@ window.allPharmacistNames = [];
         window.gasScriptUrl = url;  // เก็บไว้ใช้สร้าง ICS URL
       }).getScriptUrl();
 
-      const savedTheme = localStorage.getItem('theme');
-      const slider = document.getElementById('themeSlider');
-      if (savedTheme === 'dark') {
-        document.body.classList.add('dark-theme');
-        if (slider) slider.checked = true;
-      }
+      // v3.37 Patch 8: dark mode removed — defensively clean up legacy state
+      try {
+        document.body.classList.remove('dark-theme');
+        localStorage.removeItem('theme');
+      } catch(e) {}
 
       if (window.innerWidth < 768) { toggleFilters(); }
 
@@ -4839,8 +4821,140 @@ async function exportPDF(mode) {
   return await _exportTablePDF_v2();
 }
 
+// v3.37: TABLE multi-name batch — 1 คน 1 หน้า (+slice หน้าถ้าตารางยาว)
+// Render in main doc (Kanit cached) — pattern เดียวกับ _exportCalendarPDF_v2
+async function _exportTablePDF_perPerson(persons) {
+  if (!Array.isArray(persons) || persons.length === 0) {
+    alert('ไม่มีรายชื่อให้ export');
+    return;
+  }
+
+  const monthLabel = document.getElementById('customSelectText').innerText.replace(/⏳/g, '').trim();
+  const _midT = (typeof getCurrentMonthId === 'function') ? getCurrentMonthId() : '';
+
+  // Filename: 1 คน = <ชื่อ>_<เดือน>.pdf  ·  N คน = ตารางเวร_<เดือน>(<N>ชุด).pdf
+  const fileName = persons.length === 1
+    ? `${persons[0]}_${monthLabel}.pdf`
+    : `ตารางเวร_${monthLabel}(${persons.length}ชุด).pdf`;
+
+  // Filter อื่นๆ (date/pos/room) — apply ต่อคน
+  const filters = {
+    dateD: document.getElementById('dateDropdown').value,
+    posD: document.getElementById('posDropdown').value,
+    room: document.getElementById('roomFilter') ? document.getElementById('roomFilter').value : ""
+  };
+
+  // Pre-load Kanit weights ก่อน loop
+  try {
+    if (document.fonts && document.fonts.load) {
+      await Promise.all([
+        document.fonts.load("400 11px Kanit"),
+        document.fonts.load("500 11px Kanit"),
+        document.fonts.load("700 11px Kanit"),
+        document.fonts.load("800 11px Kanit")
+      ]);
+    }
+    if (document.fonts && document.fonts.ready) await document.fonts.ready;
+  } catch(e) {}
+
+  const { jsPDF } = window.jspdf;
+  const pdf = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
+  const pageW = pdf.internal.pageSize.getWidth();   // 210
+  const pageH = pdf.internal.pageSize.getHeight();  // 297
+  const margin = 8;
+  const imgW = pageW - 2 * margin;
+  const availH = pageH - 2 * margin;
+
+  let firstPageDone = false;
+
+  try {
+    for (let pi = 0; pi < persons.length; pi++) {
+      const target = persons[pi];
+      const usedMap = (typeof OverlayManager !== 'undefined') ? OverlayManager.getUsedMap(_midT, target) : {};
+      const ownShifts = (rawData || []).filter(s => s && s.name === target && !usedMap[makeShiftKey(s)]);
+      const ghosts = (typeof buildGhostRows === 'function')
+        ? buildGhostRows(rawData || [], _midT, target).filter(g => !usedMap[g._ghostKey])
+        : [];
+      const items = ownShifts.concat(ghosts).filter(i => {
+        const matchD = filters.dateD === '' || i.date === filters.dateD;
+        const matchR = filters.room === '' || (i.room && String(i.room).toLowerCase().includes(filters.room.toLowerCase()));
+        const matchP = filters.posD === '' || i.pos === filters.posD;
+        return matchD && matchR && matchP;
+      }).sort((a, b) => {
+        const tsDiff = (a.timestamp || 0) - (b.timestamp || 0);
+        if (tsDiff !== 0) return tsDiff;
+        const posDiff = naturalCompare(a.pos, b.pos);
+        if (posDiff !== 0) return posDiff;
+        return naturalCompare(a.name, b.name);
+      });
+
+      const tableHTML = _buildPortraitTableHTML(items, monthLabel, [target]);
+
+      // Hidden host in main doc
+      const host = document.createElement('div');
+      host.id = 'phxExpHostTbl_' + pi;
+      host.style.cssText = 'position:fixed;left:-20000px;top:0;z-index:-1;width:794px;background:#ffffff;';
+      const resetStyle = document.createElement('style');
+      resetStyle.textContent = '#' + host.id + ',#' + host.id + ' *{box-sizing:border-box;margin:0;padding:0;}';
+      host.appendChild(resetStyle);
+      const stage = document.createElement('div');
+      stage.style.cssText = "padding:14px;width:794px;background:#ffffff;font-family:'Kanit',sans-serif;-webkit-print-color-adjust:exact;print-color-adjust:exact;";
+      stage.innerHTML = tableHTML;
+      host.appendChild(stage);
+      document.body.appendChild(host);
+
+      await new Promise(res => setTimeout(res, 80));
+
+      try {
+        const canvas = await html2canvas(stage, {
+          scale: 2, backgroundColor: '#ffffff', useCORS: true, logging: false
+        });
+        const imgH = (canvas.height * imgW) / canvas.width;
+
+        if (imgH <= availH) {
+          // ตารางพอดี 1 หน้าสำหรับคนนี้
+          if (firstPageDone) pdf.addPage();
+          pdf.addImage(canvas.toDataURL('image/jpeg', 0.95), 'JPEG', margin, margin, imgW, imgH);
+          firstPageDone = true;
+        } else {
+          // ตารางยาว → slice เป็นหลายหน้า
+          const sliceHeightPx = (availH / imgH) * canvas.height;
+          let yOffset = 0;
+          while (yOffset < canvas.height) {
+            const remainingPx = canvas.height - yOffset;
+            const thisSlicePx = Math.min(sliceHeightPx, remainingPx);
+            const thisSliceMm = (thisSlicePx / canvas.height) * imgH;
+            const sliceCanvas = document.createElement('canvas');
+            sliceCanvas.width = canvas.width;
+            sliceCanvas.height = thisSlicePx;
+            const ctx = sliceCanvas.getContext('2d');
+            ctx.fillStyle = '#ffffff';
+            ctx.fillRect(0, 0, sliceCanvas.width, sliceCanvas.height);
+            ctx.drawImage(canvas, 0, -yOffset);
+            if (firstPageDone) pdf.addPage();
+            pdf.addImage(sliceCanvas.toDataURL('image/jpeg', 0.95), 'JPEG', margin, margin, imgW, thisSliceMm);
+            firstPageDone = true;
+            yOffset += thisSlicePx;
+          }
+        }
+      } finally {
+        if (host.parentNode) host.parentNode.removeChild(host);
+      }
+    }
+
+    pdf.save(fileName);
+  } catch (e) {
+    console.error('Table multi-name export failed:', e);
+    alert('Export failed: ' + e.message);
+  }
+}
+
 // 📋 TABLE — สร้างใหม่ใน iframe แล้ว html2canvas → jsPDF (portrait, multi-page)
-async function _exportTablePDF_v2() {
+async function _exportTablePDF_v2(personList) {
+  // v3.37: ถ้ามี personList array → ไป multi-name path; ถ้าไม่มี → legacy combined (เดิม)
+  if (Array.isArray(personList) && personList.length > 0) {
+    return await _exportTablePDF_perPerson(personList);
+  }
   const items = _getFilteredData();
   if (items.length === 0) {
     alert('ไม่มีข้อมูลให้ export — กรุณาตรวจตัวกรอง');
@@ -4932,90 +5046,106 @@ body{padding:14px;font-family:'Kanit',sans-serif;background:#ffffff;width:794px;
   }
 }
 
-// 📅 CALENDAR — สร้างใหม่ใน iframe แยก แล้ว html2canvas → jsPDF (landscape บังคับ)
-async function _exportCalendarPDF_v2() {
-  // หาตัวเป้าหมาย
-  const names = window.selectedPharmacists || [];
-  const fData = _getFilteredData();
-  const uniqueNames = [...new Set(fData.map(i => i.name))];
-  const target = names.length === 1 ? names[0] : (uniqueNames.length === 1 ? uniqueNames[0] : null);
-  if (!target) { alert('กรุณาเลือกเภสัชกร 1 คนเพื่อ export ปฏิทินส่วนตัว'); return; }
+// 📅 CALENDAR — v3.37: รองรับทั้ง single (legacy: no args) + multi-name batch (array arg)
+// เปลี่ยน iframe → hidden div ใน main doc (Kanit cached) — match pattern ของ _exportCombinedPDF_v2
+async function _exportCalendarPDF_v2(personList) {
+  // ───── resolve persons ─────
+  let persons;
+  if (Array.isArray(personList) && personList.length > 0) {
+    persons = personList.slice();
+  } else {
+    // legacy path: derive single person from chips/filter
+    const names = window.selectedPharmacists || [];
+    const fData = _getFilteredData();
+    const uniqueNames = [...new Set(fData.map(i => i.name))];
+    const target = names.length === 1 ? names[0] : (uniqueNames.length === 1 ? uniqueNames[0] : null);
+    if (!target) { alert('กรุณาเลือกเภสัชกร 1 คนเพื่อ export ปฏิทินส่วนตัว'); return; }
+    persons = [target];
+  }
 
   const monthLabel = document.getElementById('customSelectText').innerText.replace(/⏳/g, '').trim();
-  // v13: include overlay ghosts; drop used (struck) shifts
   const _effData = (typeof getEffectiveData === 'function' ? getEffectiveData() : rawData);
   const _midC = (typeof getCurrentMonthId === 'function') ? getCurrentMonthId() : '';
-  const _usedMapC = (typeof OverlayManager !== 'undefined') ? OverlayManager.getUsedMap(_midC, target) : {};
-  const allShifts = _effData.filter(i => {
-    if (i.name !== target) return false;
-    const _k = i._ghostKey || (typeof makeShiftKey === 'function' ? makeShiftKey(i) : null);
-    if (_k && _usedMapC[_k]) return false;
-    return true;
-  });
-  const fileBase = `${target}_${monthLabel}`;
 
-  // สร้าง HTML แบบ inline-style ล้วน
-  const calendarHTML = _buildLandscapeCalendarHTML(target, allShifts, monthLabel, allShifts.length);
+  // Filename: 1 คน = <ชื่อ>_<เดือน>.pdf  ·  N คน = ตารางเวร_<เดือน>(<N>ชุด).pdf
+  const fileName = persons.length === 1
+    ? `${persons[0]}_${monthLabel}.pdf`
+    : `ตารางเวร_${monthLabel}(${persons.length}ชุด).pdf`;
 
-  // iframe แยก ไม่มี CSS อะไรปนเลย
-  const iframe = document.createElement('iframe');
-  iframe.style.cssText = 'position:fixed;left:-20000px;top:0;width:1123px;height:794px;border:0;background:white;';
-  document.body.appendChild(iframe);
-
-  const fullHTML = `<!DOCTYPE html><html><head>
-<meta charset="UTF-8">
-<link href="https://fonts.googleapis.com/css2?family=Kanit:wght@400;500;700;800&display=swap" rel="stylesheet">
-<style>
-*{box-sizing:border-box;margin:0;padding:0;}
-body{padding:14px;font-family:'Kanit',sans-serif;background:#ffffff;width:1123px;-webkit-print-color-adjust:exact;print-color-adjust:exact;}
-</style></head><body>${calendarHTML}</body></html>`;
-
-  const doc = iframe.contentDocument || iframe.contentWindow.document;
-  doc.open(); doc.write(fullHTML); doc.close();
-
-  // รอ font Kanit โหลดเสร็จจริง
+  // Pre-load Kanit weights once (cached → ใช้ได้ทุก iteration)
   try {
-    if (doc.fonts && doc.fonts.ready) await doc.fonts.ready;
+    if (document.fonts && document.fonts.load) {
+      await Promise.all([
+        document.fonts.load("400 11px Kanit"),
+        document.fonts.load("500 11px Kanit"),
+        document.fonts.load("700 11px Kanit"),
+        document.fonts.load("800 11px Kanit")
+      ]);
+    }
+    if (document.fonts && document.fonts.ready) await document.fonts.ready;
   } catch(e) {}
-  const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent);
-  await new Promise(res => setTimeout(res, isIOS ? 1500 : 800));
+
+  const { jsPDF } = window.jspdf;
+  const pdf = new jsPDF({ orientation: 'landscape', unit: 'mm', format: 'a4' });
+  const pageW = pdf.internal.pageSize.getWidth();
+  const pageH = pdf.internal.pageSize.getHeight();
+  const margin = 5;
+  const imgW = pageW - 2 * margin;
+  const availH = pageH - 2 * margin;
 
   try {
-    const canvas = await html2canvas(doc.body, {
-      scale: 2,
-      backgroundColor: '#ffffff',
-      useCORS: true,
-      logging: false,
-      width: 1123,
-      windowWidth: 1123
-    });
+    for (let i = 0; i < persons.length; i++) {
+      const target = persons[i];
+      const _usedMapC = (typeof OverlayManager !== 'undefined') ? OverlayManager.getUsedMap(_midC, target) : {};
+      const allShifts = _effData.filter(item => {
+        if (item.name !== target) return false;
+        const _k = item._ghostKey || (typeof makeShiftKey === 'function' ? makeShiftKey(item) : null);
+        if (_k && _usedMapC[_k]) return false;
+        return true;
+      });
+      const calendarHTML = _buildLandscapeCalendarHTML(target, allShifts, monthLabel, allShifts.length);
 
-    const imgData = canvas.toDataURL('image/jpeg', 0.95);
-    const { jsPDF } = window.jspdf;
-    const pdf = new jsPDF({ orientation: 'landscape', unit: 'mm', format: 'a4' });
-    const pageW = pdf.internal.pageSize.getWidth();
-    const pageH = pdf.internal.pageSize.getHeight();
-    const margin = 5;
+      // Hidden host in main doc (Kanit ready — ไม่ต้องรอ font reload)
+      const host = document.createElement('div');
+      host.id = 'phxExpHostCal_' + i;
+      host.style.cssText = 'position:fixed;left:-20000px;top:0;z-index:-1;width:1123px;background:#ffffff;';
+      const resetStyle = document.createElement('style');
+      resetStyle.textContent = '#' + host.id + ',#' + host.id + ' *{box-sizing:border-box;margin:0;padding:0;}';
+      host.appendChild(resetStyle);
+      const stage = document.createElement('div');
+      stage.style.cssText = "padding:14px;width:1123px;background:#ffffff;font-family:'Kanit',sans-serif;-webkit-print-color-adjust:exact;print-color-adjust:exact;";
+      stage.innerHTML = calendarHTML;
+      host.appendChild(stage);
+      document.body.appendChild(host);
 
-    const imgW = pageW - 2 * margin;
-    const imgH = (canvas.height * imgW) / canvas.width;
-    const availH = pageH - 2 * margin;
+      await new Promise(res => setTimeout(res, 80));
 
-    if (imgH <= availH) {
-      pdf.addImage(imgData, 'JPEG', margin, margin, imgW, imgH);
-    } else {
-      const scale = availH / imgH;
-      const scaledW = imgW * scale;
-      const xOff = margin + (imgW - scaledW) / 2;
-      pdf.addImage(imgData, 'JPEG', xOff, margin, scaledW, availH);
+      try {
+        const canvas = await html2canvas(stage, {
+          scale: 2, backgroundColor: '#ffffff', useCORS: true, logging: false
+        });
+        const imgData = canvas.toDataURL('image/jpeg', 0.95);
+        const imgH = (canvas.height * imgW) / canvas.width;
+
+        if (i > 0) pdf.addPage();
+
+        if (imgH <= availH) {
+          pdf.addImage(imgData, 'JPEG', margin, margin, imgW, imgH);
+        } else {
+          const scale = availH / imgH;
+          const scaledW = imgW * scale;
+          const xOff = margin + (imgW - scaledW) / 2;
+          pdf.addImage(imgData, 'JPEG', xOff, margin, scaledW, availH);
+        }
+      } finally {
+        if (host.parentNode) host.parentNode.removeChild(host);
+      }
     }
 
-    pdf.save(`${fileBase}.pdf`);
+    pdf.save(fileName);
   } catch (e) {
     console.error('Calendar export failed:', e);
     alert('Export failed: ' + e.message);
-  } finally {
-    if (iframe.parentNode) iframe.parentNode.removeChild(iframe);
   }
 }
 
@@ -5180,10 +5310,11 @@ body{padding:14px;font-family:'Kanit',sans-serif;background:#ffffff;width:1123px
     // ICS GUIDE MODAL (v29) — instructions per platform
     // ============================================================
     function showExportCta() {
-      var person = _getTargetPerson();
+      // v3.37: แสดงปุ่ม CTA ตราบใดที่มีชื่อให้ export (1+ chip หรือ filter เหลือ 1 คน)
+      var targets = (typeof _ecmGetExportTargets === 'function') ? _ecmGetExportTargets() : [];
       var wrap = document.getElementById('exportCtaWrap');
       if (!wrap) return;
-      if (person) wrap.classList.remove('hidden');
+      if (targets.length > 0) wrap.classList.remove('hidden');
       else wrap.classList.add('hidden');
     }
     function openExportChoice(format) {
@@ -5199,8 +5330,152 @@ body{padding:14px;font-family:'Kanit',sans-serif;background:#ffffff;width:1123px
       if (modal) modal.classList.add('hidden');
     }
 
+// v3.37: COMBINED multi-name batch — 1 คน 1 หน้า (landscape, table+calendar+note per page)
+async function _exportCombinedPDF_perPerson(persons) {
+  if (!Array.isArray(persons) || persons.length === 0) {
+    alert('ไม่มีรายชื่อให้ export');
+    return;
+  }
+
+  const monthLabel = document.getElementById('customSelectText').innerText.replace(/⏳/g, '').trim();
+  const _midX = (typeof getCurrentMonthId === 'function') ? getCurrentMonthId() : '';
+
+  // Filename: 1 คน = <ชื่อ>_<เดือน>_รวม.pdf  ·  N คน = ตารางเวร_<เดือน>_รวม(<N>ชุด).pdf
+  const fileName = persons.length === 1
+    ? `${persons[0]}_${monthLabel}_รวม.pdf`
+    : `ตารางเวร_${monthLabel}_รวม(${persons.length}ชุด).pdf`;
+
+  // Filters (apply to table portion เท่านั้น — calendar ทั้งเดือน เหมือนเดิม)
+  const filters = {
+    dateD: document.getElementById('dateDropdown').value,
+    posD: document.getElementById('posDropdown').value,
+    room: document.getElementById('roomFilter') ? document.getElementById('roomFilter').value : ""
+  };
+
+  // Pre-load Kanit weights
+  try {
+    if (document.fonts && document.fonts.load) {
+      await Promise.all([
+        document.fonts.load("400 11px Kanit"),
+        document.fonts.load("500 11px Kanit"),
+        document.fonts.load("700 11px Kanit"),
+        document.fonts.load("800 11px Kanit")
+      ]);
+    }
+    if (document.fonts && document.fonts.ready) await document.fonts.ready;
+  } catch(e) {}
+
+  const { jsPDF } = window.jspdf;
+  const pdf = new jsPDF({ orientation: 'landscape', unit: 'mm', format: 'a4' });
+  const pageW = pdf.internal.pageSize.getWidth();   // 297
+  const pageH = pdf.internal.pageSize.getHeight();  // 210
+  const margin = 6;
+  const imgW = pageW - 2 * margin;
+  const availH = pageH - 2 * margin;
+
+  try {
+    for (let pi = 0; pi < persons.length; pi++) {
+      const target = persons[pi];
+      const usedMap = (typeof OverlayManager !== 'undefined') ? OverlayManager.getUsedMap(_midX, target) : {};
+      const ownShifts = (rawData || []).filter(s => s && s.name === target && !usedMap[makeShiftKey(s)]);
+      const ghosts = (typeof buildGhostRows === 'function')
+        ? buildGhostRows(rawData || [], _midX, target).filter(g => !usedMap[g._ghostKey])
+        : [];
+      const allShifts = ownShifts.concat(ghosts);
+
+      // Table items: apply filters; calendar uses unfiltered allShifts (เหมือนเดิม)
+      const items = allShifts.filter(i => {
+        const matchD = filters.dateD === '' || i.date === filters.dateD;
+        const matchR = filters.room === '' || (i.room && String(i.room).toLowerCase().includes(filters.room.toLowerCase()));
+        const matchP = filters.posD === '' || i.pos === filters.posD;
+        return matchD && matchR && matchP;
+      }).sort((a, b) => {
+        const tsDiff = (a.timestamp || 0) - (b.timestamp || 0);
+        if (tsDiff !== 0) return tsDiff;
+        const posDiff = naturalCompare(a.pos, b.pos);
+        if (posDiff !== 0) return posDiff;
+        return naturalCompare(a.name, b.name);
+      });
+
+      const calendarHTML = _buildLandscapeCalendarHTML(target, allShifts, monthLabel, allShifts.length, true);
+      const tableHTML = _buildPortraitTableHTML(items, monthLabel, [target], true);
+
+      const combinedHeader = `<div style="text-align:center;padding:6px 16px 14px 16px;background:#eff6ff;border:1px solid #dbeafe;border-radius:8px;margin-bottom:12px;color:#1e3a8a;font-weight:700;font-size:16px;line-height:1.1;">`
+        + `<b>${target}</b> ปฏิบัติงานเดือนนี้: `
+        + `<span style="color:#2563eb;font-weight:800;font-size:18px;padding:0 4px;">${allShifts.length}</span> เวร`
+        + `<span style="color:#cbd5e1;margin:0 8px;font-weight:300;">|</span>`
+        + `<span style="color:#475569;font-weight:500;">${monthLabel}</span>`
+        + `</div>`;
+
+      const noteBox = `<div style="flex:1 1 auto; min-height:90px; margin-top:14px; display:flex; flex-direction:column;">`
+        + `<div style="font-size:13px; font-weight:700; color:#475569; margin-bottom:6px;">Note:</div>`
+        + `<div style="flex:1; background-image:repeating-linear-gradient(to bottom, transparent 0, transparent 27px, #cbd5e1 27px, #cbd5e1 28px);"></div>`
+        + `</div>`;
+
+      const combinedHTML = `
+<div style="width:1095px;">
+  ${combinedHeader}
+  <div style="display:flex; gap:14px; width:1095px; align-items:stretch;">
+    <div style="flex:1; min-width:0;">
+      <div style="font-family:'Kanit',sans-serif;">${tableHTML}</div>
+    </div>
+    <div style="flex:0 0 700px; display:flex; flex-direction:column;">
+      ${calendarHTML}
+      ${noteBox}
+    </div>
+  </div>
+</div>`;
+
+      // Hidden host in main doc
+      const host = document.createElement('div');
+      host.id = 'phxExpHostCombined_' + pi;
+      host.style.cssText = 'position:fixed;left:-20000px;top:0;z-index:-1;width:1123px;background:#ffffff;';
+      const resetStyle = document.createElement('style');
+      resetStyle.textContent = '#' + host.id + ',#' + host.id + ' *{box-sizing:border-box;margin:0;padding:0;}';
+      host.appendChild(resetStyle);
+      const stage = document.createElement('div');
+      stage.style.cssText = "padding:14px;width:1123px;background:#ffffff;font-family:'Kanit',sans-serif;-webkit-print-color-adjust:exact;print-color-adjust:exact;";
+      stage.innerHTML = combinedHTML;
+      host.appendChild(stage);
+      document.body.appendChild(host);
+
+      await new Promise(res => setTimeout(res, 80));
+
+      try {
+        const canvas = await html2canvas(stage, {
+          scale: 2, backgroundColor: '#ffffff', useCORS: true, logging: false
+        });
+        const imgH = (canvas.height * imgW) / canvas.width;
+        const imgData = canvas.toDataURL('image/jpeg', 0.95);
+
+        if (pi > 0) pdf.addPage();
+
+        if (imgH <= availH) {
+          pdf.addImage(imgData, 'JPEG', margin, margin, imgW, imgH);
+        } else {
+          const scale = availH / imgH;
+          const scaledW = imgW * scale;
+          const xOff = margin + (imgW - scaledW) / 2;
+          pdf.addImage(imgData, 'JPEG', xOff, margin, scaledW, availH);
+        }
+      } finally {
+        if (host.parentNode) host.parentNode.removeChild(host);
+      }
+    }
+
+    pdf.save(fileName);
+  } catch (e) {
+    console.error('Combined multi-name export failed:', e);
+    alert('Export failed: ' + e.message);
+  }
+}
+
 // 🆕 v13: COMBINED PDF — table + calendar on SINGLE landscape A4 page
-async function _exportCombinedPDF_v2() {
+async function _exportCombinedPDF_v2(personList) {
+  // v3.37: ถ้ามี personList array → multi-name path; ถ้าไม่มี → legacy single (เดิม)
+  if (Array.isArray(personList) && personList.length > 0) {
+    return await _exportCombinedPDF_perPerson(personList);
+  }
   const items = _getFilteredData();
   if (items.length === 0) { alert('ไม่มีข้อมูลให้ export'); return; }
 
@@ -5314,6 +5589,136 @@ async function _exportCombinedPDF_v2() {
 }
 
 // 🆕 v13: PNG export (combined) — same layout as PDF but saved as image
+// 🆕 v3.37: PNG export (calendar only) — สำหรับ toggle "ปฏิทิน"
+async function _exportCalendarPNG_v2() {
+  const names = window.selectedPharmacists || [];
+  const fData = _getFilteredData();
+  const uniqueNames = [...new Set(fData.map(i => i.name))];
+  const target = names.length === 1 ? names[0] : (uniqueNames.length === 1 ? uniqueNames[0] : null);
+  if (!target) { alert('กรุณาเลือกเภสัชกร 1 คนเพื่อ export PNG'); return; }
+
+  const monthLabel = document.getElementById('customSelectText').innerText.replace(/⏳/g, '').trim();
+  const _effData = (typeof getEffectiveData === 'function' ? getEffectiveData() : rawData);
+  const _midC = (typeof getCurrentMonthId === 'function') ? getCurrentMonthId() : '';
+  const _usedMapC = (typeof OverlayManager !== 'undefined') ? OverlayManager.getUsedMap(_midC, target) : {};
+  const allShifts = _effData.filter(item => {
+    if (item.name !== target) return false;
+    const _k = item._ghostKey || (typeof makeShiftKey === 'function' ? makeShiftKey(item) : null);
+    if (_k && _usedMapC[_k]) return false;
+    return true;
+  });
+
+  const calendarHTML = _buildLandscapeCalendarHTML(target, allShifts, monthLabel, allShifts.length);
+
+  try {
+    if (document.fonts && document.fonts.load) {
+      await Promise.all([
+        document.fonts.load("400 11px Kanit"),
+        document.fonts.load("500 11px Kanit"),
+        document.fonts.load("700 11px Kanit"),
+        document.fonts.load("800 11px Kanit")
+      ]);
+    }
+    if (document.fonts && document.fonts.ready) await document.fonts.ready;
+  } catch(e) {}
+
+  const host = document.createElement('div');
+  host.id = 'phxExpHostCalPng';
+  host.style.cssText = 'position:fixed;left:-20000px;top:0;z-index:-1;width:1123px;background:#ffffff;';
+  const resetStyle = document.createElement('style');
+  resetStyle.textContent = '#' + host.id + ',#' + host.id + ' *{box-sizing:border-box;margin:0;padding:0;}';
+  host.appendChild(resetStyle);
+  const stage = document.createElement('div');
+  stage.style.cssText = "padding:14px;width:1123px;background:#ffffff;font-family:'Kanit',sans-serif;-webkit-print-color-adjust:exact;print-color-adjust:exact;";
+  stage.innerHTML = calendarHTML;
+  host.appendChild(stage);
+  document.body.appendChild(host);
+
+  await new Promise(res => setTimeout(res, 80));
+
+  try {
+    const canvas = await html2canvas(stage, {
+      scale: 2, backgroundColor: '#ffffff', useCORS: true, logging: false
+    });
+    const blob = await new Promise(resolve => canvas.toBlob(resolve, 'image/png'));
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `${target}_${monthLabel}.png`;
+    a.target = '_self'; // ป้องกัน Chrome strip Thai filename จาก blob URL
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  } catch (e) {
+    console.error('Calendar PNG export failed:', e);
+    alert('Export failed: ' + e.message);
+  } finally {
+    if (host.parentNode) host.parentNode.removeChild(host);
+  }
+}
+
+// 🆕 v3.37: PNG export (table only) — สำหรับ toggle "ตาราง"
+async function _exportTablePNG_v2() {
+  const items = _getFilteredData();
+  if (items.length === 0) { alert('ไม่มีข้อมูลให้ export'); return; }
+
+  const names = window.selectedPharmacists || [];
+  const uniqueNames = [...new Set(items.map(i => i.name))];
+  const target = names.length === 1 ? names[0] : (uniqueNames.length === 1 ? uniqueNames[0] : null);
+  if (!target) { alert('กรุณาเลือกเภสัชกร 1 คนเพื่อ export PNG'); return; }
+
+  const monthLabel = document.getElementById('customSelectText').innerText.replace(/⏳/g, '').trim();
+  const tableHTML = _buildPortraitTableHTML(items, monthLabel, [target]);
+
+  try {
+    if (document.fonts && document.fonts.load) {
+      await Promise.all([
+        document.fonts.load("400 11px Kanit"),
+        document.fonts.load("500 11px Kanit"),
+        document.fonts.load("700 11px Kanit"),
+        document.fonts.load("800 11px Kanit")
+      ]);
+    }
+    if (document.fonts && document.fonts.ready) await document.fonts.ready;
+  } catch(e) {}
+
+  const host = document.createElement('div');
+  host.id = 'phxExpHostTblPng';
+  host.style.cssText = 'position:fixed;left:-20000px;top:0;z-index:-1;width:794px;background:#ffffff;';
+  const resetStyle = document.createElement('style');
+  resetStyle.textContent = '#' + host.id + ',#' + host.id + ' *{box-sizing:border-box;margin:0;padding:0;}';
+  host.appendChild(resetStyle);
+  const stage = document.createElement('div');
+  stage.style.cssText = "padding:14px;width:794px;background:#ffffff;font-family:'Kanit',sans-serif;-webkit-print-color-adjust:exact;print-color-adjust:exact;";
+  stage.innerHTML = tableHTML;
+  host.appendChild(stage);
+  document.body.appendChild(host);
+
+  await new Promise(res => setTimeout(res, 80));
+
+  try {
+    const canvas = await html2canvas(stage, {
+      scale: 2, backgroundColor: '#ffffff', useCORS: true, logging: false
+    });
+    const blob = await new Promise(resolve => canvas.toBlob(resolve, 'image/png'));
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `${target}_${monthLabel}.png`;
+    a.target = '_self';
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  } catch (e) {
+    console.error('Table PNG export failed:', e);
+    alert('Export failed: ' + e.message);
+  } finally {
+    if (host.parentNode) host.parentNode.removeChild(host);
+  }
+}
+
 async function _exportCombinedPNG_v2() {
   const items = _getFilteredData();
   if (items.length === 0) { alert('ไม่มีข้อมูลให้ export'); return; }
@@ -6304,6 +6709,62 @@ table.exp-tbl .tm{margin-left:3px;opacity:0.75;}
 
   <!-- ===== v13: Export Calendar Modal (ICS subscribe + PDF/PNG) ===== -->
   <style>
+    /* v3.37 Patch 6a — iOS-style slide toggle */
+    .phx-switch {
+      position: relative;
+      display: inline-block;
+      width: 42px;
+      height: 24px;
+      flex-shrink: 0;
+    }
+    .phx-switch input { opacity: 0; width: 0; height: 0; }
+    .phx-switch-slider {
+      position: absolute; cursor: pointer; inset: 0;
+      background: #cbd5e1;
+      border-radius: 24px;
+      transition: background 0.2s;
+    }
+    .phx-switch-slider::before {
+      content: ""; position: absolute;
+      height: 18px; width: 18px;
+      left: 3px; top: 3px;
+      background: #fff;
+      border-radius: 50%;
+      transition: transform 0.2s;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.15);
+    }
+    .phx-switch input:checked + .phx-switch-slider { background: #2563eb; }
+    .phx-switch input:checked + .phx-switch-slider::before { transform: translateX(18px); }
+    body.dark-theme .phx-switch-slider { background: #475569; }
+    body.dark-theme .phx-switch input:checked + .phx-switch-slider { background: #3b82f6; }
+
+    /* v3.37 Patch 6e — Tab 2 format pill (iOS segmented control style) */
+    .ecm-fmt-pills {
+      background: var(--bg);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 3px;
+    }
+    .ecm-fmt-pills .pill-btn {
+      background: transparent;
+      color: var(--sub);
+      font-weight: 600;
+      border-radius: 7px;
+      transition: all 0.15s;
+    }
+    .ecm-fmt-pills .pill-btn:hover:not(.active) {
+      color: var(--text);
+    }
+    .ecm-fmt-pills .pill-btn.active {
+      background: var(--accent);
+      color: #fff;
+      box-shadow: 0 2px 8px rgba(37,99,235,0.30);
+    }
+    body.dark-theme .ecm-fmt-pills .pill-btn.active {
+      background: #3b82f6;
+      box-shadow: 0 2px 8px rgba(59,130,246,0.40);
+    }
+
     .ecm-tab-btn {
       flex: 1; padding: 10px 8px; border: none;
       background: transparent; cursor: pointer;
@@ -6347,22 +6808,62 @@ table.exp-tbl .tm{margin-left:3px;opacity:0.75;}
       font-family: 'Kanit', sans-serif; font-size: 12px; font-weight: 600;
       cursor: pointer;
     }
+    /* v3.37 Patch 6f — Enhanced export buttons (visual hierarchy PDF > PNG) */
     .ecm-export-btn {
-      display: flex; align-items: center; gap: 10px;
-      padding: 14px; border-radius: 12px;
+      display: flex; align-items: center; gap: 12px;
+      padding: 14px 40px 14px 16px; border-radius: 12px;
       border: 1px solid var(--border); background: var(--surface);
       cursor: pointer; font-family: 'Kanit', sans-serif;
       width: 100%; text-align: left; transition: all 0.15s;
+      position: relative;
     }
-    .ecm-export-btn:hover { border-color: var(--accent); background: var(--accent-bg); }
+    .ecm-export-btn:hover {
+      border-color: var(--accent);
+      background: var(--accent-bg);
+      transform: translateY(-1px);
+      box-shadow: 0 4px 12px rgba(37,99,235,0.15);
+    }
+    .ecm-export-btn::after {
+      content: '›';
+      position: absolute; right: 16px; top: 50%;
+      transform: translateY(-50%);
+      color: var(--sub);
+      font-size: 22px; font-weight: 700;
+      line-height: 1;
+      transition: all 0.15s;
+    }
+    .ecm-export-btn:hover::after {
+      color: var(--accent);
+      right: 12px;
+    }
     .ecm-export-btn-icon {
-      width: 36px; height: 36px; border-radius: 8px;
+      width: 40px; height: 40px; border-radius: 10px;
       display: flex; align-items: center; justify-content: center;
       background: var(--accent-bg); color: var(--accent); flex-shrink: 0;
     }
-    .ecm-export-btn-body { flex: 1; }
-    .ecm-export-btn-title { font-size: 13px; font-weight: 700; color: var(--text); }
+    .ecm-export-btn-body { flex: 1; min-width: 0; }
+    .ecm-export-btn-title { font-size: 14px; font-weight: 700; color: var(--text); }
     .ecm-export-btn-sub { font-size: 10px; color: var(--sub); margin-top: 2px; }
+
+    /* PDF — red icon tint (file-type vibe) */
+    .ecm-export-btn--pdf .ecm-export-btn-icon {
+      background: #fef2f2;
+      color: #dc2626;
+    }
+    body.dark-theme .ecm-export-btn--pdf .ecm-export-btn-icon {
+      background: #450a0a;
+      color: #fca5a5;
+    }
+
+    /* PNG — green icon tint (image vibe) */
+    .ecm-export-btn--png .ecm-export-btn-icon {
+      background: #f0fdf4;
+      color: #16a34a;
+    }
+    body.dark-theme .ecm-export-btn--png .ecm-export-btn-icon {
+      background: #052e1a;
+      color: #4ade80;
+    }
     details.ecm-details {
       background: var(--surface); border: 1px solid var(--border);
       border-radius: 10px; padding: 10px 14px; margin-bottom: 8px;
@@ -6610,19 +7111,25 @@ table.exp-tbl .tm{margin-left:3px;opacity:0.75;}
       <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:6px;">
         <div>
           <h2 style="font-size:16px; font-weight:800; color:var(--text); margin:0;">บันทึกลงปฏิทิน / Export</h2>
-          <div id="ecmSubtitle" style="font-size:11px; color:var(--sub); margin-top:2px;"></div>
         </div>
         <button onclick="closeExportCalendarModal()" style="width:32px; height:32px; border-radius:50%; border:none; background:var(--bg); color:var(--sub); cursor:pointer; font-size:14px;">✕</button>
       </div>
 
       <div style="display:flex; gap:0; margin:14px 0; border-bottom:1px solid var(--border);">
-        <button id="ecmTab1" class="ecm-tab-btn active" onclick="ecmSwitchTab(1)">📅 Calendar</button>
-        <button id="ecmTab2" class="ecm-tab-btn" onclick="ecmSwitchTab(2)">📄 PDF / PNG</button>
+        <button id="ecmTab1" class="ecm-tab-btn active" onclick="ecmSwitchTab(1)">Calendar</button>
+        <button id="ecmTab2" class="ecm-tab-btn" onclick="ecmSwitchTab(2)">PDF / PNG</button>
       </div>
 
       <div id="ecmPanel1">
-        <div class="ecm-card ecm-card-primary">
-          <h3 id="ecmCalHeading">ส่งออกเวรจาก SirirajRxShift ไปยังปฏิทิน</h3>
+        <div class="ecm-card ecm-card-primary" style="position:relative;">
+          <button onclick="phxOpenIcsReminderModal()"
+            title="ตั้งค่าการแจ้งเตือนในปฏิทิน (ICS)"
+            style="position:absolute; top:10px; right:10px; width:28px; height:28px; border:none; background:none; color:#1e3a8a; cursor:pointer; display:flex; align-items:center; justify-content:center; transition:all 0.15s; padding:0; opacity:0.55;"
+            onmouseover="this.style.opacity='1'; this.style.transform='rotate(45deg)';"
+            onmouseout="this.style.opacity='0.55'; this.style.transform='rotate(0deg)';">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 01-2.83 2.83l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-4 0v-.09A1.65 1.65 0 009 19.4 1.65 1.65 0 007.18 19.07l-.06.06a2 2 0 01-2.83-2.83l.06-.06A1.65 1.65 0 005.18 15a1.65 1.65 0 00-1.51-1H3a2 2 0 010-4h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 012.83-2.83l.06.06A1.65 1.65 0 009 4.68a1.65 1.65 0 001-1.51V3a2 2 0 014 0v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 012.83 2.83l-.06.06A1.65 1.65 0 0019.4 9a1.65 1.65 0 001.51 1H21a2 2 0 010 4h-.09a1.65 1.65 0 00-1.51 1z"/></svg>
+          </button>
+          <h3 id="ecmCalHeading" style="padding-right:42px;">ส่งออกเวรจาก SirirajRxShift ไปยังปฏิทิน</h3>
           <div class="ecm-card-desc" id="ecmCalDesc">
             กำลังตรวจสอบอุปกรณ์...
           </div>
@@ -6631,25 +7138,37 @@ table.exp-tbl .tm{margin-left:3px;opacity:0.75;}
           </div>
         </div>
 
-        <!-- 🌙 v3.36: Round 3 night shift toggle -->
-        <div class="ecm-card" style="padding-top:10px; padding-bottom:10px;">
-          <label style="display:flex; align-items:center; justify-content:space-between; cursor:pointer; gap:8px; margin:0;">
-            <div style="flex:1;">
-              <div style="font-size:13px; font-weight:600; color:var(--text);">เลื่อนเวรรอบ 3 ไปวันถัดไป</div>
-              <div style="font-size:10px; color:var(--sub); margin-top:2px;">เวรกลางคืน (รอบ 3) ในปฏิทินจะแสดงเป็นวันถัดไป — ตรงกับวันที่ทำงานจริง</div>
+        <!-- 🌙 v3.37 Patch 6d — Round 3 + moon icon -->
+        <div class="ecm-card" style="padding:12px 14px;">
+          <label style="display:flex; align-items:center; cursor:pointer; gap:12px; margin:0;">
+            <div style="flex-shrink:0; width:34px; height:34px; border-radius:8px; background:var(--accent-bg); display:flex; align-items:center; justify-content:center; color:var(--accent);">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/></svg>
             </div>
-            <input type="checkbox" id="ecmRound3Toggle" onchange="_ecmToggleRound3(this.checked)" style="width:18px; height:18px; cursor:pointer; flex-shrink:0;">
+            <div style="flex:1; min-width:0;">
+              <div style="font-size:13px; font-weight:600; color:var(--text);">เลื่อนเวรรอบ 3 ไปวันถัดไป</div>
+              <div style="font-size:10px; color:var(--sub); margin-top:2px; line-height:1.4;">เวรกลางคืน (รอบ 3) ในปฏิทินจะแสดงเป็นวันถัดไป — ตรงกับวันที่ทำงานจริง</div>
+            </div>
+            <span class="phx-switch">
+              <input type="checkbox" id="ecmRound3Toggle" onchange="_ecmToggleRound3(this.checked)">
+              <span class="phx-switch-slider"></span>
+            </span>
           </label>
         </div>
 
-        <!-- 📅 Phase H F3: Day picker (opt-in) -->
-        <div class="ecm-card" style="padding-top:10px; padding-bottom:10px;">
-          <label style="display:flex; align-items:center; justify-content:space-between; cursor:pointer; gap:8px; margin:0;">
-            <div style="flex:1;">
-              <div style="font-size:13px; font-weight:600; color:var(--text);">ส่งออกเฉพาะบางรายการ</div>
-              <div style="font-size:10px; color:var(--sub); margin-top:2px;">เว้นช่องนี้ หากต้องการส่งออกทั้งเดือน (default)</div>
+        <!-- 📅 v3.37 Patch 6d — Day picker + calendar-check icon -->
+        <div class="ecm-card" style="padding:12px 14px;">
+          <label style="display:flex; align-items:center; cursor:pointer; gap:12px; margin:0;">
+            <div style="flex-shrink:0; width:34px; height:34px; border-radius:8px; background:var(--accent-bg); display:flex; align-items:center; justify-content:center; color:var(--accent);">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/><polyline points="9 16 11 18 15 14"/></svg>
             </div>
-            <input type="checkbox" id="ecmDayPickerToggle" onchange="_ecmToggleDayPicker(this.checked)" style="width:18px; height:18px; cursor:pointer; flex-shrink:0;">
+            <div style="flex:1; min-width:0;">
+              <div style="font-size:13px; font-weight:600; color:var(--text);">ส่งออกเฉพาะบางรายการ</div>
+              <div style="font-size:10px; color:var(--sub); margin-top:2px; line-height:1.4;">เว้นช่องนี้ หากต้องการส่งออกทั้งเดือน (default)</div>
+            </div>
+            <span class="phx-switch">
+              <input type="checkbox" id="ecmDayPickerToggle" onchange="_ecmToggleDayPicker(this.checked)">
+              <span class="phx-switch-slider"></span>
+            </span>
           </label>
           <div id="ecmDayPickerWrap" style="display:none; margin-top:10px;">
             <div id="ecmDayPickerCounter" style="font-size:11px; font-weight:600; text-align:center; margin-bottom:6px;"></div>
@@ -6664,29 +7183,38 @@ table.exp-tbl .tm{margin-left:3px;opacity:0.75;}
       </div>
 
       <div id="ecmPanel2" style="display:none;">
-        <button onclick="ecmExportPDF()" class="ecm-export-btn">
+        <!-- v3.37: รูปแบบ toggle (ปฏิทิน / ตาราง / รวม) -->
+        <div class="ecm-card" style="padding:10px 14px;">
+          <div style="font-size:9px; font-weight:700; color:var(--sub); text-transform:uppercase; letter-spacing:0.3px; margin-bottom:6px;">รูปแบบ</div>
+          <div class="ecm-fmt-pills" style="display:flex; gap:2px;">
+            <button id="ecmFmt-calendar" class="pill-btn active" onclick="_ecmSetExportMode('calendar')" style="flex:1; justify-content:center; padding:8px 0; font-size:12px;">ปฏิทิน</button>
+            <button id="ecmFmt-table" class="pill-btn" onclick="_ecmSetExportMode('table')" style="flex:1; justify-content:center; padding:8px 0; font-size:12px;">ตาราง</button>
+            <button id="ecmFmt-combined" class="pill-btn" onclick="_ecmSetExportMode('combined')" style="flex:1; justify-content:center; padding:8px 0; font-size:12px;">รวม</button>
+          </div>
+        </div>
+
+        <!-- Info text — auto update -->
+        <div id="ecmExportInfo" style="font-size:11px; color:var(--sub); text-align:center; margin:10px 0 12px; line-height:1.5;">-</div>
+
+        <!-- PDF — red icon variant -->
+        <button id="ecmExportPdfBtn" onclick="_ecmExportPDFDispatch()" class="ecm-export-btn ecm-export-btn--pdf">
           <div class="ecm-export-btn-icon">
             <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
           </div>
           <div class="ecm-export-btn-body">
-            <div class="ecm-export-btn-title">PDF — ตาราง + ปฏิทิน รวม 1 หน้า</div>
-            <div class="ecm-export-btn-sub">A4 แนวนอน • รวม overlay edits</div>
+            <div class="ecm-export-btn-title">Export PDF</div>
           </div>
         </button>
-        <button onclick="ecmExportPNG()" class="ecm-export-btn" style="margin-top:8px;">
+
+        <!-- PNG — green icon variant -->
+        <button id="ecmExportPngBtn" onclick="_ecmExportPNGDispatch()" class="ecm-export-btn ecm-export-btn--png" style="margin-top:8px;">
           <div class="ecm-export-btn-icon">
             <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>
           </div>
           <div class="ecm-export-btn-body">
-            <div class="ecm-export-btn-title">PNG — ตาราง + ปฏิทิน รวม</div>
-            <div class="ecm-export-btn-sub">สำหรับแชร์ใน LINE / Facebook</div>
+            <div class="ecm-export-btn-title">Export PNG (เฉพาะรายบุคคล)</div>
           </div>
         </button>
-
-        <div style="margin-top:14px; display:flex; gap:8px;">
-          <button onclick="ecmExportTableOnly()" class="ecm-btn-secondary" style="flex:1;">เฉพาะตาราง (PDF)</button>
-          <button onclick="ecmExportCalendarOnly()" class="ecm-btn-secondary" style="flex:1;">เฉพาะปฏิทิน (PDF)</button>
-        </div>
       </div>
     </div>
   </div>
@@ -6700,14 +7228,15 @@ table.exp-tbl .tm{margin-left:3px;opacity:0.75;}
 
   <script>
     function openExportCalendarModal() {
-      var person = (typeof _getTargetPerson === 'function') ? _getTargetPerson() : null;
-      if (!person) {
+      // v3.37: รองรับ multi-name (chips หลายคน) — ICS ยังจำกัด 1 คน แต่ PDF batch ได้
+      const targets = (typeof _ecmGetExportTargets === 'function') ? _ecmGetExportTargets() : [];
+      if (targets.length === 0) {
         alert('กรุณาเลือก/พิมพ์ชื่อเภสัชกร 1 คนก่อน');
         return;
       }
-      document.getElementById('ecmSubtitle').innerText = person;
       document.getElementById('exportCalendarModal').style.display = 'block';
-      ecmSwitchTab(1);
+      // multi-name → เปิดที่ Tab 2 (PDF/PNG) เลย เพราะ ICS ไม่รองรับ
+      ecmSwitchTab(targets.length > 1 ? 2 : 1);
       // Patch ZZ2: reset shift selection on each open
       window._ecmSelectedShifts = null;
       const dpToggle = document.getElementById('ecmDayPickerToggle');
@@ -6718,6 +7247,8 @@ table.exp-tbl .tm{margin-left:3px;opacity:0.75;}
       try { _ecmRenderPlatformAction(); } catch(e) {}
       // v3.36: load Round 3 toggle state from preferences
       try { _ecmLoadRound3State(); } catch(e) {}
+      // v3.37: refresh info + button states for Tab 2
+      try { _ecmUpdateExportInfo(); } catch(e) {}
     }
 
     // v3.15: device detection — Apple family (iPhone/iPad/iPod/Mac) vs everything else
@@ -6749,7 +7280,7 @@ table.exp-tbl .tm{margin-left:3px;opacity:0.75;}
       const sel = window._ecmSelectedShifts;
       const isPickerOn = sel instanceof Set;
       if (isPickerOn && sel.size === 0) {
-        desc.innerHTML = '<b style="color:#92400e;">⚠️ เลือกเวรที่ต้องการก่อน</b><br><span style="color:var(--sub);">Tap วันในกริดด้านล่าง → เลือกเวรในวันนั้น</span>';
+        desc.innerHTML = '<b style="color:#92400e;">กรุณาเลือกเวรที่ต้องการ</b><br><span style="color:var(--sub);">Tap วันในกริดด้านล่าง → เลือกเวรในวันนั้น</span>';
         area.innerHTML = '<button class="ecm-btn-primary" disabled style="opacity:0.45; cursor:not-allowed;">รับปฏิทินเวร (เลือกเวรก่อน)</button>';
         return;
       }
@@ -6862,14 +7393,17 @@ table.exp-tbl .tm{margin-left:3px;opacity:0.75;}
       const u = (typeof phxAuthGetUser === 'function') ? phxAuthGetUser() : null;
       if (!u || !u.name || !u.hash) return;
       try {
+        // ICS endpoint applies fallback chain server-side:
+        //   col I (ICS-specific) → F/G (email reminder) → empty
+        // So r.eveningTime / r.hoursBefore = resolved ICS values
         google.script.run
           .withSuccessHandler(function(r) {
             if (r && r.success) {
-              _phxSetCachedReminderSettings(r.eveningReminderTime || '', r.hoursBeforeReminder || '');
+              _phxSetCachedReminderSettings(r.eveningTime || '', r.hoursBefore || '');
             }
           })
           .withFailureHandler(function() {})
-          .phxGetReminderSettings(u.name, u.hash);
+          .phxGetIcsReminderSettings(u.name, u.hash);
       } catch(e) {}
     }
 
@@ -7658,22 +8192,78 @@ table.exp-tbl .tm{margin-left:3px;opacity:0.75;}
       console.log('[ICS] built ' + added + ' events for ' + cleanPerson + ' (folded)');
       return rawLines.join('\r\n').split('\r\n').map(_foldICSLine).join('\r\n');
     }
-    function ecmExportPDF() {
-      closeExportCalendarModal();
-      if (typeof exportPDF === 'function') exportPDF('both');
+    // ───────────────────────────────────────────────────────────
+    // v3.37: Multi-name PDF batch — toggle calendar/table/combined
+    // ───────────────────────────────────────────────────────────
+    window._ecmExportMode = 'calendar';
+
+    function _ecmSetExportMode(mode) {
+      if (mode !== 'calendar' && mode !== 'table' && mode !== 'combined') return;
+      window._ecmExportMode = mode;
+      ['calendar', 'table', 'combined'].forEach(function(m) {
+        const btn = document.getElementById('ecmFmt-' + m);
+        if (btn) btn.classList.toggle('active', m === mode);
+      });
+      _ecmUpdateExportInfo();
     }
-    function ecmExportPNG() {
-      closeExportCalendarModal();
-      if (typeof _exportCombinedPNG_v2 === 'function') _exportCombinedPNG_v2();
-      else alert('PNG export ยังไม่พร้อม');
+
+    function _ecmGetExportTargets() {
+      const sel = window.selectedPharmacists || [];
+      if (sel.length > 0) return sel.slice();
+      const target = (typeof _getTargetPerson === 'function') ? _getTargetPerson() : null;
+      return target ? [target] : [];
     }
-    function ecmExportTableOnly() {
-      closeExportCalendarModal();
-      if (typeof exportPDF === 'function') exportPDF('table');
+
+    function _ecmUpdateExportInfo() {
+      const targets = _ecmGetExportTargets();
+      const n = targets.length;
+      const info = document.getElementById('ecmExportInfo');
+      const pngBtn = document.getElementById('ecmExportPngBtn');
+      if (info) {
+        if (n === 0) {
+          info.innerHTML = '<span style="color:#dc2626;">ยังไม่ได้เลือกชื่อ</span>';
+        } else if (n === 1) {
+          info.innerHTML = '<b>Export 1 คน</b> · ' + targets[0];
+        } else {
+          info.innerHTML = '<b>Export ' + n + ' คน</b> (1 คน/หน้า)';
+        }
+      }
+      if (pngBtn) {
+        const tooMany = n > 1;
+        pngBtn.style.opacity = tooMany ? '0.4' : '1';
+        pngBtn.style.cursor = tooMany ? 'not-allowed' : 'pointer';
+        pngBtn.disabled = tooMany;
+      }
     }
-    function ecmExportCalendarOnly() {
+
+    function _ecmExportPDFDispatch() {
+      const targets = _ecmGetExportTargets();
+      if (targets.length === 0) { alert('กรุณาเลือกชื่อก่อน'); return; }
+      const mode = window._ecmExportMode || 'calendar';
+      // v3.37: ทุก mode รองรับ multi-name แล้ว (Patches 2-4 complete)
       closeExportCalendarModal();
-      if (typeof exportPDF === 'function') exportPDF('calendar');
+      if (mode === 'calendar') _exportCalendarPDF_v2(targets);
+      else if (mode === 'table') _exportTablePDF_v2(targets);
+      else _exportCombinedPDF_v2(targets);
+    }
+
+    function _ecmExportPNGDispatch() {
+      const targets = _ecmGetExportTargets();
+      if (targets.length === 0) { alert('กรุณาเลือกชื่อก่อน'); return; }
+      if (targets.length > 1) { alert('PNG export ได้เฉพาะ 1 คน — กรุณาเลือกชื่อเดียว'); return; }
+      closeExportCalendarModal();
+      // v3.37: PNG sync กับ toggle mode
+      const mode = window._ecmExportMode || 'calendar';
+      if (mode === 'calendar') {
+        if (typeof _exportCalendarPNG_v2 === 'function') _exportCalendarPNG_v2();
+        else alert('Calendar PNG ยังไม่พร้อม');
+      } else if (mode === 'table') {
+        if (typeof _exportTablePNG_v2 === 'function') _exportTablePNG_v2();
+        else alert('Table PNG ยังไม่พร้อม');
+      } else {
+        if (typeof _exportCombinedPNG_v2 === 'function') _exportCombinedPNG_v2();
+        else alert('PNG export ยังไม่พร้อม');
+      }
     }
 
     // v3.31 (PB-4 cleanup): pre-fetch gasScriptUrl removed — no longer needed (subscribe gone)
@@ -8505,10 +9095,7 @@ table.exp-tbl .tm{margin-left:3px;opacity:0.75;}
               status.textContent = 'ยังไม่เปิดใช้งาน';
               status.style.color = 'var(--sub)';
             }
-            // Feature 2 (B4c): sync cache with fresh server values
-            if (typeof _phxSetCachedReminderSettings === 'function') {
-              _phxSetCachedReminderSettings(r.eveningReminderTime || '', r.hoursBeforeReminder || '');
-            }
+            // Note: ICS cache fed by phxGetIcsReminderSettings, not email endpoint
           } else {
             status.textContent = (r && r.error) || 'โหลดไม่ได้';
             status.style.color = '#dc2626';
@@ -8579,9 +9166,10 @@ table.exp-tbl .tm{margin-left:3px;opacity:0.75;}
               const anyOn = !!(eveningTime || hoursBefore);
               phxShowToast(anyOn ? 'บันทึกการตั้งค่าแล้ว ✓' : 'ปิดการแจ้งเตือนแล้ว ✓', 'success');
             }
-            // Feature 2 (B4d): sync cache with newly saved values
-            if (typeof _phxSetCachedReminderSettings === 'function') {
-              _phxSetCachedReminderSettings(eveningTime || '', hoursBefore || '');
+            // Refresh ICS cache — if ICS uses email fallback (col I empty),
+            // changing F/G affects ICS effective values too
+            if (typeof _phxFetchAndCacheReminderSettings === 'function') {
+              _phxFetchAndCacheReminderSettings();
             }
             setTimeout(phxCloseReminderModal, 600);
           } else {
@@ -8599,6 +9187,353 @@ table.exp-tbl .tm{margin-left:3px;opacity:0.75;}
     }
 
 
+    // ════════════════════════════════════════════════════════════
+    // 🔔 Email Notifications Modal — combines B3b (col F/G) + F1 (col H email)
+    // Replaces two separate menu items: "แจ้งเตือนเวรผ่านอีเมล" + "แจ้งเตือนประกาศ"
+    // ════════════════════════════════════════════════════════════
+
+    function phxOpenEmailNotifModal() {
+      const m = document.getElementById('phxEmailNotifModal');
+      if (!m) return;
+      m.classList.remove('hidden');
+      // Close hanging menu if open
+      if (typeof phxCloseUserMenu === 'function') phxCloseUserMenu();
+      phxLoadEmailNotifSettings();
+    }
+
+    function phxCloseEmailNotifModal() {
+      const m = document.getElementById('phxEmailNotifModal');
+      if (m) m.classList.add('hidden');
+    }
+
+    function phxEnToggleEvening() {
+      const cb = document.getElementById('phxEnEveningCb');
+      const inp = document.getElementById('phxEnEveningTime');
+      if (!cb || !inp) return;
+      inp.disabled = !cb.checked;
+      if (cb.checked && !inp.value) inp.value = '18:00';
+    }
+
+    function phxEnToggleHours() {
+      const cb = document.getElementById('phxEnHoursCb');
+      const inp = document.getElementById('phxEnHoursVal');
+      if (!cb || !inp) return;
+      inp.disabled = !cb.checked;
+      if (cb.checked && !inp.value) inp.value = '5';
+    }
+
+    function phxLoadEmailNotifSettings() {
+      const status = document.getElementById('phxEnStatus');
+      const evCb = document.getElementById('phxEnEveningCb');
+      const evInp = document.getElementById('phxEnEveningTime');
+      const hrCb = document.getElementById('phxEnHoursCb');
+      const hrInp = document.getElementById('phxEnHoursVal');
+      const bcCb = document.getElementById('phxEnBroadcastEmailCb');
+      if (!status || !evCb || !evInp || !hrCb || !hrInp || !bcCb) return;
+
+      const u = (typeof phxAuthGetUser === 'function') ? phxAuthGetUser() : null;
+      if (!u || !u.name || !u.hash) {
+        status.textContent = 'กรุณา login ก่อน';
+        status.style.color = '#dc2626';
+        return;
+      }
+
+      status.textContent = 'กำลังโหลด...';
+      status.style.color = 'var(--sub)';
+
+      let pending = 2;
+      let rR = null, cR = null;
+
+      function onBothDone() {
+        pending--;
+        if (pending > 0) return;
+
+        if (rR && rR.success) {
+          if (rR.eveningReminderTime) { evCb.checked = true; evInp.value = rR.eveningReminderTime; }
+          else { evCb.checked = false; }
+          if (rR.hoursBeforeReminder) { hrCb.checked = true; hrInp.value = rR.hoursBeforeReminder; }
+          else { hrCb.checked = false; }
+          phxEnToggleEvening();
+          phxEnToggleHours();
+        }
+
+        if (cR && cR.success) {
+          let channels = cR.channels;
+          if (typeof channels === 'string') channels = channels.split(',').map(c => c.trim()).filter(Boolean);
+          if (!Array.isArray(channels)) channels = [];
+          bcCb.checked = channels.indexOf('email') >= 0;
+        }
+
+        const anyOn = evCb.checked || hrCb.checked || bcCb.checked;
+        status.textContent = anyOn ? 'เปิดใช้งานอยู่' : 'ยังไม่เปิดใช้งาน';
+        status.style.color = anyOn ? 'var(--accent)' : 'var(--sub)';
+      }
+
+      google.script.run
+        .withSuccessHandler(function(r) { rR = r; onBothDone(); })
+        .withFailureHandler(function() { onBothDone(); })
+        .phxGetReminderSettings(u.name, u.hash);
+
+      google.script.run
+        .withSuccessHandler(function(r) { cR = r; onBothDone(); })
+        .withFailureHandler(function() { onBothDone(); })
+        .phxGetAnnounceChannels(u.name, u.hash);
+    }
+
+    function phxSaveEmailNotifSettings() {
+      const status = document.getElementById('phxEnStatus');
+      const btn = document.getElementById('phxEnSave');
+      const evCb = document.getElementById('phxEnEveningCb');
+      const evInp = document.getElementById('phxEnEveningTime');
+      const hrCb = document.getElementById('phxEnHoursCb');
+      const hrInp = document.getElementById('phxEnHoursVal');
+      const bcCb = document.getElementById('phxEnBroadcastEmailCb');
+      if (!status || !btn || !evCb || !evInp || !hrCb || !hrInp || !bcCb) return;
+
+      const u = (typeof phxAuthGetUser === 'function') ? phxAuthGetUser() : null;
+      if (!u || !u.name || !u.hash) {
+        status.textContent = 'กรุณา login ก่อน';
+        status.style.color = '#dc2626';
+        return;
+      }
+
+      const eveningTime = evCb.checked ? (evInp.value || '').trim() : '';
+      const hoursBefore = hrCb.checked ? (hrInp.value || '').trim() : '';
+
+      if (evCb.checked && !/^([01]?[0-9]|2[0-3]):[0-5][0-9]$/.test(eveningTime)) {
+        status.textContent = 'รูปแบบเวลาไม่ถูกต้อง (HH:MM)';
+        status.style.color = '#dc2626';
+        return;
+      }
+      if (hrCb.checked) {
+        const n = parseInt(hoursBefore, 10);
+        if (!hoursBefore || isNaN(n) || n < 1 || n > 24) {
+          status.textContent = 'ชั่วโมงต้องอยู่ 1-24';
+          status.style.color = '#dc2626';
+          return;
+        }
+      }
+
+      const channelsCSV = bcCb.checked ? 'email' : '';
+
+      btn.disabled = true;
+      const _origText = btn.textContent;
+      btn.textContent = '...';
+      status.textContent = '';
+
+      let pending = 2;
+      let rR = null, cR = null;
+
+      function onBothDone() {
+        pending--;
+        if (pending > 0) return;
+        btn.disabled = false;
+        btn.textContent = _origText;
+
+        const rOK = rR && rR.success;
+        const cOK = cR && cR.success;
+
+        if (rOK && cOK) {
+          if (typeof phxShowToast === 'function') {
+            phxShowToast('บันทึกการตั้งค่าแล้ว ✓', 'success');
+          }
+          // Refresh ICS cache (since F/G may be the ICS fallback source)
+          if (typeof _phxFetchAndCacheReminderSettings === 'function') {
+            _phxFetchAndCacheReminderSettings();
+          }
+          setTimeout(phxCloseEmailNotifModal, 600);
+        } else {
+          const errs = [];
+          if (!rOK) errs.push('เวร: ' + ((rR && rR.error) || 'ผิดพลาด'));
+          if (!cOK) errs.push('ประกาศ: ' + ((cR && cR.error) || 'ผิดพลาด'));
+          status.textContent = errs.join(' / ');
+          status.style.color = '#dc2626';
+        }
+      }
+
+      google.script.run
+        .withSuccessHandler(function(r) { rR = r; onBothDone(); })
+        .withFailureHandler(function(e) { rR = { success: false, error: (e && e.message) || 'err' }; onBothDone(); })
+        .phxSetReminderSettings(u.name, u.hash, eveningTime, hoursBefore);
+
+      google.script.run
+        .withSuccessHandler(function(r) { cR = r; onBothDone(); })
+        .withFailureHandler(function(e) { cR = { success: false, error: (e && e.message) || 'err' }; onBothDone(); })
+        .phxSetAnnounceChannels(u.name, u.hash, channelsCSV);
+    }
+
+    // ════════════════════════════════════════════════════════════
+    // ⚙ ICS Reminder Settings Modal — separate from Email reminder
+    // Opens from gear icon ⚙ on the export modal's "รับปฏิทินเวร" card
+    // ════════════════════════════════════════════════════════════
+
+    function phxOpenIcsReminderModal() {
+      const m = document.getElementById('phxIcsReminderModal');
+      if (!m) return;
+      m.classList.remove('hidden');
+      phxLoadIcsReminderSettings();
+    }
+
+    function phxCloseIcsReminderModal() {
+      const m = document.getElementById('phxIcsReminderModal');
+      if (m) m.classList.add('hidden');
+    }
+
+    function phxIcsToggleUseEmail() {
+      const useCb = document.getElementById('phxIcsUseEmailCb');
+      const section = document.getElementById('phxIcsCustomSection');
+      if (!useCb || !section) return;
+      const useEmail = useCb.checked;
+      section.style.opacity = useEmail ? '0.4' : '1';
+      section.style.pointerEvents = useEmail ? 'none' : 'auto';
+      const evCb = document.getElementById('phxIcsEveningCb');
+      const evInp = document.getElementById('phxIcsEveningTime');
+      const hrCb = document.getElementById('phxIcsHoursCb');
+      const hrInp = document.getElementById('phxIcsHoursVal');
+      if (evCb) evCb.disabled = useEmail;
+      if (hrCb) hrCb.disabled = useEmail;
+      if (evInp) evInp.disabled = useEmail || (evCb && !evCb.checked);
+      if (hrInp) hrInp.disabled = useEmail || (hrCb && !hrCb.checked);
+    }
+
+    function phxIcsToggleEvening() {
+      const cb = document.getElementById('phxIcsEveningCb');
+      const inp = document.getElementById('phxIcsEveningTime');
+      if (!cb || !inp) return;
+      inp.disabled = !cb.checked;
+      if (cb.checked && !inp.value) inp.value = '18:00';
+    }
+
+    function phxIcsToggleHours() {
+      const cb = document.getElementById('phxIcsHoursCb');
+      const inp = document.getElementById('phxIcsHoursVal');
+      if (!cb || !inp) return;
+      inp.disabled = !cb.checked;
+      if (cb.checked && !inp.value) inp.value = '5';
+    }
+
+    function phxLoadIcsReminderSettings() {
+      const status = document.getElementById('phxIcsStatus');
+      const useCb = document.getElementById('phxIcsUseEmailCb');
+      const evCb = document.getElementById('phxIcsEveningCb');
+      const evInp = document.getElementById('phxIcsEveningTime');
+      const hrCb = document.getElementById('phxIcsHoursCb');
+      const hrInp = document.getElementById('phxIcsHoursVal');
+      if (!status || !useCb || !evCb || !evInp || !hrCb || !hrInp) return;
+
+      const u = (typeof phxAuthGetUser === 'function') ? phxAuthGetUser() : null;
+      if (!u || !u.name || !u.hash) {
+        status.textContent = 'กรุณา login ก่อน';
+        status.style.color = '#dc2626';
+        return;
+      }
+
+      status.textContent = 'กำลังโหลด...';
+      status.style.color = 'var(--sub)';
+      useCb.disabled = true; evCb.disabled = true; hrCb.disabled = true;
+
+      google.script.run
+        .withSuccessHandler(function(r) {
+          useCb.disabled = false;
+          if (r && r.success) {
+            useCb.checked = !!r.useEmail;
+            if (r.eveningTime) { evCb.checked = true; evInp.value = r.eveningTime; }
+            else { evCb.checked = false; }
+            if (r.hoursBefore) { hrCb.checked = true; hrInp.value = r.hoursBefore; }
+            else { hrCb.checked = false; }
+            phxIcsToggleUseEmail();
+            phxIcsToggleEvening();
+            phxIcsToggleHours();
+            if (r.useEmail) {
+              status.textContent = 'ใช้ค่าเดียวกับ Email reminder';
+              status.style.color = 'var(--accent)';
+            } else {
+              status.textContent = 'ตั้งค่าแยกสำหรับปฏิทิน';
+              status.style.color = 'var(--accent)';
+            }
+          } else {
+            status.textContent = (r && r.error) || 'โหลดไม่ได้';
+            status.style.color = '#dc2626';
+          }
+        })
+        .withFailureHandler(function(e) {
+          useCb.disabled = false;
+          status.textContent = 'error: ' + ((e && e.message) || e);
+          status.style.color = '#dc2626';
+        })
+        .phxGetIcsReminderSettings(u.name, u.hash);
+    }
+
+    function phxSaveIcsReminderSettings() {
+      const status = document.getElementById('phxIcsStatus');
+      const btn = document.getElementById('phxIcsSave');
+      const useCb = document.getElementById('phxIcsUseEmailCb');
+      const evCb = document.getElementById('phxIcsEveningCb');
+      const evInp = document.getElementById('phxIcsEveningTime');
+      const hrCb = document.getElementById('phxIcsHoursCb');
+      const hrInp = document.getElementById('phxIcsHoursVal');
+      if (!status || !btn || !useCb || !evCb || !evInp || !hrCb || !hrInp) return;
+
+      const u = (typeof phxAuthGetUser === 'function') ? phxAuthGetUser() : null;
+      if (!u || !u.name || !u.hash) {
+        status.textContent = 'กรุณา login ก่อน';
+        status.style.color = '#dc2626';
+        return;
+      }
+
+      const useEmail = useCb.checked;
+      const eveningTime = (!useEmail && evCb.checked) ? (evInp.value || '').trim() : '';
+      const hoursBefore = (!useEmail && hrCb.checked) ? (hrInp.value || '').trim() : '';
+
+      if (!useEmail) {
+        if (evCb.checked && !/^([01]?[0-9]|2[0-3]):[0-5][0-9]$/.test(eveningTime)) {
+          status.textContent = 'รูปแบบเวลาไม่ถูกต้อง (HH:MM)';
+          status.style.color = '#dc2626';
+          return;
+        }
+        if (hrCb.checked) {
+          const n = parseInt(hoursBefore, 10);
+          if (!hoursBefore || isNaN(n) || n < 1 || n > 24) {
+            status.textContent = 'จำนวนชั่วโมงต้องอยู่ระหว่าง 1-24';
+            status.style.color = '#dc2626';
+            return;
+          }
+        }
+      }
+
+      btn.disabled = true;
+      const _origText = btn.textContent;
+      btn.textContent = '...';
+      status.textContent = '';
+
+      google.script.run
+        .withSuccessHandler(function(r) {
+          btn.disabled = false;
+          btn.textContent = _origText;
+          if (r && r.success) {
+            if (typeof phxShowToast === 'function') {
+              phxShowToast(r.useEmail ? 'ใช้ค่าเดียวกับ Email ✓' : 'บันทึกการตั้งค่า ICS แล้ว ✓', 'success');
+            }
+            // Refresh cache so next ICS export picks up the new value
+            // (will use the new ICS-aware fetch after Patch 4 is applied)
+            if (typeof _phxFetchAndCacheReminderSettings === 'function') {
+              _phxFetchAndCacheReminderSettings();
+            }
+            setTimeout(phxCloseIcsReminderModal, 600);
+          } else {
+            status.textContent = (r && r.error) || 'บันทึกไม่ได้';
+            status.style.color = '#dc2626';
+          }
+        })
+        .withFailureHandler(function(e) {
+          btn.disabled = false;
+          btn.textContent = _origText;
+          status.textContent = 'error: ' + ((e && e.message) || e);
+          status.style.color = '#dc2626';
+        })
+        .phxSetIcsReminderSettings(u.name, u.hash, useEmail, eveningTime, hoursBefore);
+    }
+
     // ============================================================
     // ⚙️ v3.14 — Stage H: User Preferences Sync
     // ============================================================
@@ -8607,7 +9542,6 @@ table.exp-tbl .tm{margin-left:3px;opacity:0.75;}
 
     const PHX_PREFS_DEFAULTS = {
       hideStruck: false,
-      theme: 'light',
       round3Mode: 'start',
       calStartDay: 'mon'
     };
@@ -8674,7 +9608,7 @@ table.exp-tbl .tm{margin-left:3px;opacity:0.75;}
                   '• font ปฏิทิน → 9.5\n' +
                   '• เริ่มสัปดาห์ → จันทร์\n' +
                   '• ซ่อนเวรขีดฆ่า → off\n\n' +
-                  'หมายเหตุ: การแก้ไขเวร / Prefs Sync / Theme / ตัวเลือก Export ไม่ถูกเปลี่ยน';
+                  'หมายเหตุ: การแก้ไขเวร / Prefs Sync / ตัวเลือก Export จะไม่ถูกเปลี่ยน';
       if (!confirm(msg)) return;
 
       try {
@@ -8773,12 +9707,7 @@ table.exp-tbl .tm{margin-left:3px;opacity:0.75;}
             finally { _phxSuppressPrefSave = false; }
           }
         }
-        // theme (no rawData dependency)
-        if (prefs.theme === 'dark') {
-          document.body.classList.add('dark-theme');
-        } else {
-          document.body.classList.remove('dark-theme');
-        }
+        
         // v3.36: round3Mode no longer applied to main UI — pref is read directly by
         // _ecmBuildClientICS at export time only. Main UI always shows original dates.
         // calStartDay — DEFENSIVE: write localStorage + window var, only re-render if target exists
@@ -8853,22 +9782,7 @@ table.exp-tbl .tm{margin-left:3px;opacity:0.75;}
           return r;
         };
       }
-      // Theme: hook the dark-theme class observer (theme toggle button calls toggleTheme or similar)
-      // We watch body class changes
-      try {
-        const obs = new MutationObserver(function(muts) {
-          if (_phxSuppressPrefSave) return;
-          muts.forEach(function(m) {
-            if (m.attributeName === 'class') {
-              const isDark = document.body.classList.contains('dark-theme');
-              const cur = phxGetPrefs().theme;
-              const want = isDark ? 'dark' : 'light';
-              if (cur !== want) phxSetPref('theme', want);
-            }
-          });
-        });
-        obs.observe(document.body, { attributes: true, attributeFilter: ['class'] });
-      } catch(e) {}
+      
     })();
 
 
@@ -10428,7 +11342,7 @@ table.exp-tbl .tm{margin-left:3px;opacity:0.75;}
       <div id="phxFormLogin">
         <h3 style="font-size:15px; font-weight:600; margin:0 0 16px; color:var(--text); text-align:center;">เข้าสู่ระบบ</h3>
         <div class="phx-email-wrap">
-          <input type="text" id="phxLoginEmailLocal" placeholder="username (ชื่อ+สกุล 3 ตัวแรก เช่น steve.job)" autocomplete="username" spellcheck="false">
+          <input type="text" id="phxLoginEmailLocal" placeholder="username (ชื่อ-สกุล 3 ตัวแรก เช่น steve.job)" autocomplete="username" spellcheck="false">
         </div>
         <input type="password" id="phxLoginPw" class="phx-input" placeholder="รหัสผ่าน" autocomplete="current-password">
         <button onclick="phxSubmitLogin()" class="phx-btn-primary">เข้าสู่ระบบ</button>
@@ -10473,8 +11387,7 @@ table.exp-tbl .tm{margin-left:3px;opacity:0.75;}
         </button>
         <h3 style="font-size:15px; font-weight:600; margin:0 0 16px; color:var(--text); text-align:center;">ลืมรหัสผ่าน</h3>
         <div class="phx-email-wrap">
-          <input type="text" id="phxForgotEmailLocal" placeholder="username (เช่น norapol.utt)" autocomplete="username" spellcheck="false">
-          <div class="phx-email-suffix">@mahidol.ac.th</div>
+          <input type="text" id="phxForgotEmailLocal" placeholder="กรอกอีเมล @mahidol หรือ อีเมลสำรองของท่าน (หากตั้งไว้)" autocomplete="username" spellcheck="false">
         </div>
         <button onclick="phxSubmitForgot()" class="phx-btn-primary">ส่งลิงก์รีเซ็ตรหัสผ่าน</button>
         <p class="phx-form-note">ระบบจะส่งอีเมลรีเซ็ตไปยังอีเมลที่กรอก</p>
@@ -10516,9 +11429,9 @@ table.exp-tbl .tm{margin-left:3px;opacity:0.75;}
   <div id="phxReminderModal" class="hidden" style="position:fixed; inset:0; background:rgba(0,0,0,0.55); backdrop-filter:blur(4px); z-index:5500; display:flex; align-items:center; justify-content:center; padding:20px;">
     <div class="modal-box" style="background:var(--surface); border-radius:16px; padding:24px; max-width:420px; width:100%; box-shadow:0 20px 60px rgba(0,0,0,0.25); position:relative;">
       <button onclick="phxCloseReminderModal()" style="position:absolute; top:14px; right:14px; background:none; border:none; color:#94a3b8; font-size:18px; cursor:pointer; padding:4px; line-height:1;">✕</button>
-      <h3 style="font-size:15px; font-weight:600; margin:0 0 8px; color:var(--text);">แจ้งเตือนก่อนเข้าเวร</h3>
+      <h3 style="font-size:15px; font-weight:600; margin:0 0 8px; color:var(--text);">แจ้งเตือนเวรผ่านอีเมลล์</h3>
       <p style="font-size:11px; color:var(--sub); margin:0 0 16px; line-height:1.5;">
-        ระบบจะส่งอีเมลแจ้งเตือนตามที่ตั้งไว้<br>
+        ระบบจะส่งอีเมลแจ้งเตือนตามที่ตั้งไว้ (หากไม่ได้ตั้งอีเมลสำรอง จะส่งไปยัง @mahidol)<br>
       </p>
       <div id="phxReminderStatus" style="font-size:11px; padding:8px 10px; border-radius:6px; background:var(--bg); color:var(--sub); margin-bottom:14px; text-align:center;">กำลังโหลด...</div>
 
@@ -10547,6 +11460,152 @@ table.exp-tbl .tm{margin-left:3px;opacity:0.75;}
       </div>
 
       <button id="phxReminderSave" onclick="phxSaveReminderSettings()" class="phx-btn-primary">บันทึก</button>
+    </div>
+  </div>
+
+  <!-- 🔔 EMAIL NOTIFICATIONS MODAL — combines B3b pre-shift reminder + F1 announce email opt-in -->
+  <div id="phxEmailNotifModal" class="hidden" style="position:fixed; inset:0; background:rgba(0,0,0,0.55); backdrop-filter:blur(4px); z-index:5500; display:flex; align-items:center; justify-content:center; padding:20px;">
+    <div class="modal-box" style="background:var(--surface); border-radius:16px; padding:24px; max-width:440px; width:100%; box-shadow:0 20px 60px rgba(0,0,0,0.25); position:relative; max-height:85vh; overflow-y:auto;">
+      <button onclick="phxCloseEmailNotifModal()" style="position:absolute; top:14px; right:14px; background:none; border:none; color:#94a3b8; font-size:18px; cursor:pointer; padding:4px; line-height:1;">✕</button>
+      <h3 style="font-size:15px; font-weight:600; margin:0 0 8px; color:var(--text);">🔔 การแจ้งเตือนผ่านอีเมล</h3>
+      <p style="font-size:11px; color:var(--sub); margin:0 0 14px; line-height:1.5;">ตั้งค่าการรับอีเมลจากระบบ</p>
+      <div id="phxEnStatus" style="font-size:11px; padding:8px 10px; border-radius:6px; background:var(--bg); color:var(--sub); margin-bottom:14px; text-align:center;">กำลังโหลด...</div>
+
+      <style>
+        #phxEmailNotifModal .en-toggle {
+          appearance: none; -webkit-appearance: none;
+          width: 44px; height: 26px; background: #d1d5db;
+          border-radius: 14px; position: relative; cursor: pointer;
+          transition: background 0.25s; margin: 0; flex-shrink: 0;
+          outline: none; border: none;
+        }
+        #phxEmailNotifModal .en-toggle::before {
+          content: ''; position: absolute; top: 2px; left: 2px;
+          width: 22px; height: 22px; background: white;
+          border-radius: 50%; box-shadow: 0 1px 3px rgba(0,0,0,0.2);
+          transition: transform 0.25s;
+        }
+        #phxEmailNotifModal .en-toggle:checked { background: var(--accent); }
+        #phxEmailNotifModal .en-toggle:checked::before { transform: translateX(18px); }
+        #phxEmailNotifModal .en-section-title {
+          font-size: 12px; font-weight: 600; color: #64748b;
+          margin: 0 0 8px 4px; letter-spacing: 0.2px;
+        }
+        #phxEmailNotifModal .en-card {
+          background: var(--surface); border: 1px solid var(--border);
+          border-radius: 14px; overflow: hidden;
+        }
+        #phxEmailNotifModal .en-row {
+          padding: 12px 16px; display: flex; align-items: center;
+          justify-content: space-between; gap: 12px;
+        }
+        #phxEmailNotifModal .en-row + .en-row { border-top: 1px solid var(--border); }
+        #phxEmailNotifModal .en-row-main { flex: 1; min-width: 0; }
+        #phxEmailNotifModal .en-row-title {
+          font-size: 14px; font-weight: 500; color: var(--text); margin-bottom: 4px;
+        }
+        #phxEmailNotifModal .en-row-sub {
+          font-size: 11px; color: var(--sub); line-height: 1.5;
+        }
+        #phxEmailNotifModal .en-inline-input {
+          padding: 4px 8px; border: 1px solid var(--border); border-radius: 6px;
+          font-family: 'Kanit', sans-serif; font-size: 12px;
+          background: var(--bg); color: var(--text); outline: none;
+        }
+        #phxEmailNotifModal .en-inline-input:disabled { opacity: 0.5; cursor: not-allowed; }
+      </style>
+
+      <!-- Section 1: Pre-shift reminder -->
+      <div style="margin-bottom:20px;">
+        <div class="en-section-title">ก่อนเข้าเวร</div>
+        <div class="en-card">
+          <div class="en-row">
+            <div class="en-row-main">
+              <div class="en-row-title">เตือนก่อนเข้าเวร 1 วัน</div>
+              <div class="en-row-sub" style="display:flex; align-items:center; gap:6px;">
+                <span>เวลา</span>
+                <input type="time" id="phxEnEveningTime" value="18:00" disabled class="en-inline-input">
+              </div>
+            </div>
+            <input type="checkbox" id="phxEnEveningCb" class="en-toggle" onchange="phxEnToggleEvening()">
+          </div>
+          <div class="en-row">
+            <div class="en-row-main">
+              <div class="en-row-title">เตือนก่อนเวลาเริ่มเวร</div>
+              <div class="en-row-sub" style="display:flex; align-items:center; gap:6px;">
+                <input type="number" id="phxEnHoursVal" min="1" max="24" value="5" disabled class="en-inline-input" style="width:54px; text-align:center;">
+                <span>ชั่วโมง (1-24)</span>
+              </div>
+            </div>
+            <input type="checkbox" id="phxEnHoursCb" class="en-toggle" onchange="phxEnToggleHours()">
+          </div>
+        </div>
+      </div>
+
+      <!-- Section 2: Broadcast email opt-in -->
+      <div style="margin-bottom:20px;">
+        <div class="en-section-title">ประกาศใหม่</div>
+        <div class="en-card">
+          <div class="en-row">
+            <div class="en-row-main">
+              <div class="en-row-title">รับอีเมลเมื่อมีประกาศใหม่</div>
+              <div class="en-row-sub">เช่น อัปโหลดเวรเดือนใหม่, การประกาศจากแอดมิน</div>
+            </div>
+            <input type="checkbox" id="phxEnBroadcastEmailCb" class="en-toggle">
+          </div>
+        </div>
+      </div>
+
+      <button id="phxEnSave" onclick="phxSaveEmailNotifSettings()" class="phx-btn-primary">บันทึก</button>
+    </div>
+  </div>
+
+  <!-- 🔔 ICS REMINDER MODAL — settings for calendar (.ics) export only -->
+  <div id="phxIcsReminderModal" class="hidden" style="position:fixed; inset:0; background:rgba(0,0,0,0.55); backdrop-filter:blur(4px); z-index:10010; display:flex; align-items:center; justify-content:center; padding:20px;">
+    <div class="modal-box" style="background:var(--surface); border-radius:16px; padding:24px; max-width:420px; width:100%; box-shadow:0 20px 60px rgba(0,0,0,0.25); position:relative;">
+      <button onclick="phxCloseIcsReminderModal()" style="position:absolute; top:14px; right:14px; background:none; border:none; color:#94a3b8; font-size:18px; cursor:pointer; padding:4px; line-height:1;">✕</button>
+      <h3 style="font-size:15px; font-weight:600; margin:0 0 8px; color:var(--text);">แจ้งเตือนในปฏิทิน (ICS)</h3>
+      <p style="font-size:11px; color:var(--sub); margin:0 0 14px; line-height:1.5;">
+        ตั้งเวลา VALARM สำหรับเวรในไฟล์ปฏิทิน (.ics) แยกจากการแจ้งเตือนทาง Email<br>
+        <span style="font-size:10px;">ถ้าไม่ตั้ง = ใช้ค่าเดียวกับการแจ้งเตือน Email อัตโนมัติ</span>
+      </p>
+      <div id="phxIcsStatus" style="font-size:11px; padding:8px 10px; border-radius:6px; background:var(--bg); color:var(--sub); margin-bottom:12px; text-align:center;">กำลังโหลด...</div>
+
+      <!-- Top: use email checkbox -->
+      <label style="display:flex; align-items:flex-start; gap:10px; padding:10px 12px; border:1px solid var(--accent-border); background:var(--accent-bg); border-radius:10px; cursor:pointer; margin-bottom:14px;">
+        <input type="checkbox" id="phxIcsUseEmailCb" onchange="phxIcsToggleUseEmail()" style="width:16px; height:16px; cursor:pointer; flex-shrink:0; margin-top:2px;">
+        <span style="flex:1;">
+          <span style="display:block; font-size:13px; font-weight:600; color:var(--text);">ใช้ค่าเดียวกับ Email reminder</span>
+          <span style="display:block; font-size:10px; color:var(--sub); margin-top:2px; line-height:1.5;">ตั้งค่าที่ "แจ้งเตือนเวรผ่านอีเมล" ปฏิทินจะใช้ค่าเดียวกัน</span>
+        </span>
+      </label>
+
+      <!-- Custom ICS settings (disabled when useEmail = on) -->
+      <div id="phxIcsCustomSection">
+        <div style="border:1px solid var(--border); border-radius:10px; padding:12px; margin-bottom:10px;">
+          <label style="display:flex; align-items:center; gap:8px; cursor:pointer; margin-bottom:8px;">
+            <input type="checkbox" id="phxIcsEveningCb" onchange="phxIcsToggleEvening()" style="width:16px; height:16px; cursor:pointer; flex-shrink:0;">
+            <span style="font-size:13px; font-weight:600; color:var(--text);">เตือนก่อนเข้าเวร 1 วัน</span>
+          </label>
+          <div style="display:flex; align-items:center; gap:8px; padding-left:24px;">
+            <span style="font-size:11px; color:var(--sub);">เวลา</span>
+            <input type="time" id="phxIcsEveningTime" value="18:00" disabled style="padding:6px 10px; border:1px solid var(--border); border-radius:6px; font-family:'Kanit',sans-serif; font-size:13px; background:var(--bg); color:var(--text); outline:none;">
+          </div>
+        </div>
+
+        <div style="border:1px solid var(--border); border-radius:10px; padding:12px; margin-bottom:16px;">
+          <label style="display:flex; align-items:center; gap:8px; cursor:pointer; margin-bottom:8px;">
+            <input type="checkbox" id="phxIcsHoursCb" onchange="phxIcsToggleHours()" style="width:16px; height:16px; cursor:pointer; flex-shrink:0;">
+            <span style="font-size:13px; font-weight:600; color:var(--text);">เตือนก่อนเวลาเริ่มเวร</span>
+          </label>
+          <div style="display:flex; align-items:center; gap:8px; padding-left:24px;">
+            <input type="number" id="phxIcsHoursVal" min="1" max="24" value="5" disabled style="width:70px; padding:6px 10px; border:1px solid var(--border); border-radius:6px; font-family:'Kanit',sans-serif; font-size:13px; background:var(--bg); color:var(--text); outline:none; text-align:center;">
+            <span style="font-size:11px; color:var(--sub);">ชั่วโมง (1-24)</span>
+          </div>
+        </div>
+      </div>
+
+      <button id="phxIcsSave" onclick="phxSaveIcsReminderSettings()" class="phx-btn-primary">บันทึก</button>
     </div>
   </div>
 

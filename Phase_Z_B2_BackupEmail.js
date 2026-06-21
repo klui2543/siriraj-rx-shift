@@ -145,6 +145,163 @@ function phxGetReminderSettings(rawName, passwordHash) {
   }
 }
 
+// ════════════════════════════════════════════════════════════
+// 🔔 ICS Reminder Settings — col I (icsReminderJSON)
+// แยกจาก F/G (email reminder) — ถ้า col I ว่าง = fallback ไป F/G
+// Format: {"evening":"HH:MM","hours":"N"}
+// ════════════════════════════════════════════════════════════
+
+function phxGetIcsReminderSettings(rawName, passwordHash) {
+  try {
+    const name = String(rawName || '').trim();
+    const hash = String(passwordHash || '').trim();
+    const row = _phxFindPharmacistRow(name);
+    if (!row || row.passwordHash !== hash) return { success: false, error: 'auth' };
+
+    const sh = _phxGetSheet('PHX_Pharmacists');
+
+    // Read col I (icsReminderJSON)
+    const rawI = String(sh.getRange(row.rowIndex, 9).getValue() || '').trim();
+
+    // Always read F/G too — for preview when col I is empty (fallback values)
+    const rawF = sh.getRange(row.rowIndex, 6).getValue();
+    let emailEvening = '';
+    if (rawF instanceof Date) {
+      emailEvening = Utilities.formatDate(rawF, Session.getScriptTimeZone(), 'HH:mm');
+    } else {
+      emailEvening = String(rawF || '').trim();
+    }
+    const emailHours = String(sh.getRange(row.rowIndex, 7).getValue() || '').trim();
+
+    // If col I empty → use email settings (F/G) as effective ICS settings
+    if (!rawI) {
+      return {
+        success: true,
+        useEmail: true,
+        eveningTime: emailEvening,
+        hoursBefore: emailHours,
+        source: 'email_fallback'
+      };
+    }
+
+    // Parse ICS-specific JSON
+    try {
+      const parsed = JSON.parse(rawI);
+      return {
+        success: true,
+        useEmail: false,
+        eveningTime: String(parsed.evening || '').trim(),
+        hoursBefore: String(parsed.hours || '').trim(),
+        source: 'ics_specific'
+      };
+    } catch(e) {
+      // Corrupt JSON → safe fallback to email
+      return {
+        success: true,
+        useEmail: true,
+        eveningTime: emailEvening,
+        hoursBefore: emailHours,
+        source: 'email_fallback_corrupt'
+      };
+    }
+  } catch (e) {
+    return { success: false, error: String(e.message || e) };
+  }
+}
+
+function phxSetIcsReminderSettings(rawName, passwordHash, useEmail, rawEveningTime, rawHoursBefore) {
+  try {
+    const name = String(rawName || '').trim();
+    const hash = String(passwordHash || '').trim();
+    if (!name || !hash) return { success: false, error: 'ยังไม่ได้ login' };
+
+    const row = _phxFindPharmacistRow(name);
+    if (!row) return { success: false, error: 'ไม่พบชื่อในระบบ' };
+    if (row.passwordHash !== hash) return { success: false, error: 'ยืนยันตัวตนไม่ผ่าน' };
+
+    const sh = _phxGetSheet('PHX_Pharmacists');
+
+    // Ensure col I header (one-time setup)
+    if (String(sh.getRange(1, 9).getValue() || '').trim() !== 'icsReminderJSON') {
+      sh.getRange(1, 9).setValue('icsReminderJSON');
+    }
+
+    // useEmail = true → clear col I → ICS will fallback to F/G
+    if (useEmail === true || useEmail === 'true') {
+      sh.getRange(row.rowIndex, 9).setNumberFormat('@').setValue('');
+      return {
+        success: true,
+        useEmail: true,
+        message: 'ใช้ค่าเดียวกับอีเมล'
+      };
+    }
+
+    // useEmail = false → validate + store ICS-specific JSON
+    const eveningTime = String(rawEveningTime || '').trim();
+    const hoursBefore = String(rawHoursBefore || '').trim();
+
+    if (eveningTime && !/^(0?[0-9]|1[0-9]|2[0-3]):[0-5][0-9]$/.test(eveningTime)) {
+      return { success: false, error: 'รูปแบบเวลาไม่ถูกต้อง (ต้องเป็น HH:MM)' };
+    }
+    if (hoursBefore) {
+      const h = parseInt(hoursBefore, 10);
+      if (isNaN(h) || h < 1 || h > 24 || String(h) !== hoursBefore) {
+        return { success: false, error: 'ชั่วโมงต้องเป็นจำนวนเต็ม 1-24' };
+      }
+    }
+
+    // Normalize HH:MM (pad leading zero)
+    let normalizedTime = eveningTime;
+    if (eveningTime) {
+      const parts = eveningTime.split(':');
+      normalizedTime = parts[0].padStart(2, '0') + ':' + parts[1];
+    }
+
+    // Build JSON payload — only include set values
+    const payload = {};
+    if (normalizedTime) payload.evening = normalizedTime;
+    if (hoursBefore) payload.hours = hoursBefore;
+
+    // If both empty → equivalent to "use email" → clear col I
+    if (Object.keys(payload).length === 0) {
+      sh.getRange(row.rowIndex, 9).setNumberFormat('@').setValue('');
+      return { success: true, useEmail: true, message: 'ไม่มีค่า → ใช้ค่าเดียวกับอีเมล' };
+    }
+
+    sh.getRange(row.rowIndex, 9).setNumberFormat('@').setValue(JSON.stringify(payload));
+
+    return {
+      success: true,
+      useEmail: false,
+      eveningTime: normalizedTime,
+      hoursBefore: hoursBefore,
+      message: 'บันทึกการตั้งค่า ICS แล้ว'
+    };
+  } catch (e) {
+    console.error('phxSetIcsReminderSettings: ' + e.message);
+    return { success: false, error: 'เกิดข้อผิดพลาด: ' + e.message };
+  }
+}
+
+function testICS_SettingsBasic() {
+  const hash = _phxHashPassword('ณรพล', 'klui2543');
+
+  Logger.log('--- 1. GET initial (col I ว่าง — should return email fallback) ---');
+  Logger.log(JSON.stringify(phxGetIcsReminderSettings('ณรพล', hash), null, 2));
+
+  Logger.log('--- 2. SET ICS-specific: 20:00 + 3h ---');
+  Logger.log(JSON.stringify(phxSetIcsReminderSettings('ณรพล', hash, false, '20:00', '3'), null, 2));
+
+  Logger.log('--- 3. GET after set (should return ics_specific) ---');
+  Logger.log(JSON.stringify(phxGetIcsReminderSettings('ณรพล', hash), null, 2));
+
+  Logger.log('--- 4. SET useEmail=true (clear col I) ---');
+  Logger.log(JSON.stringify(phxSetIcsReminderSettings('ณรพล', hash, true, '', ''), null, 2));
+
+  Logger.log('--- 5. GET after clear (should return email_fallback again) ---');
+  Logger.log(JSON.stringify(phxGetIcsReminderSettings('ณรพล', hash), null, 2));
+}
+
 function testB3b_SettingsBasic() {
   const hash = _phxHashPassword('ณรพล', 'klui2543');
 
