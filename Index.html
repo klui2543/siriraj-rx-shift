@@ -3848,8 +3848,11 @@ window.allPharmacistNames = [];
         currentFbRef.on('value', function(snapshot) {
           clearTimeout(fallbackTimer);
           const res = snapshot.val();
-          if (!res) { fetchViaGAS(); return; } 
+          if (!res) { fetchViaGAS(); return; }
           handleDataReceived(res, 'firebase');
+          // 🌟 Path B: หลังจาก Firebase render ตารางดิบ → ยิง GAS ต่อเพื่อเอา overlay-applied version
+          //           (Firebase มีแค่ตารางดิบไม่มี overlay — GAS getScheduleData มี Path B ทำงานอยู่)
+          fetchPathBOverlayApplied(selectEl.value);
         }, function(error) {
           clearTimeout(fallbackTimer);
           console.error("🔥 Firebase error -> fallback to GAS", error);
@@ -3859,6 +3862,35 @@ window.allPharmacistNames = [];
         clearTimeout(fallbackTimer);
         fetchViaGAS();
       }
+    }
+
+    // 🌟 Path B overlay merge: ยิง GAS getScheduleData เพื่อรับตารางที่แปะ overlay แล้ว
+    //    ทำงานหลังจาก Firebase (ตารางดิบ) render เสร็จ → replace rawData ด้วยตัวที่มี overlay
+    //    ทำงานทั้งกรณีคนล็อกอินและไม่ล็อกอิน (Path B apply บนหลังบ้าน ไม่ต้องการชื่อ viewer)
+    function fetchPathBOverlayApplied(monthId) {
+      if (!monthId) return;
+      google.script.run
+        .withSuccessHandler(function(res) {
+          if (!res || !res._pbApplied) return;   // Backend ไม่ได้ apply → ไม่ต้องทับ
+          const applied = res.data || res.schedule;
+          if (!Array.isArray(applied) || applied.length === 0) return;
+          // sanity check: length ต้องใกล้กับ rawData (ป้องกันเดือน mismatch)
+          if (rawData && Math.abs(applied.length - rawData.length) > 100) {
+            console.warn('🎯 Path B: length mismatch (' + applied.length + ' vs ' + rawData.length + '), aborting');
+            return;
+          }
+          console.log('🎯 Path B: merging overlays into rawData (' + applied.length + ' shifts, _pbApplied=' + res._pbApplied + ')');
+          rawData = applied;
+          if (typeof invalidateGhostCache === 'function') invalidateGhostCache();
+          _shiftKeyIndex = null; _shiftKeyIndexFor = null;
+          if (typeof triggerUpdate === 'function') {
+            try { triggerUpdate(); } catch (err) { console.warn('Path B triggerUpdate failed:', err && err.message); }
+          }
+        })
+        .withFailureHandler(function(err) {
+          console.warn('Path B GAS fetch failed (non-fatal):', err && err.message);
+        })
+        .getScheduleData(monthId);
     }
 
     // ==========================================

@@ -232,12 +232,33 @@ function getScheduleData(monthId) {
     }
   }
 
+  // 🌟 Path B: apply global overlays ให้ทุกคนเห็นการยกเวรเหมือนกัน (รวมคนไม่ล็อกอิน)
+  //   - อ่าน overlay จาก PHX_Overlays_v2 ด้วย Label format (m_<เดือน>_<ปีBE>)
+  //   - _phxApplyOverlaysGlobally คืน array ใหม่ (immutable) → ต้อง reassign
+  //   - try/catch: ถ้า Path B พัง ยังส่งตารางเปล่าออกได้ ไม่กระทบผู้ใช้ 300 คน
+  let pbApplied = false;
+  try {
+    const pbLabel = String(label || '').trim();
+    if (pbLabel) {
+      const pbMonthId = 'm_' + pbLabel.replace(/\s+/g, '_');   // 'มิถุนายน 2569' → 'm_มิถุนายน_2569'
+      const pbRes = phxGetAllActiveOverlaysForMonth(pbMonthId);
+      if (pbRes && pbRes.ok && pbRes.count > 0) {
+        schedule = _phxApplyOverlaysGlobally(schedule, pbRes.overlays);
+        pbApplied = true;
+      }
+    }
+  } catch (e) {
+    console.warn('Path B apply failed (non-fatal):', e && e.message);
+  }
+
   return {
-    schedule: schedule,
+    schedule: schedule,   // backward compat — used by syncMonthToFirebase, Phase_Z_B2, Phase_PathB
+    data: schedule,       // 🌟 alias for frontend (Index.html รอ res.data)
     sheets: ["103", "NM5", "IPD", "clinic"],
     sheetUrl: sheetUrl,
     diagnostics: {},
-    audit: null
+    audit: null,
+    _pbApplied: pbApplied
   };
 }
 

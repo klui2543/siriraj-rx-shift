@@ -1,0 +1,1970 @@
+<title>Siriraj Rx Shift — System Map v1</title>
+
+<!-- ═══════════════════════════════════════════════════════════
+     Fresh diagnostic data — do NOT edit inline.
+     Regenerate via:  node build_map.js <MapA_diagnostic.json>
+     ═══════════════════════════════════════════════════════════ -->
+<script id="diag-data" type="application/json">
+{
+  "runAt": "2026-07-05T08:22:47.817Z",
+  "runBy": "norapol.uttho@gmail.com",
+  "sheets": {
+    "Schedule_Index": {
+      "rows": 11,
+      "cols": 9
+    },
+    "Schedule_m_1781858940879169_v1": {
+      "rows": 2349,
+      "cols": 12
+    },
+    "PHX_UserOverlays": {
+      "rows": 6,
+      "cols": 4
+    },
+    "Schedule_m_1781304516401916_v1": {
+      "rows": 2406,
+      "cols": 12
+    },
+    "Schedule_m_1781304482466579_v1": {
+      "rows": 2307,
+      "cols": 12
+    },
+    "Schedule_m_1781302809807259_v1": {
+      "rows": 2406,
+      "cols": 12
+    },
+    "Schedule_m_1781302776024211_v1": {
+      "rows": 2307,
+      "cols": 12
+    },
+    "Schedule_m_1781135590706603_v2": {
+      "rows": 2130,
+      "cols": 12
+    },
+    "Schedule_m_1781135590706603_v1": {
+      "rows": 2130,
+      "cols": 12
+    },
+    "Schedule_m_1781088370706875_v1": {
+      "rows": 2410,
+      "cols": 12
+    },
+    "PHX_AuditLog": {
+      "rows": 192,
+      "cols": 8
+    },
+    "Schedule_m_1780956464020192_v1": {
+      "rows": 2130,
+      "cols": 12
+    },
+    "Schedule_m_1780928284757680_v1": {
+      "rows": 2406,
+      "cols": 12
+    },
+    "Schedule_m_1780833048543956_v1": {
+      "rows": 2307,
+      "cols": 12
+    },
+    "PHX_LineGroups": {
+      "rows": 2,
+      "cols": 5
+    },
+    "PHX_Broadcasts": {
+      "rows": 13,
+      "cols": 12
+    },
+    "PHX_Pharmacists_Master": {
+      "rows": 212,
+      "cols": 5
+    },
+    "PHX_Pharmacists": {
+      "rows": 4,
+      "cols": 10
+    },
+    "PHX_EmailQueue": {
+      "rows": 51,
+      "cols": 8
+    },
+    "PHX_PendingVerifications": {
+      "rows": 1,
+      "cols": 6
+    },
+    "PHX_PendingResets": {
+      "rows": 4,
+      "cols": 5
+    },
+    "PHX_Overlays_v2": {
+      "rows": 31,
+      "cols": 6
+    },
+    "PHX_Overlays": {
+      "rows": 11,
+      "cols": 9
+    },
+    "PHX_Codes": {
+      "rows": 3,
+      "cols": 2
+    },
+    "User_Overlays": {
+      "rows": 15,
+      "cols": 9
+    }
+  },
+  "firebase": {
+    "topLevelKeys": [
+      "positionNotesValidation",
+      "positionNotes",
+      "scheduleNotes",
+      "schedules",
+      "scheduleNotesParsed",
+      "scheduleNotesValidation"
+    ],
+    "probed": {
+      "schedules": {
+        "count": 2
+      },
+      "user_bindings": {
+        "count": 0
+      },
+      "user_overlays": {
+        "count": 0
+      },
+      "pharmacist_names": {
+        "count": 0
+      },
+      "positionNotes": {
+        "count": 8
+      },
+      "scheduleNotes": {
+        "count": 8
+      },
+      "scheduleNotesParsed": {
+        "count": 8
+      }
+    }
+  },
+  "functionsCount": 33,
+  "propertiesCount": 13
+}
+</script>
+
+<style>
+  :root {
+    --ground: #F5F5F1;
+    --ground-2: #EEEEE7;
+    --ink: #141B26;
+    --ink-2: #2C3441;
+    --muted: #6B7280;
+    --rule: #D5D5CE;
+    --rule-soft: #E5E5DE;
+    --teal: #0B4F52;
+    --teal-soft: #E0EBEC;
+    --moss: #3D7A5A;
+    --moss-soft: #E4EEE7;
+    --mustard: #9B7A2E;
+    --mustard-soft: #F1EADA;
+    --brick: #A63B3B;
+    --brick-soft: #F1DFDF;
+    --font-thai: "IBM Plex Sans Thai", "Sarabun", "Leelawadee UI", "Kanit", Inter, system-ui, -apple-system, "Segoe UI", sans-serif;
+    --font-mono: "IBM Plex Mono", "JetBrains Mono", "SF Mono", "Cascadia Code", Consolas, Menlo, monospace;
+  }
+  * { box-sizing: border-box; }
+  html { -webkit-text-size-adjust: 100%; }
+  body {
+    margin: 0;
+    background: var(--ground);
+    color: var(--ink);
+    font-family: var(--font-thai);
+    font-size: 15px;
+    line-height: 1.55;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    padding: 0;
+  }
+  .page {
+    max-width: 1120px;
+    margin: 0 auto;
+    padding: 48px 32px 96px;
+  }
+
+  /* ─── Header ─── */
+  header.hero {
+    border-bottom: 1px solid var(--rule);
+    padding-bottom: 32px;
+    margin-bottom: 40px;
+  }
+  .eyebrow {
+    font-size: 11px;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--teal);
+    font-weight: 600;
+    margin-bottom: 12px;
+  }
+  h1 {
+    font-size: 34px;
+    line-height: 1.15;
+    letter-spacing: -0.015em;
+    font-weight: 700;
+    margin: 0 0 10px;
+    text-wrap: balance;
+  }
+  .lede {
+    font-size: 16px;
+    color: var(--ink-2);
+    max-width: 62ch;
+    margin: 0 0 24px;
+  }
+  .meta {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 24px;
+    font-size: 12px;
+    color: var(--muted);
+    font-family: var(--font-mono);
+  }
+  .meta b { color: var(--ink); font-weight: 600; }
+
+  /* ─── Section chrome ─── */
+  section { margin-bottom: 56px; }
+  .sec-head {
+    display: flex;
+    align-items: baseline;
+    gap: 16px;
+    margin-bottom: 20px;
+    padding-bottom: 10px;
+    border-bottom: 1px solid var(--rule-soft);
+  }
+  .sec-num {
+    font-family: var(--font-mono);
+    font-size: 12px;
+    color: var(--teal);
+    letter-spacing: 0.06em;
+    font-weight: 600;
+  }
+  h2 {
+    font-size: 22px;
+    letter-spacing: -0.01em;
+    font-weight: 700;
+    margin: 0;
+    flex: 1;
+  }
+  h2 .en {
+    font-family: var(--font-mono);
+    font-size: 12px;
+    color: var(--muted);
+    font-weight: 500;
+    letter-spacing: 0;
+    margin-left: 8px;
+  }
+  h3 {
+    font-size: 15px;
+    font-weight: 600;
+    margin: 0 0 8px;
+    letter-spacing: -0.005em;
+  }
+  p { margin: 0 0 12px; }
+  p:last-child { margin-bottom: 0; }
+  .note {
+    font-size: 13px;
+    color: var(--muted);
+    margin-top: 4px;
+  }
+
+  /* ─── Overview stats ─── */
+  .stats {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 12px;
+    margin-bottom: 24px;
+  }
+  .stat {
+    background: white;
+    border: 1px solid var(--rule);
+    padding: 16px 18px;
+  }
+  .stat-label {
+    font-size: 11px;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: var(--muted);
+    margin-bottom: 6px;
+    font-weight: 600;
+  }
+  .stat-num {
+    font-family: var(--font-mono);
+    font-size: 28px;
+    font-weight: 600;
+    letter-spacing: -0.02em;
+    line-height: 1;
+    color: var(--ink);
+    font-variant-numeric: tabular-nums;
+  }
+  .stat-sub {
+    font-size: 12px;
+    color: var(--muted);
+    margin-top: 4px;
+  }
+
+  .flags {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 12px;
+  }
+  .flag {
+    padding: 14px 16px;
+    border: 1px solid;
+  }
+  .flag-red { background: var(--brick-soft); border-color: #E5B5B5; color: #6B2626; }
+  .flag-yellow { background: var(--mustard-soft); border-color: #DFC98B; color: #6E521C; }
+  .flag-green { background: var(--moss-soft); border-color: #B7D2BF; color: #275238; }
+  .flag-title {
+    font-size: 12px;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    font-weight: 700;
+    margin-bottom: 4px;
+  }
+  .flag-body { font-size: 13px; line-height: 1.5; }
+
+  /* ─── Problem visualizations ─── */
+  .problem {
+    background: white;
+    border: 1px solid var(--rule);
+    padding: 24px;
+  }
+  .problem-lead {
+    font-size: 14px;
+    color: var(--ink-2);
+    margin-bottom: 20px;
+    max-width: 68ch;
+  }
+
+  /* Format mismatch */
+  .format-split {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 0;
+    border: 1px solid var(--rule);
+    background: var(--ground-2);
+  }
+  .format-side {
+    padding: 20px 22px;
+    background: white;
+  }
+  .format-side + .format-side { border-left: 1px solid var(--rule); }
+  .format-side h4 {
+    font-family: var(--font-mono);
+    font-size: 13px;
+    font-weight: 600;
+    margin: 0 0 4px;
+    letter-spacing: 0;
+  }
+  .format-side .example {
+    font-family: var(--font-mono);
+    font-size: 12px;
+    color: var(--teal);
+    background: var(--teal-soft);
+    padding: 2px 6px;
+    display: inline-block;
+    margin-bottom: 16px;
+  }
+  .format-side ul {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+    font-size: 13px;
+  }
+  .format-side li {
+    padding: 6px 0;
+    border-top: 1px solid var(--rule-soft);
+    display: flex;
+    justify-content: space-between;
+    gap: 12px;
+  }
+  .format-side li:first-child { border-top: 0; }
+  .format-side .lbl { color: var(--ink); }
+  .format-side .qty { font-family: var(--font-mono); color: var(--muted); font-size: 12px; font-variant-numeric: tabular-nums; }
+
+  .format-collision {
+    margin-top: 20px;
+    padding: 16px 18px;
+    background: var(--brick-soft);
+    border-left: 3px solid var(--brick);
+  }
+  .format-collision h4 {
+    font-size: 12px;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: #6B2626;
+    margin: 0 0 8px;
+    font-weight: 700;
+  }
+  .format-collision .row {
+    font-family: var(--font-mono);
+    font-size: 12px;
+    padding: 6px 0;
+    display: grid;
+    grid-template-columns: 60px 1fr 200px 40px;
+    gap: 12px;
+    align-items: center;
+    color: var(--ink-2);
+  }
+  .format-collision .row + .row { border-top: 1px solid rgba(166, 59, 59, 0.15); }
+  .format-collision .row b { color: #6B2626; font-weight: 600; }
+  .fmt-a { color: var(--brick); }
+  .fmt-b { color: var(--teal); }
+
+  /* Duplicates table */
+  .dup-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 13px;
+  }
+  .dup-table thead th {
+    text-align: left;
+    font-weight: 600;
+    font-size: 11px;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--muted);
+    padding: 8px 10px;
+    border-bottom: 2px solid var(--rule);
+  }
+  .dup-table td {
+    padding: 10px;
+    border-bottom: 1px solid var(--rule-soft);
+    vertical-align: top;
+  }
+  .dup-table td.mono {
+    font-family: var(--font-mono);
+    font-size: 12px;
+    color: var(--ink-2);
+    font-variant-numeric: tabular-nums;
+  }
+  .count-pill {
+    display: inline-block;
+    padding: 2px 8px;
+    font-family: var(--font-mono);
+    font-size: 11px;
+    font-weight: 600;
+    border: 1px solid;
+    font-variant-numeric: tabular-nums;
+  }
+  .count-1 { background: var(--moss-soft); border-color: #B7D2BF; color: var(--moss); }
+  .count-2 { background: var(--mustard-soft); border-color: #DFC98B; color: var(--mustard); }
+  .count-3 { background: var(--brick-soft); border-color: #E5B5B5; color: var(--brick); }
+
+  /* Firebase sync gap */
+  .sync-bars {
+    display: grid;
+    gap: 14px;
+    margin-top: 8px;
+  }
+  .sync-row {
+    display: grid;
+    grid-template-columns: 200px 1fr 60px;
+    gap: 14px;
+    align-items: center;
+    font-size: 13px;
+  }
+  .sync-row .lbl {
+    font-family: var(--font-mono);
+    font-size: 12px;
+    color: var(--ink-2);
+  }
+  .sync-row .bar {
+    height: 12px;
+    background: var(--ground-2);
+    border: 1px solid var(--rule);
+    position: relative;
+  }
+  .sync-row .fill {
+    position: absolute;
+    left: 0; top: 0; bottom: 0;
+    background: var(--teal);
+  }
+  .sync-row .fill.partial { background: var(--mustard); }
+  .sync-row .fill.thin { background: var(--brick); }
+  .sync-row .qty {
+    font-family: var(--font-mono);
+    font-size: 12px;
+    color: var(--muted);
+    text-align: right;
+    font-variant-numeric: tabular-nums;
+  }
+
+  /* ─── Filter chips ─── */
+  .filter-bar {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin-bottom: 20px;
+  }
+  .chip {
+    padding: 6px 12px;
+    font-size: 12px;
+    font-family: var(--font-mono);
+    border: 1px solid var(--rule);
+    background: white;
+    color: var(--ink-2);
+    cursor: pointer;
+    letter-spacing: 0.02em;
+    transition: background 120ms ease, border-color 120ms ease;
+  }
+  .chip:hover { background: var(--ground-2); }
+  .chip.active {
+    background: var(--ink);
+    color: white;
+    border-color: var(--ink);
+  }
+  .chip .n {
+    display: inline-block;
+    margin-left: 6px;
+    padding: 0 5px;
+    background: rgba(0,0,0,0.06);
+    font-size: 11px;
+    border-radius: 2px;
+  }
+  .chip.active .n { background: rgba(255,255,255,0.18); }
+
+  /* ─── Data store cards ─── */
+  .grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+    gap: 10px;
+  }
+  .card {
+    background: white;
+    border: 1px solid var(--rule);
+    padding: 12px 14px;
+    font-size: 13px;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    cursor: pointer;
+    transition: border-color 120ms ease, box-shadow 120ms ease;
+    position: relative;
+  }
+  .card:hover {
+    border-color: var(--ink-2);
+    box-shadow: 0 1px 0 var(--ink-2);
+  }
+  .card.hidden { display: none; }
+  .card.expanded {
+    grid-column: 1 / -1;
+    cursor: default;
+    background: var(--ground-2);
+  }
+  .card-top {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    gap: 8px;
+  }
+  .card-name {
+    font-family: var(--font-mono);
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--ink);
+    word-break: break-word;
+  }
+  .card-badge {
+    font-size: 10px;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    font-weight: 700;
+    padding: 2px 6px;
+    white-space: nowrap;
+  }
+  .b-active { background: var(--moss-soft); color: var(--moss); }
+  .b-warn { background: var(--mustard-soft); color: var(--mustard); }
+  .b-dead { background: var(--brick-soft); color: var(--brick); }
+  .b-info { background: var(--teal-soft); color: var(--teal); }
+  .card-meta {
+    font-family: var(--font-mono);
+    font-size: 11px;
+    color: var(--muted);
+    font-variant-numeric: tabular-nums;
+  }
+  .card-desc {
+    font-size: 12px;
+    color: var(--ink-2);
+    margin-top: 4px;
+    line-height: 1.4;
+  }
+  .card-detail {
+    margin-top: 10px;
+    padding-top: 10px;
+    border-top: 1px solid var(--rule);
+    font-family: var(--font-mono);
+    font-size: 11px;
+    color: var(--ink-2);
+    display: none;
+  }
+  .card.expanded .card-detail { display: block; }
+  .card-detail .headers {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px;
+    margin-bottom: 8px;
+  }
+  .card-detail .h-cell {
+    background: white;
+    border: 1px solid var(--rule);
+    padding: 2px 6px;
+    font-size: 10px;
+  }
+  .card-detail table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 10px;
+  }
+  .card-detail th, .card-detail td {
+    padding: 4px 6px;
+    border: 1px solid var(--rule);
+    background: white;
+    text-align: left;
+    vertical-align: top;
+    word-break: break-word;
+    max-width: 200px;
+  }
+  .card-detail th { background: var(--ground-2); font-weight: 600; }
+
+  /* ─── Functions grid ─── */
+  .fn-group {
+    margin-bottom: 20px;
+  }
+  .fn-group h4 {
+    font-size: 12px;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--muted);
+    font-weight: 700;
+    margin: 0 0 8px;
+  }
+  .fn-list {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+    gap: 6px;
+  }
+  .fn {
+    font-family: var(--font-mono);
+    font-size: 12px;
+    background: white;
+    border: 1px solid var(--rule);
+    padding: 6px 10px;
+    display: flex;
+    justify-content: space-between;
+    gap: 8px;
+    align-items: baseline;
+  }
+  .fn .name { color: var(--ink); }
+  .fn .len { color: var(--muted); font-size: 11px; }
+  .fn.priv .name::before { content: "_"; opacity: 0.4; }
+  .fn.priv .name { padding-left: 0; }
+
+  /* ─── Recommendations ─── */
+  .rec {
+    background: white;
+    border: 1px solid var(--rule);
+    padding: 20px 22px;
+    margin-bottom: 10px;
+    display: grid;
+    grid-template-columns: 40px 1fr;
+    gap: 16px;
+    align-items: start;
+  }
+  .rec-num {
+    font-family: var(--font-mono);
+    font-size: 22px;
+    font-weight: 700;
+    color: var(--teal);
+    letter-spacing: -0.02em;
+    line-height: 1;
+    padding-top: 2px;
+  }
+  .rec h3 { margin-bottom: 6px; }
+  .rec .why {
+    font-size: 12px;
+    color: var(--muted);
+    margin-top: 8px;
+    font-style: italic;
+  }
+  .rec .files {
+    font-family: var(--font-mono);
+    font-size: 11px;
+    color: var(--ink-2);
+    margin-top: 6px;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px;
+  }
+  .rec .file {
+    background: var(--ground-2);
+    padding: 1px 6px;
+    border: 1px solid var(--rule);
+  }
+  .rec-priority {
+    display: inline-block;
+    padding: 1px 6px;
+    font-size: 10px;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    font-weight: 700;
+    margin-left: 6px;
+    vertical-align: middle;
+    position: relative;
+    top: -2px;
+  }
+  .p-high { background: var(--brick-soft); color: var(--brick); }
+  .p-med { background: var(--mustard-soft); color: var(--mustard); }
+  .p-low { background: var(--teal-soft); color: var(--teal); }
+
+  /* ─── Footer ─── */
+  footer {
+    margin-top: 64px;
+    padding-top: 24px;
+    border-top: 1px solid var(--rule);
+    font-size: 12px;
+    color: var(--muted);
+  }
+
+  /* ─── Flow diagram ─── */
+  .legend {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 14px;
+    padding: 10px 14px;
+    background: var(--ground-2);
+    border: 1px solid var(--rule);
+    font-size: 12px;
+    align-items: center;
+    margin-bottom: 12px;
+  }
+  .lg { display: inline-flex; align-items: center; gap: 6px; color: var(--ink-2); }
+  .lg-line { display: inline-block; width: 22px; height: 0; }
+  .lg-read { border-top: 2px solid var(--teal); }
+  .lg-write { border-top: 2px solid var(--mustard); }
+  .lg-dead { border-top: 2px dashed var(--brick); }
+  .lg-badge {
+    font-family: var(--font-mono);
+    font-size: 9px;
+    padding: 1px 5px;
+    color: white;
+    font-weight: 700;
+    letter-spacing: 0.03em;
+  }
+  .lg-id { background: #2C4E75; }
+  .lg-label { background: var(--teal); }
+  .lg-mixed { background: var(--brick); }
+  .lg-divider { width: 1px; height: 16px; background: var(--rule); }
+
+  /* Preset filter tabs */
+  .preset-bar {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    margin-bottom: 12px;
+  }
+  .preset {
+    padding: 7px 13px;
+    font-size: 12.5px;
+    font-family: var(--font-thai);
+    border: 1px solid var(--rule);
+    background: white;
+    color: var(--ink-2);
+    cursor: pointer;
+    transition: background 120ms ease, border-color 120ms ease, color 120ms ease;
+    letter-spacing: 0.01em;
+  }
+  .preset:hover { background: var(--ground-2); border-color: var(--ink-2); }
+  .preset.active {
+    background: var(--teal);
+    color: white;
+    border-color: var(--teal);
+  }
+  .preset:focus-visible { outline: 2px solid var(--teal); outline-offset: 2px; }
+
+  /* Node info panel below diagram */
+  .node-info {
+    background: white;
+    border: 1px solid var(--rule);
+    border-top: none;
+    padding: 14px 18px 14px;
+    font-size: 13px;
+  }
+  .ni-name {
+    font-family: var(--font-mono);
+    font-size: 14px;
+    font-weight: 600;
+    color: var(--ink);
+    margin-bottom: 6px;
+  }
+  .ni-detail {
+    color: var(--muted);
+    font-size: 12.5px;
+    line-height: 1.55;
+  }
+  .ni-conns {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px 14px;
+    margin-top: 8px;
+    font-family: var(--font-mono);
+    font-size: 11.5px;
+  }
+  .ni-conn {
+    display: inline-flex;
+    align-items: baseline;
+    gap: 4px;
+    color: var(--ink-2);
+  }
+  .ni-conn .dir { color: var(--teal); font-weight: 600; }
+  .ni-conn .dir.w { color: var(--mustard); }
+  .ni-conn .kind {
+    font-size: 10px;
+    color: var(--muted);
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    padding-left: 4px;
+  }
+
+  .diagram-wrap {
+    overflow-x: auto;
+    border: 1px solid var(--rule);
+    background: white;
+    margin-bottom: 0;
+  }
+  #diagram { min-width: 1200px; display: block; }
+
+  /* SVG diagram interior */
+  #diagram .lane-bg { fill: #FAFAF6; }
+  #diagram .lane-label {
+    font-family: var(--font-mono);
+    font-size: 10px;
+    font-weight: 700;
+    fill: var(--muted);
+    letter-spacing: 0.16em;
+  }
+  #diagram .node-box {
+    fill: white;
+    stroke: var(--teal);
+    stroke-width: 1;
+    transition: stroke-width 120ms ease;
+  }
+  #diagram .node.dead .node-box { stroke: #B87676; stroke-dasharray: 3 2; }
+  #diagram .node.mixed .node-box { stroke: var(--brick); stroke-width: 1.5; }
+  #diagram .node-label {
+    font-family: var(--font-mono);
+    font-size: 11px;
+    fill: var(--ink);
+    pointer-events: none;
+    font-weight: 500;
+  }
+  #diagram .node-sub {
+    font-family: var(--font-mono);
+    font-size: 9px;
+    fill: var(--muted);
+    pointer-events: none;
+  }
+  #diagram .node.dead .node-label { fill: #8B4646; }
+  #diagram .node.dead .node-sub { fill: #B87676; }
+  #diagram .node-pin { fill: var(--teal); }
+  #diagram .node.dead .node-pin { fill: #B87676; }
+  #diagram .node-badge-text {
+    font-family: var(--font-mono);
+    font-size: 8px;
+    font-weight: 700;
+    fill: white;
+    pointer-events: none;
+  }
+  #diagram .node { cursor: pointer; }
+  #diagram .node:hover .node-box,
+  #diagram .node.hovered .node-box { stroke-width: 2.5; }
+
+  #diagram .trace {
+    fill: none;
+    stroke: var(--teal);
+    stroke-width: 1.3;
+    opacity: 0.55;
+    transition: opacity 180ms ease, stroke-width 180ms ease;
+  }
+  #diagram .trace.write { stroke: var(--mustard); }
+  #diagram .trace.dim { opacity: 0.05; }
+  #diagram .trace.active { opacity: 1; stroke-width: 2.4; }
+
+  /* Preset filter — fade non-matching */
+  #diagram .node.preset-hidden { opacity: 0.14; }
+  #diagram .node.preset-hidden .node-box { stroke-width: 0.8; }
+  #diagram .trace.preset-hidden { opacity: 0.05; }
+
+  /* ─── Focus & responsive ─── */
+  .chip:focus-visible, .card:focus-visible {
+    outline: 2px solid var(--teal);
+    outline-offset: 2px;
+  }
+  @media (max-width: 720px) {
+    .page { padding: 24px 16px 64px; }
+    h1 { font-size: 26px; }
+    .stats { grid-template-columns: repeat(2, 1fr); }
+    .flags { grid-template-columns: 1fr; }
+    .format-split { grid-template-columns: 1fr; }
+    .format-side + .format-side { border-left: 0; border-top: 1px solid var(--rule); }
+    .format-collision .row { grid-template-columns: 1fr; }
+    .sync-row { grid-template-columns: 1fr; }
+    .rec { grid-template-columns: 1fr; }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    * { transition: none !important; }
+  }
+</style>
+
+<div class="page">
+
+<header class="hero">
+  <div class="eyebrow">Diagnostic Map · Map-A v1</div>
+  <h1>Siriraj Rx Shift — แผนที่ระบบ</h1>
+  <p class="lede">
+    วิเคราะห์จากข้อมูลจริง 25 sheets, 6 Firebase paths, 32 ฟังก์ชัน, 13 script properties
+    เพื่อตอบคำถามว่า <b>อะไรเชื่อมกับอะไร</b> — และปัญหา visibility ที่ทำให้คนไม่ล็อกอินไม่เห็นการยกเวรอยู่ตรงไหน
+  </p>
+  <div class="meta">
+    <span>Run: <b data-diag="runAt">2026-07-05 15:22 ICT</b></span>
+    <span>By: <b data-diag="runBy">norapol.uttho@gmail.com</b></span>
+    <span>Sheet: <b>1V1Fo4rE...O3KHM</b></span>
+    <span>Firebase: <b>siriraj-rx-shift-default-rtdb</b></span>
+  </div>
+</header>
+
+<!-- ═══════════════════════════════════════════════ -->
+<!-- SECTION 1: OVERVIEW                              -->
+<!-- ═══════════════════════════════════════════════ -->
+<section>
+  <div class="sec-head">
+    <span class="sec-num">01</span>
+    <h2>ภาพรวม <span class="en">/ overview</span></h2>
+  </div>
+
+  <div class="stats">
+    <div class="stat">
+      <div class="stat-label">Sheets</div>
+      <div class="stat-num" data-diag="sheetsCount">25</div>
+      <div class="stat-sub">ตาราง ใน spreadsheet</div>
+    </div>
+    <div class="stat">
+      <div class="stat-label">Firebase paths</div>
+      <div class="stat-num" data-diag="firebaseCount">6</div>
+      <div class="stat-sub">top-level keys ใน RTDB</div>
+    </div>
+    <div class="stat">
+      <div class="stat-label">Functions</div>
+      <div class="stat-num"><span data-diag="functionsCount">32</span><span style="font-size:14px;color:var(--muted);"> ครบ</span></div>
+      <div class="stat-sub">ไม่มีอันหายไป</div>
+    </div>
+    <div class="stat">
+      <div class="stat-label">Script props</div>
+      <div class="stat-num" data-diag="propertiesCount">13</div>
+      <div class="stat-sub">config + tokens</div>
+    </div>
+  </div>
+
+  <div class="flags">
+    <div class="flag flag-red">
+      <div class="flag-title">Format Mismatch</div>
+      <div class="flag-body">monthId 2 format ใช้พร้อมกัน — root cause ของปัญหา visibility</div>
+    </div>
+    <div class="flag flag-yellow">
+      <div class="flag-title">Schedule ซ้ำ</div>
+      <div class="flag-body">3 เดือนมี Schedule tab หลายอัน — May/Jun x3, Jan x3</div>
+    </div>
+    <div class="flag flag-yellow">
+      <div class="flag-title">Firebase Sync Gap</div>
+      <div class="flag-body">Sheets มี 11 เดือน แต่ Firebase มีแค่ 2 — sync ตกไป 9 เดือน</div>
+    </div>
+  </div>
+</section>
+
+<!-- ═══════════════════════════════════════════════ -->
+<!-- SECTION 2: FLOW CHART / CIRCUIT                  -->
+<!-- ═══════════════════════════════════════════════ -->
+<section>
+  <div class="sec-head">
+    <span class="sec-num">02</span>
+    <h2>แผงวงจรของระบบ <span class="en">/ system topology · flow chart</span></h2>
+  </div>
+
+  <div class="problem" style="padding: 20px 22px 12px;">
+    <p class="problem-lead">
+      แผนที่การไหลของข้อมูลจริง 4 lanes: <b>Frontend → Apps Script → Sheets → Firebase</b>
+      · <b>คลิก tab ด้านล่าง</b> เพื่อกรองเฉพาะ flow ที่สนใจ · <b>Hover กล่อง</b> เพื่อดูรายการที่เชื่อม
+    </p>
+
+    <div class="legend">
+      <span class="lg"><span class="lg-line lg-read"></span> read</span>
+      <span class="lg"><span class="lg-line lg-write"></span> write</span>
+      <span class="lg-divider"></span>
+      <span class="lg"><span class="lg-badge lg-id">ID</span> ใช้ ID format</span>
+      <span class="lg"><span class="lg-badge lg-label">Label</span> ใช้ Label format</span>
+      <span class="lg"><span class="lg-badge lg-mixed">MIX</span> ปน 2 format!</span>
+      <span class="lg-divider"></span>
+      <span class="lg" style="color:var(--brick);opacity:0.8;">▬ ▬  = dead / orphaned</span>
+    </div>
+
+    <div class="preset-bar" id="presetBar" role="tablist">
+      <button class="preset active" data-preset="all" type="button">🔍 ทั้งหมด</button>
+      <button class="preset" data-preset="schedule" type="button">📅 ตารางเวร</button>
+      <button class="preset" data-preset="overlay" type="button">🔀 ยกเวร/แลกเวร (Path B)</button>
+      <button class="preset" data-preset="reminder" type="button">📧 เตือนเวร (email)</button>
+      <button class="preset" data-preset="sync" type="button">☁️ Cloud Sync</button>
+      <button class="preset" data-preset="dead" type="button">💀 โครงสร้างตายแล้ว</button>
+    </div>
+
+    <div class="diagram-wrap">
+      <svg id="diagram" viewBox="0 0 1200 640" xmlns="http://www.w3.org/2000/svg" width="100%" role="img" aria-label="System topology diagram">
+        <defs>
+          <marker id="ar-read" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+            <path d="M0,0 L10,5 L0,10 Z" fill="#0B4F52" />
+          </marker>
+          <marker id="ar-write" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+            <path d="M0,0 L10,5 L0,10 Z" fill="#9B7A2E" />
+          </marker>
+        </defs>
+        <g id="d-lanes"></g>
+        <g id="d-traces"></g>
+        <g id="d-nodes"></g>
+      </svg>
+    </div>
+
+    <div class="node-info" id="nodeInfo">
+      <div class="ni-name">แตะกล่องใดๆ ด้านบน 👆</div>
+      <div class="ni-detail">ผ่านเมาส์ที่กล่องเพื่อไฮไลต์เส้นเชื่อม + แสดงรายการทั้งอ่านและเขียน / คลิก tab กรอง เพื่อดูเฉพาะ flow</div>
+    </div>
+
+    <p class="note" style="margin-top:16px;">
+      💡 <b>ที่ควรสังเกต:</b> <code style="font-family:var(--font-mono);font-size:12px;background:var(--ground-2);padding:1px 4px;">PHX_UserOverlays</code>
+      ที่มีป้าย <b>MIX</b> (กรอบแดงเข้ม) คือจุดที่ 2 format ชนกัน · <b>3 nodes ทางขวาสุดของ Firebase</b>
+      (user_overlays / user_bindings / pharmacist_names) เป็น <b>Phase 2B orphan</b> — code ยัง run แต่ไม่มีข้อมูลจริง
+    </p>
+  </div>
+</section>
+
+<!-- ═══════════════════════════════════════════════ -->
+<!-- SECTION 3: FORMAT MISMATCH                       -->
+<!-- ═══════════════════════════════════════════════ -->
+<section>
+  <div class="sec-head">
+    <span class="sec-num">03</span>
+    <h2>ปัญหาที่ 1 — Format ของ monthId ปนกัน <span class="en">/ format mismatch</span></h2>
+  </div>
+
+  <div class="problem">
+    <p class="problem-lead">
+      ระบบใช้ <b>2 รูปแบบของ monthId</b> ปะปนกันในแหล่งข้อมูลต่างๆ — เวลา code พยายามหา
+      "overlay ของเดือนนี้" มันเทียบ format ไม่ตรงกัน → หา<b>ไม่เจอ</b> → คนอื่นเลย<b>มองไม่เห็นการยกเวร</b>
+    </p>
+
+    <div class="format-split">
+      <div class="format-side">
+        <h4>Format A — ID-based</h4>
+        <span class="example">m_1780833048543956</span>
+        <ul>
+          <li><span class="lbl">Schedule_Index (month_id col)</span><span class="qty">11 rows</span></li>
+          <li><span class="lbl">Script Property: MONTH_LIST</span><span class="qty">cached</span></li>
+          <li><span class="lbl">PHX_UserOverlays</span><span class="qty">1 of 6 rows</span></li>
+        </ul>
+      </div>
+      <div class="format-side">
+        <h4>Format B — Label-based</h4>
+        <span class="example">m_มิถุนายน_2569</span>
+        <ul>
+          <li><span class="lbl">PHX_Overlays_v2</span><span class="qty">31/31 rows</span></li>
+          <li><span class="lbl">PHX_Overlays (dead)</span><span class="qty">11/11 rows</span></li>
+          <li><span class="lbl">User_Overlays (legacy)</span><span class="qty">15/15 rows</span></li>
+          <li><span class="lbl">PHX_UserOverlays</span><span class="qty">5 of 6 rows</span></li>
+          <li><span class="lbl">Firebase: schedules</span><span class="qty">2/2</span></li>
+          <li><span class="lbl">Firebase: positionNotes / scheduleNotes</span><span class="qty">8/8</span></li>
+          <li><span class="lbl">Script Property: PHX_LAST_UPLOAD</span><span class="qty">1</span></li>
+          <li><span class="lbl">Frontend getCurrentMonthId()</span><span class="qty">runtime</span></li>
+        </ul>
+      </div>
+    </div>
+
+    <div class="format-collision">
+      <h4>⚠️ หลักฐานเด็ด — คนเดียวกัน มี 2 format ในตารางเดียวกัน (PHX_UserOverlays)</h4>
+      <div class="row">
+        <span><b>Row 0</b></span>
+        <span>ณรพล</span>
+        <span class="fmt-a">m_1781304482466579</span>
+        <span>[ว่าง]</span>
+      </div>
+      <div class="row">
+        <span><b>Row 1</b></span>
+        <span>ณรพล</span>
+        <span class="fmt-b">m_มิถุนายน_2569</span>
+        <span>[มีข้อมูล]</span>
+      </div>
+      <p style="margin-top:12px; font-size:12px; color:#6B2626;">
+        คน เดียวกัน (ณรพล) เดือนเดียวกัน (มิ.ย. 2569) — แต่ 2 แถวไม่รวมเป็นแถวเดียว
+        เพราะ monthId เขียนต่าง format = ระบบมองเป็นคนละเดือน
+      </p>
+    </div>
+  </div>
+</section>
+
+<!-- ═══════════════════════════════════════════════ -->
+<!-- SECTION 4: DUPLICATES                            -->
+<!-- ═══════════════════════════════════════════════ -->
+<section>
+  <div class="sec-head">
+    <span class="sec-num">04</span>
+    <h2>ปัญหาที่ 2 — Schedule tab ซ้ำหลายอัน <span class="en">/ duplicated tabs</span></h2>
+  </div>
+  <div class="problem">
+    <p class="problem-lead">
+      แต่ละเดือนควรมี Schedule tab อันเดียว — แต่บางเดือนมีถึง 3 tab (คนละ monthId, ข้อมูลเหมือนกัน)
+      Schedule_Index ส่วนใหญ่ชี้ไปที่ tab <b>เก่า</b> ไม่ใช่ tab ล่าสุด
+    </p>
+
+    <table class="dup-table">
+      <thead>
+        <tr>
+          <th>เดือน</th>
+          <th># tabs</th>
+          <th class="mono">monthId ที่พบใน tab</th>
+          <th>rows</th>
+          <th>วันที่ modified</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td>มกราคม 2569</td>
+          <td><span class="count-pill count-3">3</span></td>
+          <td class="mono">
+            m_1781135590706603_v2<br>
+            m_1781135590706603_v1<br>
+            m_1780956464020192_v1
+          </td>
+          <td class="mono">2130<br>2130<br>2130</td>
+          <td class="mono">06-11<br>06-10<br>06-08</td>
+        </tr>
+        <tr>
+          <td>มีนาคม 2569</td>
+          <td><span class="count-pill count-1">1</span></td>
+          <td class="mono">m_1781088370706875_v1</td>
+          <td class="mono">2410</td>
+          <td class="mono">06-10</td>
+        </tr>
+        <tr>
+          <td>พฤษภาคม 2569</td>
+          <td><span class="count-pill count-3">3</span></td>
+          <td class="mono">
+            m_1781304516401916_v1<br>
+            m_1781302809807259_v1<br>
+            m_1780928284757680_v1 <b style="color:var(--moss)">← Index</b>
+          </td>
+          <td class="mono">2406<br>2406<br>2406</td>
+          <td class="mono">06-12 (ล่าสุด)<br>06-12<br>06-08 (Index ชี้)</td>
+        </tr>
+        <tr>
+          <td>มิถุนายน 2569</td>
+          <td><span class="count-pill count-3">3</span></td>
+          <td class="mono">
+            m_1781304482466579_v1 <b style="color:var(--brick)">← web ใช้</b><br>
+            m_1781302776024211_v1<br>
+            m_1780833048543956_v1 <b style="color:var(--moss)">← Index</b>
+          </td>
+          <td class="mono">2307<br>2307<br>2307</td>
+          <td class="mono">06-12<br>06-12<br>06-07 (Index ชี้)</td>
+        </tr>
+        <tr>
+          <td>กรกฎาคม 2569</td>
+          <td><span class="count-pill count-1">1</span></td>
+          <td class="mono">m_1781858940879169_v1</td>
+          <td class="mono">2349</td>
+          <td class="mono">06-19</td>
+        </tr>
+      </tbody>
+    </table>
+    <p class="note" style="margin-top:12px;">
+      🚨 <b>มิถุนายน</b>: web ใช้ tab หนึ่ง แต่ Schedule_Index ชี้อีก tab — inconsistency ระหว่าง frontend กับ backend truth
+    </p>
+  </div>
+</section>
+
+<!-- ═══════════════════════════════════════════════ -->
+<!-- SECTION 5: FIREBASE SYNC GAP                     -->
+<!-- ═══════════════════════════════════════════════ -->
+<section>
+  <div class="sec-head">
+    <span class="sec-num">05</span>
+    <h2>ปัญหาที่ 3 — Firebase sync ตกไปเกือบทั้งหมด <span class="en">/ firebase sync gap</span></h2>
+  </div>
+  <div class="problem">
+    <p class="problem-lead">
+      Firebase RTDB มี infrastructure ครบ แต่ในทางปฏิบัติ <b>sync ครอบคลุมแค่ 2 เดือน</b> —
+      Phase 2B integration (user_bindings, user_overlays, pharmacist_names) <b>ว่างหมด</b>
+      ทั้งที่ code ยัง run อยู่
+    </p>
+
+    <div class="sync-bars">
+      <div class="sync-row">
+        <span class="lbl">schedules</span>
+        <div class="bar"><div class="fill thin" style="width:18.2%;"></div></div>
+        <span class="qty">2/11 <span style="color:var(--brick);">18%</span></span>
+      </div>
+      <div class="sync-row">
+        <span class="lbl">positionNotes</span>
+        <div class="bar"><div class="fill partial" style="width:72.7%;"></div></div>
+        <span class="qty">8/11 <span style="color:var(--mustard);">73%</span></span>
+      </div>
+      <div class="sync-row">
+        <span class="lbl">scheduleNotes</span>
+        <div class="bar"><div class="fill partial" style="width:72.7%;"></div></div>
+        <span class="qty">8/11 <span style="color:var(--mustard);">73%</span></span>
+      </div>
+      <div class="sync-row">
+        <span class="lbl">scheduleNotesParsed</span>
+        <div class="bar"><div class="fill partial" style="width:72.7%;"></div></div>
+        <span class="qty">8/11 <span style="color:var(--mustard);">73%</span></span>
+      </div>
+      <div class="sync-row">
+        <span class="lbl">user_bindings</span>
+        <div class="bar"><div class="fill thin" style="width:0%;"></div></div>
+        <span class="qty">0 <span style="color:var(--brick);">empty</span></span>
+      </div>
+      <div class="sync-row">
+        <span class="lbl">user_overlays</span>
+        <div class="bar"><div class="fill thin" style="width:0%;"></div></div>
+        <span class="qty">0 <span style="color:var(--brick);">empty</span></span>
+      </div>
+      <div class="sync-row">
+        <span class="lbl">pharmacist_names</span>
+        <div class="bar"><div class="fill thin" style="width:0%;"></div></div>
+        <span class="qty">0 <span style="color:var(--brick);">empty</span></span>
+      </div>
+    </div>
+
+    <p class="note" style="margin-top:20px;">
+      <b>ผลกระทบ:</b> Phase 2B ที่เขียนขึ้นเพื่อ sync bindings/overlays ไปยัง Firebase — <b>ตายในทางปฏิบัติ</b>
+      code ทำงานแต่ปลายทางว่าง = orphaned infrastructure. positionNotes / scheduleNotes ทำงานปกติดี — sync ครบ 8 เดือน (Dec 2568–Jul 2569)
+    </p>
+  </div>
+</section>
+
+<!-- ═══════════════════════════════════════════════ -->
+<!-- SECTION 6: ALL DATA STORES                       -->
+<!-- ═══════════════════════════════════════════════ -->
+<section>
+  <div class="sec-head">
+    <span class="sec-num">06</span>
+    <h2>ตู้ข้อมูลทั้งหมด <span class="en">/ all data stores — click a card to expand</span></h2>
+  </div>
+
+  <div class="filter-bar" id="filterBar">
+    <button class="chip active" data-filter="all">ทั้งหมด <span class="n">32</span></button>
+    <button class="chip" data-filter="overlay">Overlays <span class="n">4</span></button>
+    <button class="chip" data-filter="schedule">Schedules <span class="n">12</span></button>
+    <button class="chip" data-filter="user">Users/Auth <span class="n">5</span></button>
+    <button class="chip" data-filter="email">Email/LINE <span class="n">3</span></button>
+    <button class="chip" data-filter="firebase">Firebase <span class="n">6</span></button>
+    <button class="chip" data-filter="dead">Dead/Legacy <span class="n">3</span></button>
+  </div>
+
+  <div class="grid" id="storeGrid"></div>
+</section>
+
+<!-- ═══════════════════════════════════════════════ -->
+<!-- SECTION 7: FUNCTIONS                             -->
+<!-- ═══════════════════════════════════════════════ -->
+<section>
+  <div class="sec-head">
+    <span class="sec-num">07</span>
+    <h2>ฟังก์ชันสำคัญ <span class="en">/ 32 functions checked · all exist</span></h2>
+  </div>
+
+  <div id="fnGroups"></div>
+</section>
+
+<!-- ═══════════════════════════════════════════════ -->
+<!-- SECTION 8: RECOMMENDATIONS                       -->
+<!-- ═══════════════════════════════════════════════ -->
+<section>
+  <div class="sec-head">
+    <span class="sec-num">08</span>
+    <h2>ข้อเสนอ — ทำอะไรก่อน–หลัง <span class="en">/ recommended actions</span></h2>
+  </div>
+
+  <div class="rec">
+    <div class="rec-num">1</div>
+    <div>
+      <h3>แก้ Path B patch ให้ query overlay ด้วย <b>Label format</b> (m_มิถุนายน_2569)<span class="rec-priority p-high">High</span></h3>
+      <p>
+        Patch เดิมล้มเหลวเพราะสร้าง <code style="font-family:var(--font-mono);font-size:12px;background:var(--ground-2);padding:1px 4px;">m_&lt;label&gt;</code>
+        แล้วเรียก <code style="font-family:var(--font-mono);font-size:12px;background:var(--ground-2);padding:1px 4px;">getScheduleData(labelId)</code> —
+        แต่ getScheduleData ต้องรับ ID format. วิธีถูก: <b>ใช้ ID format สำหรับ schedule lookup</b>
+        แต่<b>ใช้ Label format สำหรับ overlay lookup</b> (ตามที่ overlay ที่มีอยู่จริง 30+ แถวใช้กัน)
+      </p>
+      <div class="files">
+        <span class="file">code.js:170 getScheduleData</span>
+        <span class="file">Phase_PathB_Global.js:34 phxGetAllActiveOverlaysForMonth</span>
+      </div>
+      <p class="why">Why: overlay 100% ใน system ใช้ label format แล้ว — ถ้าเปลี่ยนเป็น ID จะเสียข้อมูลย้อนหลัง</p>
+    </div>
+  </div>
+
+  <div class="rec">
+    <div class="rec-num">2</div>
+    <div>
+      <h3>อย่าเพิ่ง rename monthId ในทุกที่ (เฟส 2 เดิมที่คุยกัน)<span class="rec-priority p-med">Medium</span></h3>
+      <p>
+        เดิมเสนอ "rename ทั้งระบบให้เป็น format เดียว" — <b>ยกเลิก</b> จากการเห็น map นี้:
+        Schedule_Index ใช้ ID เป็น primary key (มี foreign refs หลายที่) — rename = ต้อง migrate เยอะ + risk สูง
+        แนวทางดีกว่า: <b>ยอมรับ 2 format</b> แล้วเพิ่ม lookup helper (ID ↔ Label) ที่จุดข้าม format
+      </p>
+    </div>
+  </div>
+
+  <div class="rec">
+    <div class="rec-num">3</div>
+    <div>
+      <h3>เคลียร์ Schedule tab ซ้ำ (เก็บ tab ล่าสุดของแต่ละเดือน)<span class="rec-priority p-med">Medium</span></h3>
+      <p>
+        มิถุนายน/พฤษภาคม/มกราคม มี 3 tab ต่อเดือน — เก็บอันล่าสุดตาม last_modified
+        พร้อมอัปเดต Schedule_Index ให้ชี้ไปที่ tab ที่ web ใช้จริง (มิถุนายน: web ใช้ 466579 แต่ Index ชี้ 543956)
+      </p>
+      <div class="files">
+        <span class="file">6 tabs to delete</span>
+        <span class="file">Schedule_Index update × 3 rows</span>
+      </div>
+      <p class="why">Why: ป้องกันความสับสน + ประหยัดพื้นที่ + ทำให้ debug ง่ายขึ้น. ทำหลัง #1 เพราะไม่ใช่ blocker</p>
+    </div>
+  </div>
+
+  <div class="rec">
+    <div class="rec-num">4</div>
+    <div>
+      <h3>ยืนยัน sunset ของ Phase 2B (User_Overlays sheet + Firebase user_overlays)<span class="rec-priority p-low">Low</span></h3>
+      <p>
+        User_Overlays 15/15 แถว status="deleted" + Firebase user_overlays/user_bindings/pharmacist_names ว่าง —
+        Phase 2B ไม่ทำงานจริงแล้ว. ก่อนลบ code (Phase2B.js 1000+ บรรทัด): <b>grep หา caller ที่ยังใช้ getUserOverlays(bare)</b> ให้ครบก่อน
+      </p>
+      <div class="files">
+        <span class="file">Phase2B.js delete</span>
+        <span class="file">code.js:1365 getUserOverlays cleanup</span>
+        <span class="file">Test.js remove Phase 2B tests</span>
+      </div>
+    </div>
+  </div>
+
+  <div class="rec">
+    <div class="rec-num">5</div>
+    <div>
+      <h3>ลบ PHX_Overlays (Phase Y dead) — 11 แถว<span class="rec-priority p-low">Low</span></h3>
+      <p>
+        ตาราง Phase Y ที่ handoff ระบุว่าตายแล้ว — ไม่มี consumer ใน code ปัจจุบัน
+        ปลอดภัยที่จะลบ. Grep ยืนยัน <code style="font-family:var(--font-mono);font-size:12px;background:var(--ground-2);padding:1px 4px;">'PHX_Overlays'</code>
+        (ไม่มี _v2) หา reference ก่อนลบ
+      </p>
+    </div>
+  </div>
+
+  <div class="rec">
+    <div class="rec-num">6</div>
+    <div>
+      <h3>อย่าลืมเรียก <code style="font-family:var(--font-mono);">phxDisableTestMode()</code><span class="rec-priority p-high">High</span></h3>
+      <p>
+        ตาม HANDOFF_v3.39_FINAL.md — ระบบยังอยู่ใน test mode. Script Property
+        <code style="font-family:var(--font-mono);font-size:12px;background:var(--ground-2);padding:1px 4px;">PHX_TEST_DOMAIN=gmail.com</code>
+        ยังอยู่. ก่อน rollout 300 users ต้อง disable
+      </p>
+    </div>
+  </div>
+</section>
+
+<footer>
+  Generated จาก MapA_diagnostic_20260705_152247.json — ข้อมูล runtime สด ณ 2026-07-05 15:22 ICT.
+  ระบบ Siriraj Rx Shift · Google Apps Script + Firebase RTDB (asia-southeast1) + Google Sheets.
+</footer>
+
+</div>
+
+<script>
+  // ─── Data ─────────────────────────────────────────────────
+  const STORES = [
+    // Sheets — Schedule index
+    { name: "Schedule_Index", type: "sheet", cat: "schedule", status: "active", rows: 11, cols: 9,
+      desc: "Master index ของทุกเดือน · ใช้ ID format",
+      headers: ["month_id","label","active_tab","version","sheet_url","row_count","last_modified","source_file","status"],
+      sample: [["m_1780833048543956","มิถุนายน 2569","Schedule_m_..._v1","1","...","2306","2026-06-07","06-69.xlsx","active"]] },
+
+    // Sheets — Schedule tabs (12)
+    { name: "Schedule_m_1781858940879169_v1", type: "sheet", cat: "schedule", status: "active", rows: 2349, cols: 12,
+      desc: "กรกฎาคม 2569 (July) — ล่าสุด" },
+    { name: "Schedule_m_1781304516401916_v1", type: "sheet", cat: "schedule", status: "duplicate", rows: 2406, cols: 12,
+      desc: "พฤษภาคม 2569 — 1 ใน 3 tab ของเดือน" },
+    { name: "Schedule_m_1781304482466579_v1", type: "sheet", cat: "schedule", status: "active", rows: 2307, cols: 12,
+      desc: "มิถุนายน 2569 — web ใช้อันนี้ (แต่ Index ไม่ชี้)" },
+    { name: "Schedule_m_1781302809807259_v1", type: "sheet", cat: "schedule", status: "duplicate", rows: 2406, cols: 12,
+      desc: "พฤษภาคม 2569 — duplicate" },
+    { name: "Schedule_m_1781302776024211_v1", type: "sheet", cat: "schedule", status: "duplicate", rows: 2307, cols: 12,
+      desc: "มิถุนายน 2569 — duplicate" },
+    { name: "Schedule_m_1781135590706603_v2", type: "sheet", cat: "schedule", status: "duplicate", rows: 2130, cols: 12,
+      desc: "มกราคม 2569 — v2 duplicate" },
+    { name: "Schedule_m_1781135590706603_v1", type: "sheet", cat: "schedule", status: "duplicate", rows: 2130, cols: 12,
+      desc: "มกราคม 2569 — v1" },
+    { name: "Schedule_m_1781088370706875_v1", type: "sheet", cat: "schedule", status: "active", rows: 2410, cols: 12,
+      desc: "มีนาคม 2569 (March)" },
+    { name: "Schedule_m_1780956464020192_v1", type: "sheet", cat: "schedule", status: "duplicate", rows: 2130, cols: 12,
+      desc: "มกราคม 2569 — เก่าสุด" },
+    { name: "Schedule_m_1780928284757680_v1", type: "sheet", cat: "schedule", status: "active", rows: 2406, cols: 12,
+      desc: "พฤษภาคม 2569 — Schedule_Index ชี้อันนี้" },
+    { name: "Schedule_m_1780833048543956_v1", type: "sheet", cat: "schedule", status: "active", rows: 2307, cols: 12,
+      desc: "มิถุนายน 2569 — Schedule_Index ชี้อันนี้ (ไม่ตรงกับ web)" },
+
+    // Sheets — Overlays
+    { name: "PHX_UserOverlays", type: "sheet", cat: "overlay", status: "active", rows: 6, cols: 4,
+      desc: "Cloud Sync overlay ต่อผู้ใช้ · ใช้ 2 format ปนกัน ⚠️",
+      headers: ["userName","monthId","shiftsJSON","updatedAt"] },
+    { name: "PHX_Overlays_v2", type: "sheet", cat: "overlay", status: "active", rows: 31, cols: 6,
+      desc: "Path B active overlay store · Label format",
+      headers: ["actionId","name","monthId","type","payload","createdAt"] },
+    { name: "User_Overlays", type: "sheet", cat: "overlay", status: "legacy", rows: 15, cols: 9,
+      desc: "Phase 2B legacy · ทุกแถว status=deleted", tag: "dead" },
+    { name: "PHX_Overlays", type: "sheet", cat: "overlay", status: "dead", rows: 11, cols: 9,
+      desc: "Phase Y dead · ไม่มี consumer แล้ว", tag: "dead" },
+
+    // Sheets — Users/Auth
+    { name: "PHX_Pharmacists_Master", type: "sheet", cat: "user", status: "active", rows: 212, cols: 5,
+      desc: "รายชื่อเภสัชกรทั้งหมด (whitelist)" },
+    { name: "PHX_Pharmacists", type: "sheet", cat: "user", status: "active", rows: 4, cols: 10,
+      desc: "ผู้ใช้ที่ลงทะเบียนแล้ว + password + prefs" },
+    { name: "PHX_PendingVerifications", type: "sheet", cat: "user", status: "active", rows: 1, cols: 6,
+      desc: "รอ verify email registration" },
+    { name: "PHX_PendingResets", type: "sheet", cat: "user", status: "active", rows: 4, cols: 5,
+      desc: "รอ password reset" },
+    { name: "PHX_Codes", type: "sheet", cat: "user", status: "active", rows: 3, cols: 2,
+      desc: "codeHash → createdAt (device codes)" },
+
+    // Sheets — Email/LINE
+    { name: "PHX_EmailQueue", type: "sheet", cat: "email", status: "active", rows: 51, cols: 8,
+      desc: "Email queue (registration + reminders)" },
+    { name: "PHX_Broadcasts", type: "sheet", cat: "email", status: "active", rows: 13, cols: 12,
+      desc: "ประกาศ + สถานะการอ่าน" },
+    { name: "PHX_LineGroups", type: "sheet", cat: "email", status: "active", rows: 2, cols: 5,
+      desc: "LINE group tracking" },
+
+    // Sheets — misc
+    { name: "PHX_AuditLog", type: "sheet", cat: "user", status: "active", rows: 192, cols: 8,
+      desc: "Audit log (before/after/action/target)" },
+
+    // Firebase
+    { name: "schedules", type: "firebase", cat: "firebase", status: "partial", count: 2,
+      desc: "Firebase schedules · 2/11 เดือน (June + July เท่านั้น)",
+      sample: ["m_กรกฎาคม_2569","m_มิถุนายน_2569"] },
+    { name: "positionNotes", type: "firebase", cat: "firebase", status: "active", count: 8,
+      desc: "Position notes · 8 เดือน (Dec 2568 → Jul 2569)" },
+    { name: "scheduleNotes", type: "firebase", cat: "firebase", status: "active", count: 8,
+      desc: "Schedule notes · 8 เดือน" },
+    { name: "scheduleNotesParsed", type: "firebase", cat: "firebase", status: "active", count: 8,
+      desc: "Parsed schedule notes · 8 เดือน" },
+    { name: "user_bindings", type: "firebase", cat: "firebase", status: "empty", count: 0,
+      desc: "Phase 2B · empty · code เขียนแต่ปลายทางว่าง", tag: "dead" },
+    { name: "user_overlays", type: "firebase", cat: "firebase", status: "empty", count: 0,
+      desc: "Phase 2B · empty", tag: "dead" },
+    { name: "pharmacist_names", type: "firebase", cat: "firebase", status: "empty", count: 0,
+      desc: "Phase 2B · empty", tag: "dead" }
+  ];
+
+  const FUNCTIONS = {
+    "Web entry": [
+      { name: "doGet", args: 1, len: 3144 },
+      { name: "getScriptUrl", args: 0, len: 67 }
+    ],
+    "Schedule": [
+      { name: "getScheduleData", args: 1, len: 2353 },
+      { name: "getAvailableMonths", args: 0, len: 246 },
+      { name: "getScheduleIndexSheet_", args: 0, len: 373, priv: true },
+      { name: "listScheduleMonthsFromSheet_", args: 0, len: 399, priv: true },
+      { name: "monthIdToLabel_", args: 1, len: 453, priv: true },
+      { name: "readScheduleFromSheet_", args: 1, len: 1210, priv: true },
+      { name: "writeScheduleToSheet_", args: 5, len: 1290, priv: true }
+    ],
+    "Overlays": [
+      { name: "getUserOverlays", args: 2, len: 1039 },
+      { name: "getUserOverlaysSheet_", args: 0, len: 619, priv: true },
+      { name: "appendUserOverlay", args: 3, len: 875 },
+      { name: "appendUserOverlaysBatch", args: 3, len: 743 },
+      { name: "clearUserOverlaysForMonth", args: 2, len: 666 },
+      { name: "phxGetAllActiveOverlaysForMonth", args: 1, len: 1546 },
+      { name: "_phxApplyOverlaysGlobally", args: 2, len: 4234, priv: true },
+      { name: "_phxGetUserOverlayShifts", args: 2, len: 1022, priv: true },
+      { name: "debugDumpUserOverlays", args: 1, len: 228 }
+    ],
+    "Auth": [
+      { name: "verifyGoogleIdToken", args: 1, len: 889 },
+      { name: "verifyAdminLogin", args: 1, len: 495 },
+      { name: "isAdminEmail_", args: 1, len: 119, priv: true }
+    ],
+    "Email / Reminder": [
+      { name: "phxQueueEmail", args: 3, len: 614 },
+      { name: "phxShowQueueStatus", args: 0, len: 797 },
+      { name: "_phxScanShiftsByUserForDate", args: 1, len: 1759, priv: true },
+      { name: "_phxScanShiftsInTimeWindow", args: 2, len: 1084, priv: true },
+      { name: "_phxGetUserReminderSettings", args: 1, len: 980, priv: true },
+      { name: "phxDisableTestMode", args: 0, len: 212 }
+    ],
+    "Cloud Sync": [
+      { name: "pushToFirebase_", args: 2, len: 706, priv: true },
+      { name: "syncAllSchedulesToFirebase", args: 0, len: 1190 },
+      { name: "syncMonthToFirebase", args: 1, len: 755 }
+    ],
+    "Diagnostic": [
+      { name: "devCheckToggles", args: 0, len: 309 },
+      { name: "debugPeopleMatching", args: 0, len: 1907 },
+      { name: "debugScheduleMapping", args: 0, len: 1838 }
+    ]
+  };
+
+  // ─── Render data stores ─────────────────────────────────
+  const badgeMap = {
+    active: { cls: "b-active", label: "Active" },
+    duplicate: { cls: "b-warn", label: "Duplicate" },
+    legacy: { cls: "b-warn", label: "Legacy" },
+    dead: { cls: "b-dead", label: "Dead" },
+    partial: { cls: "b-warn", label: "Partial" },
+    empty: { cls: "b-dead", label: "Empty" }
+  };
+  function esc(s) { return String(s).replace(/[&<>"']/g, c => ({ "&":"&amp;", "<":"&lt;", ">":"&gt;", "\"":"&quot;", "'":"&#39;" }[c])); }
+
+  const grid = document.getElementById("storeGrid");
+  STORES.forEach((s, i) => {
+    const b = badgeMap[s.status] || { cls: "b-info", label: s.status };
+    const meta = s.type === "firebase"
+      ? `${s.count} subkey(s) · firebase`
+      : `${s.rows} × ${s.cols} · sheet`;
+    let detail = "";
+    if (s.headers) {
+      detail += `<div class="headers">${s.headers.map(h => `<span class="h-cell">${esc(h)}</span>`).join("")}</div>`;
+    }
+    if (s.sample && Array.isArray(s.sample)) {
+      if (s.type === "firebase") {
+        detail += `<div>sample keys: ${s.sample.map(k => `<span class="h-cell">${esc(k)}</span>`).join(" ")}</div>`;
+      } else if (s.sample[0]) {
+        detail += `<table><tr>${s.sample[0].map(v => `<td>${esc(v).substring(0,60)}</td>`).join("")}</tr></table>`;
+      }
+    }
+    const card = document.createElement("div");
+    card.className = "card";
+    card.dataset.cat = s.cat;
+    if (s.tag === "dead") card.dataset.tag = "dead";
+    card.tabIndex = 0;
+    card.innerHTML = `
+      <div class="card-top">
+        <span class="card-name">${esc(s.name)}</span>
+        <span class="card-badge ${b.cls}">${b.label}</span>
+      </div>
+      <div class="card-meta">${meta}</div>
+      <div class="card-desc">${esc(s.desc)}</div>
+      ${detail ? `<div class="card-detail">${detail}</div>` : ""}
+    `;
+    card.addEventListener("click", () => card.classList.toggle("expanded"));
+    card.addEventListener("keydown", (e) => {
+      if (e.key === "Enter" || e.key === " ") { e.preventDefault(); card.classList.toggle("expanded"); }
+    });
+    grid.appendChild(card);
+  });
+
+  // ─── Filter ─────────────────────────────────────────────
+  const chips = document.querySelectorAll("#filterBar .chip");
+  chips.forEach(chip => chip.addEventListener("click", () => {
+    chips.forEach(c => c.classList.remove("active"));
+    chip.classList.add("active");
+    const f = chip.dataset.filter;
+    document.querySelectorAll("#storeGrid .card").forEach(card => {
+      const match = f === "all"
+        || (f === "dead" && card.dataset.tag === "dead")
+        || card.dataset.cat === f;
+      card.classList.toggle("hidden", !match);
+      card.classList.remove("expanded");
+    });
+  }));
+
+  // ─── Render function groups ─────────────────────────────
+  const fnEl = document.getElementById("fnGroups");
+  Object.entries(FUNCTIONS).forEach(([group, fns]) => {
+    const div = document.createElement("div");
+    div.className = "fn-group";
+    div.innerHTML = `
+      <h4>${esc(group)} · ${fns.length} function${fns.length > 1 ? "s" : ""}</h4>
+      <div class="fn-list">
+        ${fns.map(f => `
+          <div class="fn ${f.priv ? "priv" : ""}">
+            <span class="name">${esc(f.name)}(${f.args})</span>
+            <span class="len">${f.len}b</span>
+          </div>
+        `).join("")}
+      </div>
+    `;
+    fnEl.appendChild(div);
+  });
+
+  // ─── Flow diagram (v3 — cleaner, presets, node-info) ────
+  const SVG_NS = "http://www.w3.org/2000/svg";
+  const D_LANES = [
+    { y: 8,   h: 100, label: "FRONTEND" },
+    { y: 112, h: 194, label: "APPS SCRIPT · BACKEND FUNCTIONS", alt: true },
+    { y: 314, h: 168, label: "GOOGLE SHEETS" },
+    { y: 494, h: 138, label: "FIREBASE RTDB", alt: true }
+  ];
+
+  // Cleaner layout: no p2b/phasey nodes (dead paths shown via "orphaned" tags on stores instead)
+  const D_NODES = [
+    // Frontend — centered
+    { id: "index", x: 475, y: 34, w: 250, h: 56, label: "Index.html", sub: "browser · login · schedule view", desc: "หน้าเว็บ frontend — เรียก backend ผ่าน google.script.run" },
+
+    // Backend row 1 — Schedule + Overlay read (y=134-174)
+    { id: "doget", x: 30, y: 134, w: 130, h: 40, label: "doGet(e)", desc: "Entry point ตอนโหลดหน้าเว็บ" },
+    { id: "getsch", x: 180, y: 134, w: 200, h: 40, label: "getScheduleData", badge: "ID", desc: "ดึงตารางเวรของเดือน · รับ monthId (ID format)" },
+    { id: "getov", x: 400, y: 134, w: 260, h: 40, label: "phxGetAllActiveOverlays", badge: "Label", desc: "ดึง overlay ทั้งหมดของเดือน · รับ monthId (Label format)" },
+    { id: "applyov", x: 680, y: 134, w: 220, h: 40, label: "_phxApplyOverlays", desc: "แปะ overlay ทับตารางที่ getScheduleData คืนมา (Path B core)" },
+
+    // Backend row 2 — Overlay CRUD + Sync (y=194-234)
+    { id: "append", x: 30, y: 194, w: 210, h: 40, label: "appendUserOverlay", desc: "เพิ่ม overlay 1 รายการของผู้ใช้" },
+    { id: "getuo", x: 260, y: 194, w: 190, h: 40, label: "getUserOverlays", desc: "อ่าน overlay ของผู้ใช้คนเดียว" },
+    { id: "clearuo", x: 470, y: 194, w: 250, h: 40, label: "clearUserOverlaysForMonth", desc: "ล้าง overlay ทั้งเดือนของผู้ใช้" },
+    { id: "syncfb", x: 740, y: 194, w: 220, h: 40, label: "syncMonthToFirebase", desc: "push ตารางเวรของเดือนขึ้น Firebase RTDB" },
+
+    // Backend row 3 — Reminders + email (y=254-294)
+    { id: "scansh", x: 30, y: 254, w: 250, h: 40, label: "_phxScanShiftsByUserForDate", desc: "trigger รายวัน — สแกนหาเวรของผู้ใช้แต่ละคน" },
+    { id: "remset", x: 300, y: 254, w: 260, h: 40, label: "_phxGetUserReminderSettings", desc: "อ่านการตั้งค่าเตือนของแต่ละคน" },
+    { id: "getuosh", x: 580, y: 254, w: 240, h: 40, label: "_phxGetUserOverlayShifts", desc: "อ่าน overlay ของผู้ใช้เพื่อนำมา apply กับตาราง" },
+    { id: "queuemail", x: 840, y: 254, w: 180, h: 40, label: "phxQueueEmail", desc: "คิว email ลง PHX_EmailQueue" },
+
+    // Sheets row 1 — Active (y=336-386)
+    { id: "schidx", x: 30, y: 336, w: 180, h: 50, label: "Schedule_Index", sub: "11 rows", badge: "ID", desc: "Master index ของทุกเดือน · Primary key = monthId (ID format)" },
+    { id: "schtab", x: 230, y: 336, w: 220, h: 50, label: "Schedule_m_...", sub: "11 tabs · some dup", badge: "ID", desc: "ตารางเวรจริงของแต่ละเดือน · sheet name = 'Schedule_m_<numericId>_v1'" },
+    { id: "phxov2", x: 470, y: 336, w: 200, h: 50, label: "PHX_Overlays_v2", sub: "31 rows · Path B", badge: "Label", desc: "Active overlay store (Path B) · monthId = Label format" },
+    { id: "phxuo", x: 690, y: 336, w: 210, h: 50, label: "PHX_UserOverlays", sub: "6 rows · MIXED format!", badge: "MIX", desc: "Cloud Sync overlay ต่อผู้ใช้ · 1 แถวใช้ ID + 5 แถวใช้ Label!" },
+    { id: "phxpharm", x: 920, y: 336, w: 220, h: 50, label: "PHX_Pharmacists", sub: "4 + 212 master", desc: "ผู้ใช้ที่ลงทะเบียน (4) + whitelist master (212)" },
+
+    // Sheets row 2 — Legacy/Email/Audit (y=414-456)
+    { id: "userov", x: 30, y: 414, w: 240, h: 42, label: "User_Overlays", sub: "15 rows · orphaned Phase 2B", dead: true, badge: "Label", desc: "Phase 2B legacy · ทุกแถวมี status=deleted · ไม่มี consumer" },
+    { id: "phxov", x: 290, y: 414, w: 200, h: 42, label: "PHX_Overlays", sub: "Phase Y dead", dead: true, badge: "Label", desc: "Phase Y ที่ถูก drop · ไม่มี code ที่ใช้แล้ว" },
+    { id: "emailq", x: 510, y: 414, w: 200, h: 42, label: "PHX_EmailQueue", sub: "51 rows", desc: "Email queue — pending + sent" },
+    { id: "audit", x: 730, y: 414, w: 200, h: 42, label: "PHX_AuditLog", sub: "192 rows", desc: "Audit log ของการแก้ไข" },
+
+    // Firebase (y=520-570)
+    { id: "fbsch", x: 30, y: 520, w: 190, h: 50, label: "/schedules", sub: "2/11 months ⚠️", badge: "Label", desc: "Firebase schedules · sync ครอบคลุมแค่ 2 เดือน (June + July)" },
+    { id: "fbnotes", x: 240, y: 520, w: 360, h: 50, label: "/positionNotes ·/scheduleNotes ·/...Parsed", sub: "8/11 months", badge: "Label", desc: "Position + Schedule notes · sync ดี (8 เดือน)" },
+    { id: "fbuo", x: 620, y: 520, w: 165, h: 50, label: "/user_overlays", sub: "EMPTY · Phase 2B orphan", dead: true, badge: "Label", desc: "Phase 2B integration · code ยัง write แต่ไม่มีข้อมูลจริง" },
+    { id: "fbub", x: 805, y: 520, w: 165, h: 50, label: "/user_bindings", sub: "EMPTY · Phase 2B orphan", dead: true, badge: "Label", desc: "Phase 2B · empty" },
+    { id: "fbpn", x: 990, y: 520, w: 195, h: 50, label: "/pharmacist_names", sub: "EMPTY · Phase 2B orphan", dead: true, badge: "Label", desc: "Phase 2B · empty" }
+  ];
+
+  const D_TRACES = [
+    // Frontend → Backend (google.script.run)
+    { from: "index", to: "doget", type: "read" },
+    { from: "index", to: "getsch", type: "read" },
+    { from: "index", to: "getov", type: "read" },
+    { from: "index", to: "append", type: "write" },
+    { from: "index", to: "getuo", type: "read" },
+    { from: "index", to: "clearuo", type: "write" },
+    // Backend chain
+    { from: "getov", to: "applyov", type: "read" },
+    { from: "scansh", to: "remset", type: "read" },
+    { from: "scansh", to: "getuosh", type: "read" },
+    { from: "scansh", to: "queuemail", type: "write" },
+    // Backend → Sheets (read)
+    { from: "getsch", to: "schidx", type: "read" },
+    { from: "getsch", to: "schtab", type: "read" },
+    { from: "getov", to: "phxov2", type: "read" },
+    { from: "applyov", to: "phxov2", type: "read" },
+    { from: "getuo", to: "phxuo", type: "read" },
+    { from: "scansh", to: "schtab", type: "read" },
+    { from: "remset", to: "phxpharm", type: "read" },
+    { from: "getuosh", to: "phxuo", type: "read" },
+    // Backend → Sheets (write)
+    { from: "append", to: "phxuo", type: "write" },
+    { from: "clearuo", to: "phxuo", type: "write" },
+    { from: "queuemail", to: "emailq", type: "write" },
+    // Backend → Firebase (write)
+    { from: "syncfb", to: "fbsch", type: "write" }
+  ];
+
+  // Preset filter groups (which node ids to show)
+  const D_PRESETS = {
+    all: null,
+    schedule: ["index", "doget", "getsch", "schidx", "schtab", "syncfb", "fbsch", "fbnotes"],
+    overlay: ["index", "getov", "applyov", "append", "getuo", "clearuo", "phxov2", "phxuo"],
+    reminder: ["scansh", "remset", "phxpharm", "getuosh", "phxuo", "queuemail", "emailq"],
+    sync: ["syncfb", "fbsch", "fbnotes", "schidx", "schtab"],
+    dead: ["userov", "phxov", "fbuo", "fbub", "fbpn"]
+  };
+
+  function el(tag, attrs, parent) {
+    const n = document.createElementNS(SVG_NS, tag);
+    if (attrs) Object.keys(attrs).forEach(k => n.setAttribute(k, attrs[k]));
+    if (parent) parent.appendChild(n);
+    return n;
+  }
+
+  function routeD(from, to) {
+    const sxc = from.x + from.w / 2;
+    const sy_bot = from.y + from.h;
+    const sy_top = from.y;
+    const txc = to.x + to.w / 2;
+    const ty_top = to.y;
+    const ty_bot = to.y + to.h;
+    // Same row (backend → backend chain): loop below
+    if (Math.abs(from.y - to.y) < 6) {
+      const cy = sy_bot + 10;
+      return `M ${sxc} ${sy_bot} L ${sxc} ${cy} L ${txc} ${cy} L ${txc} ${sy_bot}`;
+    }
+    // Backward (target above source) — reads from stores back to backend
+    if (ty_bot <= sy_top + 6) {
+      const midY = (sy_top + ty_bot) / 2;
+      return `M ${sxc} ${sy_top} L ${sxc} ${midY} L ${txc} ${midY} L ${txc} ${ty_bot}`;
+    }
+    // Straight down
+    if (Math.abs(sxc - txc) < 2) return `M ${sxc} ${sy_bot} L ${txc} ${ty_top}`;
+    // Route via corridor just above target
+    const corridor = ty_top - 16;
+    return `M ${sxc} ${sy_bot} L ${sxc} ${corridor} L ${txc} ${corridor} L ${txc} ${ty_top}`;
+  }
+
+  // ─── DIAG data application ────────────────────────────
+  // Reads embedded <script id="diag-data"> and merges fresh counts
+  // into STORES, D_NODES, hero meta, and overview stats.
+  function applyDiag() {
+    let DIAG = null;
+    try {
+      const src = document.getElementById("diag-data");
+      if (src && src.textContent.trim().length > 20) DIAG = JSON.parse(src.textContent);
+    } catch(e) { console.warn("diag-data parse failed:", e); }
+    if (!DIAG) return;
+
+    const setAll = (attr, v) => {
+      document.querySelectorAll('[data-diag="' + attr + '"]').forEach(e => e.textContent = v);
+    };
+
+    if (DIAG.runAt) {
+      const d = new Date(DIAG.runAt);
+      const stamp = d.toISOString().substring(0, 16).replace("T", " ") + " UTC";
+      setAll("runAt", stamp);
+    }
+    if (DIAG.runBy) setAll("runBy", DIAG.runBy);
+
+    const sheetsN = Object.keys(DIAG.sheets || {}).length;
+    const fbN = ((DIAG.firebase && DIAG.firebase.topLevelKeys) || []).length;
+    const fnN = DIAG.functionsCount || 32;
+    const propN = DIAG.propertiesCount || 13;
+    setAll("sheetsCount", sheetsN);
+    setAll("firebaseCount", fbN);
+    setAll("functionsCount", fnN);
+    setAll("propertiesCount", propN);
+
+    // Merge counts into STORES (in memory) and update already-rendered cards
+    STORES.forEach(s => {
+      if (s.type === "sheet" && DIAG.sheets && DIAG.sheets[s.name]) {
+        s.rows = DIAG.sheets[s.name].rows;
+        s.cols = DIAG.sheets[s.name].cols;
+      } else if (s.type === "firebase" && DIAG.firebase && DIAG.firebase.probed && DIAG.firebase.probed[s.name]) {
+        s.count = DIAG.firebase.probed[s.name].count || 0;
+      }
+    });
+    document.querySelectorAll("#storeGrid .card").forEach(card => {
+      const nameEl = card.querySelector(".card-name");
+      if (!nameEl) return;
+      const s = STORES.find(x => x.name === nameEl.textContent);
+      if (!s) return;
+      const metaEl = card.querySelector(".card-meta");
+      if (metaEl) {
+        metaEl.textContent = s.type === "firebase"
+          ? `${s.count} subkey(s) · firebase`
+          : `${s.rows} × ${s.cols} · sheet`;
+      }
+    });
+
+    // Merge into D_NODES sub texts (used by initDiagram after this)
+    const overrides = {
+      schidx: () => DIAG.sheets.Schedule_Index && `${DIAG.sheets.Schedule_Index.rows} rows`,
+      phxov2: () => DIAG.sheets.PHX_Overlays_v2 && `${DIAG.sheets.PHX_Overlays_v2.rows} rows · Path B`,
+      phxuo: () => DIAG.sheets.PHX_UserOverlays && `${DIAG.sheets.PHX_UserOverlays.rows} rows · MIXED format!`,
+      phxpharm: () => `${(DIAG.sheets.PHX_Pharmacists||{}).rows || "?"} + ${(DIAG.sheets.PHX_Pharmacists_Master||{}).rows || "?"} master`,
+      userov: () => `${(DIAG.sheets.User_Overlays||{}).rows || "?"} rows · orphaned Phase 2B`,
+      emailq: () => `${(DIAG.sheets.PHX_EmailQueue||{}).rows || "?"} rows`,
+      audit: () => `${(DIAG.sheets.PHX_AuditLog||{}).rows || "?"} rows`,
+      fbsch: () => {
+        const c = (DIAG.firebase.probed.schedules||{}).count || 0;
+        return `${c}/11 months` + (c < 11 ? " ⚠️" : "");
+      },
+      fbnotes: () => `${(DIAG.firebase.probed.positionNotes||{}).count || 0}/11 months`
+    };
+    D_NODES.forEach(n => {
+      if (overrides[n.id]) {
+        try { const s = overrides[n.id](); if (s) n.sub = s; } catch(e) {}
+      }
+    });
+  }
+
+  function initDiagram() {
+    const svg = document.getElementById("diagram");
+    if (!svg) return;
+    const laneG = svg.querySelector("#d-lanes");
+    const traceG = svg.querySelector("#d-traces");
+    const nodeG = svg.querySelector("#d-nodes");
+    const nodeMap = {};
+    D_NODES.forEach(n => nodeMap[n.id] = n);
+
+    // Lanes
+    D_LANES.forEach(l => {
+      if (l.alt) {
+        el("rect", { class: "lane-bg", x: 8, y: l.y, width: 1184, height: l.h }, laneG);
+      }
+      el("text", { class: "lane-label", x: 20, y: l.y + 14 }, laneG).textContent = l.label;
+    });
+
+    // Traces (drawn first, layered underneath nodes)
+    D_TRACES.forEach(t => {
+      const from = nodeMap[t.from], to = nodeMap[t.to];
+      if (!from || !to) return;
+      const cls = "trace" + (t.type === "write" ? " write" : "");
+      const marker = "url(#ar-" + (t.type === "write" ? "write" : "read") + ")";
+      el("path", {
+        class: cls, d: routeD(from, to),
+        "data-from": t.from, "data-to": t.to,
+        "marker-end": marker
+      }, traceG);
+    });
+
+    // Nodes
+    D_NODES.forEach(n => {
+      const g = el("g", {
+        class: "node" + (n.dead ? " dead" : "") + (n.badge === "MIX" ? " mixed" : ""),
+        "data-id": n.id,
+        transform: `translate(${n.x}, ${n.y})`,
+        tabindex: "0"
+      }, nodeG);
+      el("rect", { class: "node-box", x: 0, y: 0, width: n.w, height: n.h, rx: 2 }, g);
+      el("rect", { class: "node-pin", x: n.w / 2 - 4, y: -2, width: 8, height: 2 }, g);
+      el("rect", { class: "node-pin", x: n.w / 2 - 4, y: n.h, width: 8, height: 2 }, g);
+      const labelY = n.sub ? 18 : n.h / 2 + 4;
+      el("text", { class: "node-label", x: 10, y: labelY }, g).textContent = n.label;
+      if (n.sub) {
+        el("text", { class: "node-sub", x: 10, y: 34 }, g).textContent = n.sub;
+      }
+      if (n.badge) {
+        const badgeColor = n.badge === "ID" ? "#2C4E75" : (n.badge === "Label" ? "#0B4F52" : "#A63B3B");
+        const bw = n.badge === "Label" ? 34 : (n.badge === "MIX" ? 26 : 18);
+        el("rect", { x: n.w - bw - 5, y: 5, width: bw, height: 13, rx: 1, fill: badgeColor }, g);
+        const bt = el("text", { class: "node-badge-text", x: n.w - bw / 2 - 5, y: 14, "text-anchor": "middle" }, g);
+        bt.textContent = n.badge;
+      }
+      // Hover / focus → highlight connections + show node-info
+      const onEnter = () => { highlight(n.id); showNodeInfo(n.id); };
+      const onLeave = () => { clearHighlight(); resetNodeInfo(); };
+      g.addEventListener("mouseenter", onEnter);
+      g.addEventListener("mouseleave", onLeave);
+      g.addEventListener("focus", onEnter);
+      g.addEventListener("blur", onLeave);
+    });
+
+    // Wire preset filter buttons
+    document.querySelectorAll("#presetBar .preset").forEach(btn => {
+      btn.addEventListener("click", () => {
+        document.querySelectorAll("#presetBar .preset").forEach(b => b.classList.remove("active"));
+        btn.classList.add("active");
+        applyPreset(btn.dataset.preset);
+        // Reset node hover state
+        clearHighlight();
+        resetNodeInfo();
+      });
+    });
+  }
+
+  function highlight(nodeId) {
+    const svg = document.getElementById("diagram");
+    svg.querySelectorAll(".trace").forEach(t => {
+      const isConn = t.getAttribute("data-from") === nodeId || t.getAttribute("data-to") === nodeId;
+      t.classList.toggle("active", isConn);
+      t.classList.toggle("dim", !isConn);
+    });
+    const connectedIds = new Set();
+    D_TRACES.forEach(t => {
+      if (t.from === nodeId) connectedIds.add(t.to);
+      if (t.to === nodeId) connectedIds.add(t.from);
+    });
+    svg.querySelectorAll(".node").forEach(n => {
+      n.classList.toggle("hovered", connectedIds.has(n.getAttribute("data-id")));
+    });
+  }
+  function clearHighlight() {
+    const svg = document.getElementById("diagram");
+    svg.querySelectorAll(".trace").forEach(t => t.classList.remove("active", "dim"));
+    svg.querySelectorAll(".node").forEach(n => n.classList.remove("hovered"));
+  }
+
+  function showNodeInfo(nodeId) {
+    const n = D_NODES.find(x => x.id === nodeId);
+    if (!n) return;
+    const panel = document.getElementById("nodeInfo");
+    if (!panel) return;
+    panel.querySelector(".ni-name").textContent = n.label + (n.sub ? "  ·  " + n.sub : "") + (n.badge ? "  [" + n.badge + "]" : "");
+    const outs = [], ins = [];
+    D_TRACES.forEach(t => {
+      if (t.from === nodeId) {
+        const target = D_NODES.find(x => x.id === t.to);
+        if (target) outs.push({ target, type: t.type });
+      }
+      if (t.to === nodeId) {
+        const source = D_NODES.find(x => x.id === t.from);
+        if (source) ins.push({ source, type: t.type });
+      }
+    });
+    let html = n.desc ? `<div style="margin-bottom:8px;">${n.desc}</div>` : '';
+    if (ins.length || outs.length) {
+      html += `<div class="ni-conns">`;
+      ins.forEach(({source, type}) => {
+        const cls = type === "write" ? "dir w" : "dir";
+        html += `<span class="ni-conn"><span class="${cls}">← ${source.label}</span><span class="kind">${type}</span></span>`;
+      });
+      outs.forEach(({target, type}) => {
+        const cls = type === "write" ? "dir w" : "dir";
+        html += `<span class="ni-conn"><span class="${cls}">→ ${target.label}</span><span class="kind">${type}</span></span>`;
+      });
+      html += `</div>`;
+    } else {
+      html += `<span style="color:var(--brick);">ไม่มี connection ในผัง (dead / isolated)</span>`;
+    }
+    panel.querySelector(".ni-detail").innerHTML = html;
+  }
+  function resetNodeInfo() {
+    const panel = document.getElementById("nodeInfo");
+    if (!panel) return;
+    panel.querySelector(".ni-name").textContent = "แตะกล่องใดๆ ด้านบน 👆";
+    panel.querySelector(".ni-detail").innerHTML = "ผ่านเมาส์ที่กล่องเพื่อไฮไลต์เส้นเชื่อม + แสดงรายการทั้งอ่านและเขียน / คลิก tab กรอง เพื่อดูเฉพาะ flow";
+  }
+
+  function applyPreset(name) {
+    const focus = D_PRESETS[name];
+    const svg = document.getElementById("diagram");
+    if (!focus) {
+      svg.querySelectorAll(".node").forEach(n => n.classList.remove("preset-hidden"));
+      svg.querySelectorAll(".trace").forEach(t => t.classList.remove("preset-hidden"));
+      return;
+    }
+    const focusSet = new Set(focus);
+    svg.querySelectorAll(".node").forEach(n => {
+      n.classList.toggle("preset-hidden", !focusSet.has(n.getAttribute("data-id")));
+    });
+    svg.querySelectorAll(".trace").forEach(t => {
+      const from = t.getAttribute("data-from"), to = t.getAttribute("data-to");
+      t.classList.toggle("preset-hidden", !(focusSet.has(from) && focusSet.has(to)));
+    });
+  }
+
+  // Boot: apply DIAG overrides first (so counts are fresh), then render diagram
+  applyDiag();
+  initDiagram();
+</script>

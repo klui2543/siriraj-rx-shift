@@ -1,0 +1,1291 @@
+{
+  "metadata": {
+    "version": "Map-A v1",
+    "runAt": "2026-07-05T08:22:47.817Z",
+    "runBy": "norapol.uttho@gmail.com",
+    "spreadsheetId": "1V1Fo4rEadSYfqLDc1sZEE-fRtZ4Je5_30_EAclO3KHM",
+    "firebaseUrl": "https://siriraj-rx-shift-default-rtdb.asia-southeast1.firebasedatabase.app"
+  },
+  "sheets": [
+    {
+      "name": "Schedule_Index",
+      "rows": 11,
+      "cols": 9,
+      "headers": [
+        "month_id",
+        "label",
+        "active_tab",
+        "version",
+        "sheet_url",
+        "row_count",
+        "last_modified",
+        "source_file",
+        "status"
+      ],
+      "samples": [
+        [
+          "m_1780833048543956",
+          "มิถุนายน 2569",
+          "Schedule_m_1780833048543956_v1",
+          "1",
+          "https://docs.google.com/spreadsheets/d/1sGVfa0e1nXip2n4ygrTumT_1bn5fh0ux6AztZSEb...",
+          "2306",
+          "2026-06-07T11:50:52.109Z",
+          "เวรเภสัชกร 06-69.xlsx",
+          "active"
+        ],
+        [
+          "m_1780928284757680",
+          "พฤษภาคม 2569",
+          "Schedule_m_1780928284757680_v1",
+          "1",
+          "https://docs.google.com/spreadsheets/d/1fvOarZTRoswtJFaYmnbVjklxVHdXkAjV-T7X3inh...",
+          "2405",
+          "2026-06-08T14:18:12.273Z",
+          "เวรเภสัชกร 05-69.xlsx",
+          "active"
+        ]
+      ]
+    },
+    {
+      "name": "Schedule_m_1781858940879169_v1",
+      "rows": 2349,
+      "cols": 12,
+      "headers": [
+        "shift_id",
+        "name",
+        "date",
+        "timestamp",
+        "pos",
+        "shift",
+        "range",
+        "room",
+        "isNew",
+        "originOwner",
+        "status",
+        "last_modified"
+      ],
+      "samples": [
+        [
+          "MDEvMDcgKD8uKVN",
+          "เดียน่า",
+          "01/07 (พ.)",
+          "20260701",
+          "SM1*",
+          "⚠️",
+          "ตรวจสอบ",
+          "clinic",
+          "false",
+          "เดียน่า",
+          "active",
+          "2026-06-19T08:49:04.554Z"
+        ],
+        [
+          "MDIvMDcgKD8/Lil",
+          "รุ่งนภา",
+          "02/07 (พฤ.)",
+          "20260702",
+          "SM1*",
+          "⚠️",
+          "ตรวจสอบ",
+          "clinic",
+          "false",
+          "รุ่งนภา",
+          "active",
+          "2026-06-19T08:49:04.554Z"
+        ]
+      ]
+    },
+    {
+      "name": "PHX_UserOverlays",
+      "rows": 6,
+      "cols": 4,
+      "headers": [
+        "userName",
+        "monthId",
+        "shiftsJSON",
+        "updatedAt"
+      ],
+      "samples": [
+        [
+          "ณรพล",
+          "m_1781304482466579",
+          "[]",
+          "Wed Jun 17 2026 22:34:41 GMT+0700 (Indochina Time)"
+        ],
+        [
+          "ณรพล",
+          "m_มิถุนายน_2569",
+          "[{\"shift_id\":\"MDMvMDYgKD8uKU5\",\"name\":\"ณรพล\",\"date\":\"03/06 (พ.)\",\"timestamp\":202...",
+          "Fri Jun 26 2026 13:50:08 GMT+0700 (Indochina Time)"
+        ]
+      ]
+    },
+    {
+      "name": "Schedule_m_1781304516401916_v1",
+      "rows": 2406,
+      "cols": 12,
+      "headers": [
+        "shift_id",
+        "name",
+        "date",
+        "timestamp",
+        "pos",
+        "shift",
+        "range",
+        "room",
+        "isNew",
+        "originOwner",
+        "status",
+        "last_modified"
+      ],
+      "samples": [
+        [
+          "MDEvMDUgKD8uKVN",
+          "นริสา",
+          "01/05 (ศ.)",
+          "20260501",
+          "SM1*",
+          "⚠️",
+          "ตรวจสอบ",
+          "clinic",
+          "false",
+          "นริสา",
+          "active",
+          "2026-06-12T22:48:37.348Z"
+        ],
+        [
+          "MDIvMDUgKD8uKVN",
+          "พิรุณ",
+          "02/05 (ส.)",
+          "20260502",
+          "SM1*",
+          "⚠️",
+          "ตรวจสอบ",
+          "clinic",
+          "false",
+          "พิรุณ",
+          "active",
+          "2026-06-12T22:48:37.348Z"
+        ]
+      ]
+    },
+    {
+      "name": "Schedule_m_1781304482466579_v1",
+      "rows": 2307,
+      "cols": 12,
+      "headers": [
+        "shift_id",
+        "name",
+        "date",
+        "timestamp",
+        "pos",
+        "shift",
+        "range",
+        "room",
+        "isNew",
+        "originOwner",
+        "status",
+        "last_modified"
+      ],
+      "samples": [
+        [
+          "MDIvMDYgKD8uKVN",
+          "บุศยา",
+          "02/06 (อ.)",
+          "20260602",
+          "SM1*",
+          "⚠️",
+          "ตรวจสอบ",
+          "clinic",
+          "false",
+          "บุศยา",
+          "active",
+          "2026-06-12T22:48:03.206Z"
+        ],
+        [
+          "MDQvMDYgKD8/Lil",
+          "อัจจิมา",
+          "04/06 (พฤ.)",
+          "20260604",
+          "SM1*",
+          "⚠️",
+          "ตรวจสอบ",
+          "clinic",
+          "false",
+          "อัจจิมา",
+          "active",
+          "2026-06-12T22:48:03.206Z"
+        ]
+      ]
+    },
+    {
+      "name": "Schedule_m_1781302809807259_v1",
+      "rows": 2406,
+      "cols": 12,
+      "headers": [
+        "shift_id",
+        "name",
+        "date",
+        "timestamp",
+        "pos",
+        "shift",
+        "range",
+        "room",
+        "isNew",
+        "originOwner",
+        "status",
+        "last_modified"
+      ],
+      "samples": [
+        [
+          "MDEvMDUgKD8uKVN",
+          "นริสา",
+          "01/05 (ศ.)",
+          "20260501",
+          "SM1*",
+          "⚠️",
+          "ตรวจสอบ",
+          "clinic",
+          "false",
+          "นริสา",
+          "active",
+          "2026-06-12T22:20:10.415Z"
+        ],
+        [
+          "MDIvMDUgKD8uKVN",
+          "พิรุณ",
+          "02/05 (ส.)",
+          "20260502",
+          "SM1*",
+          "⚠️",
+          "ตรวจสอบ",
+          "clinic",
+          "false",
+          "พิรุณ",
+          "active",
+          "2026-06-12T22:20:10.415Z"
+        ]
+      ]
+    },
+    {
+      "name": "Schedule_m_1781302776024211_v1",
+      "rows": 2307,
+      "cols": 12,
+      "headers": [
+        "shift_id",
+        "name",
+        "date",
+        "timestamp",
+        "pos",
+        "shift",
+        "range",
+        "room",
+        "isNew",
+        "originOwner",
+        "status",
+        "last_modified"
+      ],
+      "samples": [
+        [
+          "MDIvMDYgKD8uKVN",
+          "บุศยา",
+          "02/06 (อ.)",
+          "20260602",
+          "SM1*",
+          "⚠️",
+          "ตรวจสอบ",
+          "clinic",
+          "false",
+          "บุศยา",
+          "active",
+          "2026-06-12T22:19:37.946Z"
+        ],
+        [
+          "MDQvMDYgKD8/Lil",
+          "อัจจิมา",
+          "04/06 (พฤ.)",
+          "20260604",
+          "SM1*",
+          "⚠️",
+          "ตรวจสอบ",
+          "clinic",
+          "false",
+          "อัจจิมา",
+          "active",
+          "2026-06-12T22:19:37.946Z"
+        ]
+      ]
+    },
+    {
+      "name": "Schedule_m_1781135590706603_v2",
+      "rows": 2130,
+      "cols": 12,
+      "headers": [
+        "shift_id",
+        "name",
+        "date",
+        "timestamp",
+        "pos",
+        "shift",
+        "range",
+        "room",
+        "isNew",
+        "originOwner",
+        "status",
+        "last_modified"
+      ],
+      "samples": [
+        [
+          "MDUvMDEgKD8uKVN",
+          "นริสา",
+          "05/01 (จ.)",
+          "20260105",
+          "SM1*",
+          "⚠️",
+          "ตรวจสอบ",
+          "clinic",
+          "false",
+          "นริสา",
+          "active",
+          "2026-06-11T06:42:48.746Z"
+        ],
+        [
+          "MDYvMDEgKD8uKVN",
+          "สุริณี",
+          "06/01 (อ.)",
+          "20260106",
+          "SM1*",
+          "⚠️",
+          "ตรวจสอบ",
+          "clinic",
+          "false",
+          "สุริณี",
+          "active",
+          "2026-06-11T06:42:48.746Z"
+        ]
+      ]
+    },
+    {
+      "name": "Schedule_m_1781135590706603_v1",
+      "rows": 2130,
+      "cols": 12,
+      "headers": [
+        "shift_id",
+        "name",
+        "date",
+        "timestamp",
+        "pos",
+        "shift",
+        "range",
+        "room",
+        "isNew",
+        "originOwner",
+        "status",
+        "last_modified"
+      ],
+      "samples": [
+        [
+          "MDUvMDEgKD8uKVN",
+          "นริสา",
+          "05/01 (จ.)",
+          "20260105",
+          "SM1*",
+          "⚠️",
+          "ตรวจสอบ",
+          "clinic",
+          "false",
+          "นริสา",
+          "active",
+          "2026-06-10T23:53:12.287Z"
+        ],
+        [
+          "MDYvMDEgKD8uKVN",
+          "สุริณี",
+          "06/01 (อ.)",
+          "20260106",
+          "SM1*",
+          "⚠️",
+          "ตรวจสอบ",
+          "clinic",
+          "false",
+          "สุริณี",
+          "active",
+          "2026-06-10T23:53:12.287Z"
+        ]
+      ]
+    },
+    {
+      "name": "Schedule_m_1781088370706875_v1",
+      "rows": 2410,
+      "cols": 12,
+      "headers": [
+        "shift_id",
+        "name",
+        "date",
+        "timestamp",
+        "pos",
+        "shift",
+        "range",
+        "room",
+        "isNew",
+        "originOwner",
+        "status",
+        "last_modified"
+      ],
+      "samples": [
+        [
+          "MDEvMDMgKD8/Lil",
+          "ปรีดา",
+          "01/03 (อา.)",
+          "20260301",
+          "SM1*",
+          "⚠️",
+          "ตรวจสอบ",
+          "clinic",
+          "false",
+          "ปรีดา",
+          "active",
+          "2026-06-10T10:46:11.407Z"
+        ],
+        [
+          "MDIvMDMgKD8uKVN",
+          "นงลักษณ์",
+          "02/03 (จ.)",
+          "20260302",
+          "SM1*",
+          "⚠️",
+          "ตรวจสอบ",
+          "clinic",
+          "true",
+          "นงลักษณ์",
+          "active",
+          "2026-06-10T10:46:11.407Z"
+        ]
+      ]
+    },
+    {
+      "name": "PHX_AuditLog",
+      "rows": 192,
+      "cols": 8,
+      "headers": [
+        "timestamp",
+        "userName",
+        "action",
+        "target",
+        "before",
+        "after",
+        "source",
+        "sessionId"
+      ],
+      "samples": [
+        [
+          "2026-06-09T00:14:54.874Z",
+          "(system)",
+          "test",
+          "manual-test-target",
+          "{\"hello\":\"before\"}",
+          "{\"hello\":\"after\"}",
+          "system",
+          ""
+        ],
+        [
+          "2026-06-09T00:16:33.715Z",
+          "(system)",
+          "test",
+          "manual-test-target",
+          "{\"hello\":\"before\"}",
+          "{\"hello\":\"after\"}",
+          "system",
+          ""
+        ]
+      ]
+    },
+    {
+      "name": "Schedule_m_1780956464020192_v1",
+      "rows": 2130,
+      "cols": 12,
+      "headers": [
+        "shift_id",
+        "name",
+        "date",
+        "timestamp",
+        "pos",
+        "shift",
+        "range",
+        "room",
+        "isNew",
+        "originOwner",
+        "status",
+        "last_modified"
+      ],
+      "samples": [
+        [
+          "MDUvMDEgKD8uKVN",
+          "นริสา",
+          "05/01 (จ.)",
+          "20260105",
+          "SM1*",
+          "⚠️",
+          "ตรวจสอบ",
+          "clinic",
+          "false",
+          "นริสา",
+          "active",
+          "2026-06-08T22:07:45.056Z"
+        ],
+        [
+          "MDYvMDEgKD8uKVN",
+          "สุริณี",
+          "06/01 (อ.)",
+          "20260106",
+          "SM1*",
+          "⚠️",
+          "ตรวจสอบ",
+          "clinic",
+          "false",
+          "สุริณี",
+          "active",
+          "2026-06-08T22:07:45.056Z"
+        ]
+      ]
+    },
+    {
+      "name": "Schedule_m_1780928284757680_v1",
+      "rows": 2406,
+      "cols": 12,
+      "headers": [
+        "shift_id",
+        "name",
+        "date",
+        "timestamp",
+        "pos",
+        "shift",
+        "range",
+        "room",
+        "isNew",
+        "originOwner",
+        "status",
+        "last_modified"
+      ],
+      "samples": [
+        [
+          "MDEvMDUgKD8uKVN",
+          "นริสา",
+          "01/05 (ศ.)",
+          "20260501",
+          "SM1*",
+          "⚠️",
+          "ตรวจสอบ",
+          "clinic",
+          "false",
+          "นริสา",
+          "active",
+          "2026-06-08T14:18:07.578Z"
+        ],
+        [
+          "MDIvMDUgKD8uKVN",
+          "พิรุณ",
+          "02/05 (ส.)",
+          "20260502",
+          "SM1*",
+          "⚠️",
+          "ตรวจสอบ",
+          "clinic",
+          "false",
+          "พิรุณ",
+          "active",
+          "2026-06-08T14:18:07.578Z"
+        ]
+      ]
+    },
+    {
+      "name": "Schedule_m_1780833048543956_v1",
+      "rows": 2307,
+      "cols": 12,
+      "headers": [
+        "shift_id",
+        "name",
+        "date",
+        "timestamp",
+        "pos",
+        "shift",
+        "range",
+        "room",
+        "isNew",
+        "originOwner",
+        "status",
+        "last_modified"
+      ],
+      "samples": [
+        [
+          "MDIvMDYgKD8uKVN",
+          "บุศยา",
+          "02/06 (อ.)",
+          "20260602",
+          "SM1*",
+          "⚠️",
+          "ตรวจสอบ",
+          "clinic",
+          "false",
+          "บุศยา",
+          "active",
+          "2026-06-07T11:50:49.331Z"
+        ],
+        [
+          "MDQvMDYgKD8/Lil",
+          "อัจจิมา",
+          "04/06 (พฤ.)",
+          "20260604",
+          "SM1*",
+          "⚠️",
+          "ตรวจสอบ",
+          "clinic",
+          "false",
+          "อัจจิมา",
+          "active",
+          "2026-06-07T11:50:49.331Z"
+        ]
+      ]
+    },
+    {
+      "name": "PHX_LineGroups",
+      "rows": 2,
+      "cols": 5,
+      "headers": [
+        "groupId",
+        "sourceType",
+        "joinedAt",
+        "lastSeen",
+        "status"
+      ],
+      "samples": [
+        [
+          "C1fb6875ef2fd18449751741d3bf36e56",
+          "group",
+          "2026-06-07T09:54:02.951Z",
+          "2026-06-19T08:18:56.997Z",
+          "active"
+        ]
+      ]
+    },
+    {
+      "name": "PHX_Broadcasts",
+      "rows": 13,
+      "cols": 12,
+      "headers": [
+        "id",
+        "title",
+        "body",
+        "createdAt",
+        "createdBy",
+        "expiresAt",
+        "emailSent",
+        "emailSentCount",
+        "readBy",
+        "status",
+        "lineSent",
+        "lineSentCount"
+      ],
+      "samples": [
+        [
+          "b_1780948452461_7phe7o",
+          "📅 ตารางเวรเดือน กุมภาพันธ์ 2569 ออกแล้ว",
+          "ตรวจสอบเวรของท่านได้ที่:\nhttps://script.google.com/macros/s/AKfycbyDVJpVFpvMsKTW...",
+          "2026-06-08T19:54:12.461Z",
+          "auto-sync (Gmail)",
+          "2026-06-22T19:54:12.461Z",
+          "N",
+          "0",
+          "{\"ณรพล\":\"2026-06-08T21:56:55.450Z\"}",
+          "active",
+          "Y",
+          "1"
+        ],
+        [
+          "b_1780956475110_21hetk",
+          "📅 ตารางเวรเดือน มกราคม 2569 ออกแล้ว",
+          "ตรวจสอบเวรของท่านได้ที่:\nhttps://script.google.com/macros/s/AKfycbyDVJpVFpvMsKTW...",
+          "2026-06-08T22:07:55.110Z",
+          "auto-sync (Gmail)",
+          "2026-06-22T22:07:55.110Z",
+          "N",
+          "0",
+          "{\"ณรพล\":\"2026-06-08T23:58:38.205Z\"}",
+          "active",
+          "Y",
+          "1"
+        ]
+      ]
+    },
+    {
+      "name": "PHX_Pharmacists_Master",
+      "rows": 212,
+      "cols": 5,
+      "headers": [
+        "name",
+        "approvedEmail",
+        "active",
+        "notes",
+        "role"
+      ],
+      "samples": [
+        [
+          "กชนุช",
+          "",
+          "true",
+          "",
+          ""
+        ],
+        [
+          "กติยากร",
+          "",
+          "true",
+          "",
+          ""
+        ]
+      ]
+    },
+    {
+      "name": "PHX_Pharmacists",
+      "rows": 4,
+      "cols": 10,
+      "headers": [
+        "name",
+        "passwordHash",
+        "createdAt",
+        "lastSeen",
+        "backupEmail",
+        "eveningReminderTime",
+        "hoursBeforeReminder",
+        "announceChannels",
+        "icsReminderJSON",
+        "preferences"
+      ],
+      "samples": [
+        [
+          "ณรพล",
+          "61659362...(hash)",
+          "Sat Jun 06 2026 04:59:36 GMT+0700 (Indochina Time)",
+          "Sun Jul 05 2026 13:20:30 GMT+0700 (Indochina Time)",
+          "norapol.uttho@gmail.com",
+          "18:00",
+          "8",
+          "email",
+          "{\"evening\":\"18:00\",\"hours\":\"8\"}",
+          "{\"hideStruck\":false,\"round3Mode\":\"next\",\"calStartDay\":\"sun\",\"theme\":\"light\"}"
+        ],
+        [
+          "รยคนสวย",
+          "8331cd36...(hash)",
+          "Sat Jun 20 2026 16:00:55 GMT+0700 (Indochina Time)",
+          "Sat Jun 20 2026 16:01:52 GMT+0700 (Indochina Time)",
+          "",
+          "",
+          "",
+          "",
+          "",
+          ""
+        ]
+      ]
+    },
+    {
+      "name": "PHX_EmailQueue",
+      "rows": 51,
+      "cols": 8,
+      "headers": [
+        "id",
+        "to",
+        "subject",
+        "body",
+        "status",
+        "queuedAt",
+        "sentAt",
+        "error"
+      ],
+      "samples": [
+        [
+          "64e234ce-930e-4edc-a0ee-b9d03a91b6b0",
+          "norapol.utt@mahidol.ac.th",
+          "✅ ยืนยันการลงทะเบียน — Siriraj Rx Shift",
+          "สวัสดี ณรพล\n\nคลิกลิงก์ด้านล่างเพื่อยืนยันการลงทะเบียน:\n\nhttps://script.google.co...",
+          "sent",
+          "Sat Jun 06 2026 04:04:57 GMT+0700 (Indochina Time)",
+          "2026-06-05T21:05:17.568Z",
+          ""
+        ],
+        [
+          "b405db67-977f-486a-b220-9019fc004c52",
+          "norapol.utt@mahidol.ac.th",
+          "✅ ยืนยันการลงทะเบียน — Siriraj Rx Shift",
+          "สวัสดี ณรพล\n\nคลิกลิงก์ด้านล่างเพื่อยืนยันการลงทะเบียน:\n\nhttps://script.google.co...",
+          "sent",
+          "Sat Jun 06 2026 04:20:04 GMT+0700 (Indochina Time)",
+          "2026-06-05T21:20:17.153Z",
+          ""
+        ]
+      ]
+    },
+    {
+      "name": "PHX_PendingVerifications",
+      "rows": 1,
+      "cols": 6,
+      "headers": [
+        "token",
+        "name",
+        "passwordHash",
+        "approvedEmail",
+        "expiresAt",
+        "createdAt"
+      ],
+      "samples": []
+    },
+    {
+      "name": "PHX_PendingResets",
+      "rows": 4,
+      "cols": 5,
+      "headers": [
+        "token",
+        "name",
+        "approvedEmail",
+        "expiresAt",
+        "createdAt"
+      ],
+      "samples": [
+        [
+          "54c8a674e77471af21df3f03143bb7e7",
+          "Test ระบบ",
+          "norapol.uttho@gmail.com",
+          "Sun Jun 21 2026 21:36:52 GMT+0700 (Indochina Time)",
+          "Sat Jun 20 2026 21:36:53 GMT+0700 (Indochina Time)"
+        ],
+        [
+          "b33b885cb5e21bccd569e4cb26007e08",
+          "ณรพล",
+          "norapol.utt@mahidol.ac.th",
+          "Mon Jun 22 2026 10:02:28 GMT+0700 (Indochina Time)",
+          "Sun Jun 21 2026 10:02:28 GMT+0700 (Indochina Time)"
+        ]
+      ]
+    },
+    {
+      "name": "PHX_Overlays_v2",
+      "rows": 31,
+      "cols": 6,
+      "headers": [
+        "actionId",
+        "name",
+        "monthId",
+        "type",
+        "payload",
+        "createdAt"
+      ],
+      "samples": [
+        [
+          "ovl_1780379492343_ofem0",
+          "ณรพล",
+          "m_มิถุนายน_2569",
+          "",
+          "{\"createdAt\":\"2026-06-02T05:51:32.343Z\",\"viewerName\":\"ณรพล\",\"partnerName\":\"ณัชชพ...",
+          "Sat Jun 06 2026 14:56:14 GMT+0700 (Indochina Time)"
+        ],
+        [
+          "ovl_1780379517366_oi0fi",
+          "ณรพล",
+          "m_มิถุนายน_2569",
+          "",
+          "{\"createdAt\":\"2026-06-02T05:51:57.367Z\",\"viewerName\":\"ณรพล\",\"shiftKey\":\"07/06 (อ...",
+          "Sat Jun 06 2026 14:56:14 GMT+0700 (Indochina Time)"
+        ]
+      ]
+    },
+    {
+      "name": "PHX_Overlays",
+      "rows": 11,
+      "cols": 9,
+      "headers": [
+        "codeHash",
+        "monthId",
+        "actionId",
+        "viewerName",
+        "actionType",
+        "shiftKey",
+        "payload",
+        "createdAt",
+        "syncedAt"
+      ],
+      "samples": [
+        [
+          "cdcf6ad0...(hash)",
+          "m_มิถุนายน_2569",
+          "ovl_1780379492343_ofem0",
+          "ณรพล",
+          "add",
+          "05/06 (ศ.)|O11|ณัชชพล|2:30-8:30",
+          "{\"monthId\":\"m_มิถุนายน_2569\",\"viewerName\":\"ณรพล\",\"createdAt\":\"2026-06-02T05:51:3...",
+          "2026-06-02T05:51:32.343Z",
+          "2026-06-04T15:18:59.548Z"
+        ],
+        [
+          "cdcf6ad0...(hash)",
+          "m_มิถุนายน_2569",
+          "ovl_1780379517366_oi0fi",
+          "ณรพล",
+          "add",
+          "07/06 (อา.)|O9|สุพัฒนา|21:30-2:30",
+          "{\"monthId\":\"m_มิถุนายน_2569\",\"viewerName\":\"ณรพล\",\"createdAt\":\"2026-06-02T05:51:5...",
+          "2026-06-02T05:51:57.367Z",
+          "2026-06-04T15:18:59.548Z"
+        ]
+      ]
+    },
+    {
+      "name": "PHX_Codes",
+      "rows": 3,
+      "cols": 2,
+      "headers": [
+        "codeHash",
+        "createdAt"
+      ],
+      "samples": [
+        [
+          "01234567...(hash)",
+          "2026-06-04T13:57:53.120Z"
+        ],
+        [
+          "cdcf6ad0...(hash)",
+          "2026-06-04T15:18:57.493Z"
+        ]
+      ]
+    },
+    {
+      "name": "User_Overlays",
+      "rows": 15,
+      "cols": 9,
+      "headers": [
+        "email",
+        "action_id",
+        "month_id",
+        "action_type",
+        "shift_key",
+        "payload_json",
+        "created_at",
+        "viewer_name",
+        "status"
+      ],
+      "samples": [
+        [
+          "norapol.utt@mahidol.ac.th",
+          "ovl_1780377925384_fjuf2",
+          "m_มิถุนายน_2569",
+          "add",
+          "03/06 (พ.)|I-14|เอลียา|16:30-21:30",
+          "{\"partnerShiftKey\":\"\",\"partnerName\":\"เอลียา\",\"originalOwner\":\"\"}",
+          "2026-06-02T05:25:25.384Z",
+          "ณรพล",
+          "deleted"
+        ],
+        [
+          "norapol.utt@mahidol.ac.th",
+          "ovl_1780379463425_2ys7e",
+          "m_มิถุนายน_2569",
+          "swap",
+          "03/06 (พ.)|NM5-22|ณรพล|21:30-2:30",
+          "{\"partnerShiftKey\":\"03/06 (พ.)|I-11|ธัญสินี|8:30-16:30\",\"partnerName\":\"ธัญสินี\",...",
+          "2026-06-02T05:51:03.425Z",
+          "ณรพล",
+          "deleted"
+        ]
+      ]
+    }
+  ],
+  "firebase": {
+    "topLevelKeys": [
+      "positionNotesValidation",
+      "positionNotes",
+      "scheduleNotes",
+      "schedules",
+      "scheduleNotesParsed",
+      "scheduleNotesValidation"
+    ],
+    "keyDetails": {},
+    "errors": [],
+    "probedPaths": {
+      "schedules": {
+        "status": "ok",
+        "usedAuth": false,
+        "count": 2,
+        "sample": [
+          "m_กรกฎาคม_2569",
+          "m_มิถุนายน_2569"
+        ],
+        "truncated": false
+      },
+      "user_bindings": {
+        "status": "empty",
+        "usedAuth": true
+      },
+      "user_overlays": {
+        "status": "empty",
+        "usedAuth": true
+      },
+      "pharmacist_names": {
+        "status": "empty",
+        "usedAuth": true
+      },
+      "positionNotes": {
+        "status": "ok",
+        "usedAuth": false,
+        "count": 8,
+        "sample": [
+          "m_มีนาคม_2569",
+          "m_พฤษภาคม_2569",
+          "m_มิถุนายน_2569",
+          "m_กรกฎาคม_2569",
+          "m_เมษายน_2569",
+          "m_ธันวาคม_2568",
+          "m_มกราคม_2569",
+          "m_กุมภาพันธ์_2569"
+        ],
+        "truncated": false
+      },
+      "scheduleNotes": {
+        "status": "ok",
+        "usedAuth": false,
+        "count": 8,
+        "sample": [
+          "m_มีนาคม_2569",
+          "m_พฤษภาคม_2569",
+          "m_มิถุนายน_2569",
+          "m_กรกฎาคม_2569",
+          "m_เมษายน_2569",
+          "m_ธันวาคม_2568",
+          "m_มกราคม_2569",
+          "m_กุมภาพันธ์_2569"
+        ],
+        "truncated": false
+      },
+      "scheduleNotesParsed": {
+        "status": "ok",
+        "usedAuth": false,
+        "count": 8,
+        "sample": [
+          "m_มีนาคม_2569",
+          "m_พฤษภาคม_2569",
+          "m_มิถุนายน_2569",
+          "m_กรกฎาคม_2569",
+          "m_เมษายน_2569",
+          "m_ธันวาคม_2568",
+          "m_มกราคม_2569",
+          "m_กุมภาพันธ์_2569"
+        ],
+        "truncated": false
+      }
+    },
+    "rootProbe": {
+      "code": 200,
+      "usedAuth": true,
+      "firstCode": 401
+    }
+  },
+  "functions": {
+    "doGet": {
+      "exists": true,
+      "argsCount": 1,
+      "sourceLen": 3144
+    },
+    "getScriptUrl": {
+      "exists": true,
+      "argsCount": 0,
+      "sourceLen": 67
+    },
+    "getScheduleData": {
+      "exists": true,
+      "argsCount": 1,
+      "sourceLen": 2353
+    },
+    "getAvailableMonths": {
+      "exists": true,
+      "argsCount": 0,
+      "sourceLen": 246
+    },
+    "getScheduleIndexSheet_": {
+      "exists": true,
+      "argsCount": 0,
+      "sourceLen": 373
+    },
+    "listScheduleMonthsFromSheet_": {
+      "exists": true,
+      "argsCount": 0,
+      "sourceLen": 399
+    },
+    "monthIdToLabel_": {
+      "exists": true,
+      "argsCount": 1,
+      "sourceLen": 453
+    },
+    "readScheduleFromSheet_": {
+      "exists": true,
+      "argsCount": 1,
+      "sourceLen": 1210
+    },
+    "writeScheduleToSheet_": {
+      "exists": true,
+      "argsCount": 5,
+      "sourceLen": 1290
+    },
+    "getUserOverlays": {
+      "exists": true,
+      "argsCount": 2,
+      "sourceLen": 1039
+    },
+    "getUserOverlaysSheet_": {
+      "exists": true,
+      "argsCount": 0,
+      "sourceLen": 619
+    },
+    "appendUserOverlay": {
+      "exists": true,
+      "argsCount": 3,
+      "sourceLen": 875
+    },
+    "appendUserOverlaysBatch": {
+      "exists": true,
+      "argsCount": 3,
+      "sourceLen": 743
+    },
+    "clearUserOverlaysForMonth": {
+      "exists": true,
+      "argsCount": 2,
+      "sourceLen": 666
+    },
+    "phxGetAllActiveOverlaysForMonth": {
+      "exists": true,
+      "argsCount": 1,
+      "sourceLen": 1546
+    },
+    "_phxApplyOverlaysGlobally": {
+      "exists": true,
+      "argsCount": 2,
+      "sourceLen": 4234
+    },
+    "_phxGetUserOverlayShifts": {
+      "exists": true,
+      "argsCount": 2,
+      "sourceLen": 1022
+    },
+    "debugDumpUserOverlays": {
+      "exists": true,
+      "argsCount": 1,
+      "sourceLen": 228
+    },
+    "verifyGoogleIdToken": {
+      "exists": true,
+      "argsCount": 1,
+      "sourceLen": 889
+    },
+    "verifyAdminLogin": {
+      "exists": true,
+      "argsCount": 1,
+      "sourceLen": 495
+    },
+    "isAdminEmail_": {
+      "exists": true,
+      "argsCount": 1,
+      "sourceLen": 119
+    },
+    "phxQueueEmail": {
+      "exists": true,
+      "argsCount": 3,
+      "sourceLen": 614
+    },
+    "phxShowQueueStatus": {
+      "exists": true,
+      "argsCount": 0,
+      "sourceLen": 797
+    },
+    "_phxScanShiftsByUserForDate": {
+      "exists": true,
+      "argsCount": 1,
+      "sourceLen": 1759
+    },
+    "_phxScanShiftsInTimeWindow": {
+      "exists": true,
+      "argsCount": 2,
+      "sourceLen": 1084
+    },
+    "_phxGetUserReminderSettings": {
+      "exists": true,
+      "argsCount": 1,
+      "sourceLen": 980
+    },
+    "phxDisableTestMode": {
+      "exists": true,
+      "argsCount": 0,
+      "sourceLen": 212
+    },
+    "pushToFirebase_": {
+      "exists": true,
+      "argsCount": 2,
+      "sourceLen": 706
+    },
+    "syncAllSchedulesToFirebase": {
+      "exists": true,
+      "argsCount": 0,
+      "sourceLen": 1190
+    },
+    "syncMonthToFirebase": {
+      "exists": true,
+      "argsCount": 1,
+      "sourceLen": 755
+    },
+    "devCheckToggles": {
+      "exists": true,
+      "argsCount": 0,
+      "sourceLen": 309
+    },
+    "debugPeopleMatching": {
+      "exists": true,
+      "argsCount": 0,
+      "sourceLen": 1907
+    },
+    "debugScheduleMapping": {
+      "exists": true,
+      "argsCount": 0,
+      "sourceLen": 1838
+    }
+  },
+  "scriptProperties": {
+    "keys": [
+      "ADMIN_PASSWORD_HASH",
+      "ADMIN_TOKEN_a795b92d-9faa-46fe-851f-95e6ae799c26",
+      "ADMIN_TOKEN_fc3cb942-07c1-44db-b3f4-2807c776b6b9",
+      "LATEST_DIAG",
+      "LINE_CHANNEL_ACCESS_TOKEN",
+      "LINE_CHANNEL_SECRET",
+      "MAHIDOL_SENDER_SECRET",
+      "MONTH_LIST",
+      "PHX_LAST_UPLOAD",
+      "PHX_NOTIFY_FILE_UPLOAD",
+      "PHX_NOTIFY_HOT_POLLING",
+      "PHX_NOTIFY_MANUAL_SYNC",
+      "PHX_TEST_DOMAIN"
+    ],
+    "values": {
+      "ADMIN_PASSWORD_HASH": "***REDACTED*** (len=64)",
+      "ADMIN_TOKEN_a795b92d-9faa-46fe-851f-95e6ae799c26": "***REDACTED*** (len=5)",
+      "ADMIN_TOKEN_fc3cb942-07c1-44db-b3f4-2807c776b6b9": "***REDACTED*** (len=5)",
+      "LATEST_DIAG": "{\"label\":\"กรกฎาคม 2569\",\"time\":\"19/6/2569 15:49:11\",\"masterStatus\":\"\",\"sheetsProcessed\":[\"clinic\",\"IPD\",\"NM5\",\"103\"],\"sheetsSkipped\":[\"หน้าที่เวร รพ. up 19.8.64เก่า (ถูกยกเว้น)\",\"หน้าที่ NM5-IPD up 4-...",
+      "LINE_CHANNEL_ACCESS_TOKEN": "***REDACTED*** (len=172)",
+      "LINE_CHANNEL_SECRET": "***REDACTED*** (len=32)",
+      "MAHIDOL_SENDER_SECRET": "***REDACTED*** (len=48)",
+      "MONTH_LIST": "[{\"id\":\"m_1781858940879169\",\"label\":\"กรกฎาคม 2569\",\"updated\":\"19/06/26 15:49\",\"fileId\":\"1FfLDM9fzOmo1LnBjXoObBNUSHFbyOiFn\",\"sheetUrl\":\"https://docs.google.com/spreadsheets/d/1uF3LoAt1LzJV2vZ06TCkfShmL...",
+      "PHX_LAST_UPLOAD": "{\"timestamp\":1781858966268,\"monthLabel\":\"กรกฎาคม 2569\",\"monthId\":\"m_กรกฎาคม_2569\",\"recordCount\":2348,\"action\":\"hotPolling\",\"actionLabel\":\"Hot Polling (Auto)\",\"source\":\"เวรเภสัชกร 07-69.xlsx\"}",
+      "PHX_NOTIFY_FILE_UPLOAD": "false",
+      "PHX_NOTIFY_HOT_POLLING": "true",
+      "PHX_NOTIFY_MANUAL_SYNC": "false",
+      "PHX_TEST_DOMAIN": "gmail.com"
+    }
+  },
+  "errors": []
+}
