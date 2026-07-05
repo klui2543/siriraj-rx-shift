@@ -1959,6 +1959,9 @@
     // 🌟 GLOBAL STATE
     // ==========================================
     let rawData = [];
+    // v3.41: global overlays (all viewers in this month) — do NOT mutate rawData
+    // Used to render chevron/dot for anonymous or non-owner viewers
+    let pathBOverlays = [];
     let currentMode = 'table';
     let currentFontSize = 9.5;
     let currentTableFontSize = 11.0;
@@ -2331,24 +2334,50 @@ window.allPharmacistNames = [];
       // v14: getActions filters by viewerName. If null, returns nothing (safe default).
       // Pass '__all__' to deliberately get everything (rare — for debug only)
       // v29: when viewing someone other than bound user, source from P2B._RO (server-fetched)
+      // v3.41: fallback to pathBOverlays so non-owner viewers get the same ghost rows
+      //        as the actual owner sees (matches shift count across views)
       getActions(monthId, viewerName) {
-        // Read-only cross-user mode: viewing a name that is NOT the bound user
-        if (typeof P2B !== 'undefined' && P2B && P2B.boundName && viewerName && viewerName !== P2B.boundName) {
-          if (P2B._RO && P2B._RO.currentViewName === viewerName && P2B._RO.monthId === monthId) {
-            // Return actions where viewedName is involved (viewer or partner)
-            // Map to look like "viewerName === viewedName" so getUsedMap/buildGhostRows
-            // can apply them naturally (system already handles both directions via shiftKey lookup)
-            return P2B._RO.actions.map(function(a) {
-              return Object.assign({}, a, { viewerName: viewerName });
-            });
-          }
-          return [];
+        if (viewerName === '__all__') {
+          this.load();
+          return (this._data[monthId] && this._data[monthId].actions) || [];
         }
-        this.load();
-        const all = (this._data[monthId] && this._data[monthId].actions) || [];
-        if (viewerName === '__all__') return all;
-        if (!viewerName) return [];  // no viewer = no actions visible
-        return all.filter(a => a.viewerName === viewerName);
+        if (!viewerName) return [];
+
+        const boundName = (typeof P2B !== 'undefined' && P2B && P2B.boundName) ? P2B.boundName : null;
+
+        // Logged-in user asking for own actions → local storage
+        if (boundName && String(viewerName) === String(boundName)) {
+          this.load();
+          const all = (this._data[monthId] && this._data[monthId].actions) || [];
+          return all.filter(a => a.viewerName === viewerName);
+        }
+
+        // Asking for another user's actions — try P2B._RO first (richer, includes partner-side)
+        if (typeof P2B !== 'undefined' && P2B && P2B._RO
+            && P2B._RO.currentViewName === viewerName
+            && P2B._RO.monthId === monthId) {
+          return P2B._RO.actions.map(function(a) {
+            return Object.assign({}, a, { viewerName: viewerName });
+          });
+        }
+
+        // Fallback: derive from pathBOverlays (works for logged-in viewing others AND anonymous)
+        if (typeof pathBOverlays !== 'undefined' && Array.isArray(pathBOverlays)) {
+          return pathBOverlays
+            .filter(o => String(o.viewerName || '') === String(viewerName))
+            .map(o => ({
+              id: String(o.actionId || ''),
+              action: String(o.action || ''),
+              shiftKey: String(o.shiftKey || ''),
+              partnerShiftKey: String(o.partnerShiftKey || ''),
+              partnerName: String(o.partnerName || ''),
+              originalOwner: String(o.originalOwner || ''),
+              createdAt: o.createdAt || '',
+              viewerName: viewerName
+            }));
+        }
+
+        return [];
       },
       addAction(monthId, action) {
         this.load();
@@ -2446,6 +2475,104 @@ window.allPharmacistNames = [];
       const hue = Math.round(((idx - SWAP_PAIR_PALETTE.length) * 137.508) % 360);
       return 'hsl(' + hue + ', 75%, 60%)';
     }
+
+    // ═══════════════════════════════════════════════════════════
+    // v3.41: PBOverlays — global overlays helper (Path B)
+    //   - build _pbUsedMap keyed by ORIGINAL row keys (rawData unchanged)
+    //   - traverse chain via _g_<actionId> ghost prefix (same as OverlayManager)
+    //   - access gate: viewer name anywhere in chain → full detail; else first↔last
+    //   - filters out overlays owned by LOGGED-IN user only (OverlayManager decorates those)
+    //   - CRITICAL: filter uses P2B.boundName (login identity), NOT getCurrentUser (display filter)
+    // ═══════════════════════════════════════════════════════════
+    // Get the logged-in user's identity (Phase 2B binding), not the display filter.
+    // Anonymous → null → no filtering → all overlays visible.
+    function _pbGetLoggedInName() {
+      try {
+        if (typeof P2B !== 'undefined' && P2B && P2B.boundName) return String(P2B.boundName);
+      } catch(e) {}
+      return null;
+    }
+    const PBOverlays = {
+      _getExcluding(loggedInName) {
+        const arr = Array.isArray(pathBOverlays) ? pathBOverlays : [];
+        if (!loggedInName) return arr;
+        return arr.filter(o => String(o.viewerName || '') !== String(loggedInName));
+      },
+      /** shiftKey → {label, actionId, color, _pbSource:true}.
+       *  Pass logged-in name (P2B.boundName) — NOT display filter — so decorations
+       *  appear for everyone except the actual authoring user. */
+      getUsedMap(loggedInName) {
+        const overlays = this._getExcluding(loggedInName);
+        const map = {};
+        const colors = {};
+        let idx = 0;
+        overlays.forEach(o => {
+          if (String(o.action || '') === 'swap') colors[o.actionId] = swapPairColor(idx++);
+        });
+        overlays.forEach(o => {
+          const act = String(o.action || '');
+          if (act === 'swap') {
+            const c = colors[o.actionId];
+            if (o.shiftKey)        map[o.shiftKey]        = { label: 'สลับกับ ' + o.partnerName + ' แล้ว', actionId: o.actionId, color: c, _pbSource: true };
+            if (o.partnerShiftKey) map[o.partnerShiftKey] = { label: 'สลับกับ ' + o.viewerName  + ' แล้ว', actionId: o.actionId, color: c, _pbSource: true };
+          } else if (act === 'give') {
+            if (o.shiftKey) map[o.shiftKey] = { label: 'ยกให้ ' + o.partnerName + ' แล้ว', actionId: o.actionId, _pbSource: true };
+          } else if (act === 'add') {
+            // 'add' shiftKey = "date|pos|partnerName|range" → labels partner's original row
+            if (o.shiftKey) map[o.shiftKey] = { label: 'ยกให้ ' + o.viewerName + ' แล้ว', actionId: o.actionId, _pbSource: true };
+          }
+        });
+        return map;
+      },
+      /** Traverse chain via _g_ prefix (same rule as buildTimelineHTML) */
+      buildChain(actionId) {
+        const all = Array.isArray(pathBOverlays) ? pathBOverlays : [];
+        const target = all.find(o => o.actionId === actionId);
+        if (!target) return null;
+        const chain = [target];
+        // walk back: cur.shiftKey starts with '_g_ovl_' → parent is that ovl
+        let cur = target;
+        while (cur.shiftKey && cur.shiftKey.indexOf('_g_ovl_') === 0) {
+          const prevId = cur.shiftKey.substring(3);
+          const prev = all.find(o => o.actionId === prevId);
+          if (!prev) break;
+          chain.unshift(prev);
+          cur = prev;
+        }
+        // walk forward: next's shiftKey === '_g_' + last.actionId
+        let last = target;
+        while (true) {
+          const nextGhostKey = '_g_' + last.actionId;
+          const next = all.find(o => o.shiftKey === nextGhostKey);
+          if (!next) break;
+          chain.push(next);
+          last = next;
+        }
+        return chain;
+      },
+      /** Access gate: viewer name in chain (as viewer, partner, or originalOwner) */
+      canSeeFullChain(chain, viewer) {
+        if (!viewer || !Array.isArray(chain)) return false;
+        return chain.some(o =>
+          String(o.viewerName || '')    === viewer ||
+          String(o.partnerName || '')   === viewer ||
+          String(o.originalOwner || '') === viewer
+        );
+      },
+      /** Endpoint names for limited "A ↔ D" display */
+      getChainEndpoints(chain) {
+        if (!chain || chain.length === 0) return { first: '', last: '' };
+        const f = chain[0];
+        const l = chain[chain.length - 1];
+        let firstPerson;
+        if (String(f.action) === 'add') firstPerson = f.originalOwner || f.partnerName || f.viewerName;
+        else firstPerson = f.originalOwner || f.viewerName;
+        let lastPerson;
+        if (String(l.action) === 'add') lastPerson = l.viewerName;
+        else lastPerson = l.partnerName;  // swap: recipient of viewer's original; give: recipient
+        return { first: String(firstPerson || ''), last: String(lastPerson || '') };
+      }
+    };
 
     function getCurrentMonthId() {
       var sel = document.getElementById('mainMonthSelector');
@@ -2637,7 +2764,8 @@ window.allPharmacistNames = [];
         let _side = 'ghost', _baseId = actionId;
         if (_sepIdx >= 0) { _baseId = actionId.substring(0, _sepIdx); _side = actionId.substring(_sepIdx + 2); }
         const targetAction = actions.find(a => a.id === _baseId);
-        if (!targetAction) return '<div style="color:#dc2626;">ไม่พบประวัติ</div>';
+        // v3.41: dispatch to Path B builder when action isn't in viewer's local OverlayManager
+        if (!targetAction) return _buildPBTimelineHTML(_baseId, _side);
 
         const chain = [targetAction];
         let cur = targetAction;
@@ -2693,25 +2821,78 @@ window.allPharmacistNames = [];
           html += '<div class="tl-inline-body">' + desc + '</div></div>';
         });
         const lastAct = chain[chain.length - 1];
-        // Patch TL1: ฝั่ง src = ช่องที่ขีดฆ่า/แลกไป — อธิบายว่า action ไหนเอาเวรนี้ไป
+        // v3.41: unified end message — match PB format so all viewers see the same
+        let _curHolder;
         if (_side === 'src') {
-          if (targetAction.action === 'swap') {
-            const _recv = targetAction.partnerShiftKey ? findShiftByKey(targetAction.partnerShiftKey) : null;
-            const _recvPos = _recv ? _recv.pos : '';
-            html += '<div class="tl-inline-end ended">เวรเดิมนี้สลับให้ ' + targetAction.partnerName + ' แล้ว' + (_recvPos ? ' — ได้รับ ' + _recvPos + ' มาแทน' : '') + '</div>';
-          } else if (targetAction.action === 'give') {
-            html += '<div class="tl-inline-end ended">เวรนี้ยกให้ ' + targetAction.partnerName + ' แล้ว</div>';
-          } else {
-            html += '<div class="tl-inline-end ended">เวรนี้ไม่อยู่กับคุณแล้ว</div>';
-          }
+          _curHolder = (targetAction.action === 'swap' || targetAction.action === 'give')
+                        ? targetAction.partnerName
+                        : viewer;
         } else if (lastAct.action === 'give') {
-          html += '<div class="tl-inline-end ended">เวรนี้ไม่อยู่กับคุณแล้ว — ยกให้ ' + lastAct.partnerName + '</div>';
+          _curHolder = lastAct.partnerName;
         } else {
-          html += '<div class="tl-inline-end active">เวรนี้อยู่กับคุณตอนนี้</div>';
+          _curHolder = viewer;
         }
+        html += '<div class="tl-inline-end active">ปัจจุบันเวรนี้อยู่กับ: <b>' + (_curHolder || '?') + '</b></div>';
         return html;
       } catch(err) {
         v10ShowError('buildTimelineHTML', err);
+        return '<div style="color:#dc2626;">เกิดข้อผิดพลาด</div>';
+      }
+    }
+
+    // v3.41: PB timeline builder — for actions not in viewer's OverlayManager
+    //   - full detail if viewer is in chain (canSeeFullChain)
+    //   - else limited "A ↔ D" endpoints view
+    function _pbShiftPosFromKey(shiftKey) {
+      if (!shiftKey || String(shiftKey).indexOf('_g_') === 0) return '';
+      const parts = String(shiftKey).split('|');
+      return parts.length >= 2 ? parts[1] : '';
+    }
+    function _buildPBTimelineHTML(baseId, side) {
+      try {
+        if (typeof PBOverlays === 'undefined') return '<div style="color:#dc2626;">ไม่พบประวัติ</div>';
+        // v3.41 update: access gate ปลด — ทุกคน (รวม anonymous) เห็นเชนเต็ม
+        const chain = PBOverlays.buildChain(baseId);
+        if (!chain || chain.length === 0) return '<div style="color:#dc2626;">ไม่พบประวัติ</div>';
+
+        // ── Full view — match OverlayManager format exactly ──
+        let html = '';
+        chain.forEach((ov, idx) => {
+          const act = String(ov.action || '');
+          let kind = '', desc = '';
+          if (act === 'add') {
+            kind = 'add';
+            const p = _pbShiftPosFromKey(ov.shiftKey);
+            desc = 'รับ <b>' + p + '</b> จาก <b>' + ov.partnerName + '</b>';
+          } else if (act === 'swap') {
+            let srcStr = '';
+            if (ov.shiftKey && ov.shiftKey.indexOf('_g_') !== 0) {
+              const sp = _pbShiftPosFromKey(ov.shiftKey);
+              if (sp) srcStr = '<b>' + sp + '</b><span class="tl-arrow">↔</span>';
+            }
+            const tp = _pbShiftPosFromKey(ov.partnerShiftKey);
+            kind = 'swap';
+            desc = 'แลก ' + srcStr + '<b>' + (tp || '') + '</b> กับ <b>' + ov.partnerName + '</b>';
+          } else if (act === 'give') {
+            let srcStr = '';
+            if (ov.shiftKey && ov.shiftKey.indexOf('_g_') !== 0) {
+              const sp = _pbShiftPosFromKey(ov.shiftKey);
+              if (sp) srcStr = '<b>' + sp + '</b> ';
+            }
+            kind = 'give';
+            desc = (srcStr ? 'ยก ' + srcStr : 'ยก') + 'ให้ <b>' + ov.partnerName + '</b>';
+          }
+          const tsStr = ov.createdAt ? new Date(ov.createdAt).toLocaleString('th-TH', {dateStyle:'short', timeStyle:'short'}) : '';
+          if (tsStr) desc += ' <span class="tl-inline-ts">· ' + tsStr + '</span>';
+          html += '<div class="tl-inline-step tl-' + kind + '">';
+          html += '<div class="tl-inline-num">' + (idx + 1) + '</div>';
+          html += '<div class="tl-inline-body">' + desc + '</div></div>';
+        });
+        const ep = PBOverlays.getChainEndpoints(chain);
+        html += '<div class="tl-inline-end active">ปัจจุบันเวรนี้อยู่กับ: <b>' + (ep.last || '?') + '</b></div>';
+        return html;
+      } catch (err) {
+        v10ShowError('_buildPBTimelineHTML', err);
         return '<div style="color:#dc2626;">เกิดข้อผิดพลาด</div>';
       }
     }
@@ -3722,6 +3903,9 @@ window.allPharmacistNames = [];
       }
 
       rawData = res.data || [];
+      // v3.41: if response includes global overlays (GAS path), adopt them.
+      //        Firebase path won't have _pbOverlays — fetchPathBOverlays fills it separately.
+      if (Array.isArray(res._pbOverlays)) pathBOverlays = res._pbOverlays;
       currentSheetUrl = res.sheetUrl || "";
       window.currentAuditInfo = res.audit || null;
       
@@ -3816,6 +4000,9 @@ window.allPharmacistNames = [];
       toggleLoading(true);
       isDataLoadedInSession = false;
       lastDataSignature = '';
+      // v3.41: seed pathBOverlays from localStorage cache → chevron/dot appear instantly
+      //        (fresh fetch runs in parallel below — cache updates on success)
+      pathBOverlays = _pbLoadCached(selectEl.value);
       if (firebasePollTimer) { clearInterval(firebasePollTimer); firebasePollTimer = null; }
 
       const fetchViaGAS = () => {
@@ -3843,6 +4030,10 @@ window.allPharmacistNames = [];
 
       const fallbackTimer = setTimeout(() => { fetchViaGAS(); }, 6000);
 
+      // v3.41: fire PB fetch in PARALLEL with Firebase (was: sequential after firebase)
+      //         — reduces perceived delay ~half; cache seeded above shows chevron immediately
+      fetchPathBOverlays(selectEl.value);
+
       try {
         currentFbRef = fbDb.ref('schedules/' + firebaseKey);
         currentFbRef.on('value', function(snapshot) {
@@ -3850,9 +4041,6 @@ window.allPharmacistNames = [];
           const res = snapshot.val();
           if (!res) { fetchViaGAS(); return; }
           handleDataReceived(res, 'firebase');
-          // 🌟 Path B: หลังจาก Firebase render ตารางดิบ → ยิง GAS ต่อเพื่อเอา overlay-applied version
-          //           (Firebase มีแค่ตารางดิบไม่มี overlay — GAS getScheduleData มี Path B ทำงานอยู่)
-          fetchPathBOverlayApplied(selectEl.value);
         }, function(error) {
           clearTimeout(fallbackTimer);
           console.error("🔥 Firebase error -> fallback to GAS", error);
@@ -3864,31 +4052,39 @@ window.allPharmacistNames = [];
       }
     }
 
-    // 🌟 Path B overlay merge: ยิง GAS getScheduleData เพื่อรับตารางที่แปะ overlay แล้ว
-    //    ทำงานหลังจาก Firebase (ตารางดิบ) render เสร็จ → replace rawData ด้วยตัวที่มี overlay
-    //    ทำงานทั้งกรณีคนล็อกอินและไม่ล็อกอิน (Path B apply บนหลังบ้าน ไม่ต้องการชื่อ viewer)
-    function fetchPathBOverlayApplied(monthId) {
+    // 🌟 Path B v2 (v3.41): ดึง global overlays ของเดือน — ไม่แตะ rawData
+    //    - เก็บ overlays ล้วนไว้ที่ pathBOverlays
+    //    - Cache in localStorage → next month load shows chevron/dot instantly
+    //    - Fires in parallel with Firebase (see fetchMonthData) — halves perceived delay
+    const PB_CACHE_PREFIX = 'siriraj_pb_overlays_';
+    function _pbLoadCached(monthId) {
+      try {
+        const raw = localStorage.getItem(PB_CACHE_PREFIX + monthId);
+        const parsed = raw ? JSON.parse(raw) : [];
+        return Array.isArray(parsed) ? parsed : [];
+      } catch (e) { return []; }
+    }
+    function _pbSaveCached(monthId, overlays) {
+      try { localStorage.setItem(PB_CACHE_PREFIX + monthId, JSON.stringify(overlays || [])); } catch (e) {}
+    }
+    function fetchPathBOverlays(monthId) {
       if (!monthId) return;
       google.script.run
         .withSuccessHandler(function(res) {
-          if (!res || !res._pbApplied) return;   // Backend ไม่ได้ apply → ไม่ต้องทับ
-          const applied = res.data || res.schedule;
-          if (!Array.isArray(applied) || applied.length === 0) return;
-          // sanity check: length ต้องใกล้กับ rawData (ป้องกันเดือน mismatch)
-          if (rawData && Math.abs(applied.length - rawData.length) > 100) {
-            console.warn('🎯 Path B: length mismatch (' + applied.length + ' vs ' + rawData.length + '), aborting');
-            return;
-          }
-          console.log('🎯 Path B: merging overlays into rawData (' + applied.length + ' shifts, _pbApplied=' + res._pbApplied + ')');
-          rawData = applied;
+          const overlays = (res && Array.isArray(res._pbOverlays)) ? res._pbOverlays : [];
+          pathBOverlays = overlays;
+          _pbSaveCached(monthId, overlays);
+          console.log('🎯 Path B: loaded ' + overlays.length + ' global overlays (rawData preserved)');
           if (typeof invalidateGhostCache === 'function') invalidateGhostCache();
           _shiftKeyIndex = null; _shiftKeyIndexFor = null;
-          if (typeof triggerUpdate === 'function') {
+          // Guard: only re-render if rawData already populated (else Firebase's own trigger picks it up)
+          if (rawData && rawData.length > 0 && typeof triggerUpdate === 'function') {
             try { triggerUpdate(); } catch (err) { console.warn('Path B triggerUpdate failed:', err && err.message); }
           }
         })
         .withFailureHandler(function(err) {
           console.warn('Path B GAS fetch failed (non-fatal):', err && err.message);
+          // keep cached value if any — don't wipe
         })
         .getScheduleData(monthId);
     }
@@ -4127,12 +4323,14 @@ window.allPharmacistNames = [];
       const _mid = getCurrentMonthId();
       const _curUser = getCurrentUser();
       const _usedMap = OverlayManager.getUsedMap(_mid, _curUser);
+      // v3.41: PB usedMap for anonymous / non-owner chevron+dot
+      const _pbUsedMap = (typeof PBOverlays !== 'undefined') ? PBOverlays.getUsedMap(_pbGetLoggedInName()) : {};
       const _rowsHtml = [];
       items.forEach(i => {
         const _rowHtml = (function(i) {
         const _isGhost = !!i._ghost;
         const _shiftKey = _isGhost ? i._ghostKey : makeShiftKey(i);
-        const _used = _usedMap[_shiftKey];  // v13: works for ghost keys too (chained actions)
+        const _used = _usedMap[_shiftKey] || _pbUsedMap[_shiftKey];  // v13/v3.41
         const _isOwn = !_isGhost && i.name === _curUser;
         const _tappable = editModeActive && (_isOwn || _isGhost || !!_used);
         let badge = "badge-other"; let s = i.shift.toLowerCase();
@@ -4221,7 +4419,7 @@ window.allPharmacistNames = [];
         // Patch TL1: side suffix → source/ghost rows ของ swap เดียวกันไม่ใช้ id ซ้ำ
         const _isGhostX = !!i._ghost;
         const _shiftKeyX = _isGhostX ? i._ghostKey : makeShiftKey(i);
-        const _usedX = _usedMap[_shiftKeyX];
+        const _usedX = _usedMap[_shiftKeyX] || _pbUsedMap[_shiftKeyX];
         let _aid = null;
         if (_usedX) _aid = _usedX.actionId + '__src';
         else if (_isGhostX && i._ghostActionId) _aid = i._ghostActionId + '__ghost';
@@ -4316,7 +4514,9 @@ window.allPharmacistNames = [];
       }
 
       const _calMid = getCurrentMonthId();
-      const _calUsedMap = OverlayManager.getUsedMap(_calMid, getCurrentUser());
+      const _calUser = getCurrentUser();
+      const _calUsedMap = OverlayManager.getUsedMap(_calMid, _calUser);
+      const _calPBUsedMap = (typeof PBOverlays !== 'undefined') ? PBOverlays.getUsedMap(_pbGetLoggedInName()) : {};
       const _calEffective = getEffectiveData();
       for (let day = 1; day <= totalDays; day++) {
         let shiftsToday = _calEffective.filter(i => i.name === name && parseInt(i.date.split('/')[0], 10) === day);
@@ -4340,7 +4540,7 @@ window.allPharmacistNames = [];
           else if (ls.includes("รอบ 3") || ls.includes("รอบ3")) bc = "badge-s3";
           const _isGhostBadge = !!s._ghost;
           const _calKey = _isGhostBadge ? s._ghostKey : makeShiftKey(s);
-          const _calUsed = _calUsedMap[_calKey];  // v13: works for ghost keys too
+          const _calUsed = _calUsedMap[_calKey] || _calPBUsedMap[_calKey];  // v13/v3.41
           let _calExtraCls = '';
           if (_calUsed) _calExtraCls = ' cal-badge-used';
           else if (_isGhostBadge) {
@@ -4384,7 +4584,7 @@ window.allPharmacistNames = [];
           // ZZ4: นับเฉพาะ shift ที่ยัง alive (ไม่ใช่ struck) — ถ้าทั้งหมดถูกยก/แลกไปแล้ว ให้แสดง "+"
           const _hasAliveShifts = shiftsToday.some(function(s) {
             const _k = s._ghost ? s._ghostKey : makeShiftKey(s);
-            return !_calUsedMap[_k];
+            return !_calUsedMap[_k] && !_calPBUsedMap[_k];
           });
           if (!_hasAliveShifts) _cellPlus = '<span class="cal-empty-plus">+</span>';
         } else if (shiftsToday.length >= 2) {
