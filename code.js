@@ -3,11 +3,11 @@
 // ==========================================
 const MASTER_TIME_SHEET_ID = "1bxlaH1JAQ3RZtJsBVEqdMn4-dIjxX236wNOsTRRmijc";
 const SCHEDULE_SHEET_ID = "1V1Fo4rEadSYfqLDc1sZEE-fRtZ4Je5_30_EAclO3KHM";
-const INPUT_FOLDER_ID = "1zTvCcqGLOfF_DnhLX7kTyl6E24WgIoNz"; 
-const STATS_SHEET_ID = "1ycH3nUqukYBhKRxh7Es4JYnE2H1yLThba1ZK3bVUMDk"; 
+const INPUT_FOLDER_ID = "1zTvCcqGLOfF_DnhLX7kTyl6E24WgIoNz";
+const STATS_SHEET_ID = "1ycH3nUqukYBhKRxh7Es4JYnE2H1yLThba1ZK3bVUMDk";
 const ADMIN_EMAIL = "norapol.uttho@gmail.com";
-const ADMIN_PASS_HASH = "8d969eef6ecad3c29a3a629280e686cf0c3f5d5a86aff3ca12020c923adc6c92"; 
-const TARGET_EMAIL = "sih2o850@gmail.com"; 
+const ADMIN_PASS_HASH = "8d969eef6ecad3c29a3a629280e686cf0c3f5d5a86aff3ca12020c923adc6c92";
+const TARGET_EMAIL = "sih2o850@gmail.com";
 const FILE_KEYWORD = "เวรเภสัชกร";
 
 // บัตรผ่านพิเศษสำหรับหุ่นยนต์ Sync อัตโนมัติ
@@ -38,13 +38,13 @@ function doGet(e) {
     var _adminName = e.parameter.name || '';
     var _adminHash = e.parameter.hash || '';
     var _adminOk = false;
- 
+
     if (_adminName && _adminHash && typeof _phxGetRole === 'function') {
       try {
         if (_phxGetRole(_adminName, _adminHash) === 'admin') _adminOk = true;
       } catch(_) {}
     }
- 
+
     if (!_adminOk) {
       // Show "Access Denied" page
       var _backUrl = ScriptApp.getService().getUrl();
@@ -71,7 +71,7 @@ function doGet(e) {
         '</div></body></html>'
       ).setTitle('Access Denied').setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL);
     }
- 
+
     // ✅ Admin verified → serve Admin.html
     return HtmlService.createTemplateFromFile('Admin').evaluate()
       .setTitle('Admin Panel')
@@ -106,11 +106,11 @@ function processGmailSync_(isManual, token) {
   }
 
   const query = `is:unread subject:"${FILE_KEYWORD}"`;
-  const threads = GmailApp.search(query, 0, 1); 
+  const threads = GmailApp.search(query, 0, 1);
 
   if (threads.length === 0) return isManual ? "❌ ไม่พบอีเมลใหม่ที่ยังไม่ได้อ่าน" : "NO_NEW_MAIL";
 
-  const message = threads[0].getMessages()[threads[0].getMessageCount() - 1]; 
+  const message = threads[0].getMessages()[threads[0].getMessageCount() - 1];
   const attachments = message.getAttachments();
 
   for (let i = 0; i < attachments.length; i++) {
@@ -128,13 +128,13 @@ function processGmailSync_(isManual, token) {
         PropertiesService.getScriptProperties().deleteProperty('_PHX_UPLOAD_CTX');
       }
       threads[0].markRead();
-      
+
       // 🆕 Phase G: upload สำเร็จ → ปิด hot polling auto
-      try { 
-        disableHotPolling(); 
+      try {
+        disableHotPolling();
         console.log('🎯 Upload success → Hot polling auto-disabled');
       } catch(e) {}
-      
+
       return `✅ อัปเดตตารางรอบ ${resultLabel} สำเร็จ!`;
     }
   }
@@ -163,15 +163,15 @@ function getAvailableMonths() {
   } catch(e) { return []; }
 }
 
-function getLatestDiagnostics() { 
-  return PropertiesService.getScriptProperties().getProperty('LATEST_DIAG'); 
+function getLatestDiagnostics() {
+  return PropertiesService.getScriptProperties().getProperty('LATEST_DIAG');
 }
 
 function getScheduleData(monthId) {
   let schedule = null;
   let label = "";
   let sheetUrl = "";
-  
+
   // 🌟 ขั้น 1: ลองอ่าน Sheet ตรงๆ ด้วย monthId
   try {
     schedule = readScheduleFromSheet_(monthId);
@@ -232,23 +232,22 @@ function getScheduleData(monthId) {
     }
   }
 
-  // 🌟 Path B: apply global overlays ให้ทุกคนเห็นการยกเวรเหมือนกัน (รวมคนไม่ล็อกอิน)
-  //   - อ่าน overlay จาก PHX_Overlays_v2 ด้วย Label format (m_<เดือน>_<ปีBE>)
-  //   - _phxApplyOverlaysGlobally คืน array ใหม่ (immutable) → ต้อง reassign
-  //   - try/catch: ถ้า Path B พัง ยังส่งตารางเปล่าออกได้ ไม่กระทบผู้ใช้ 300 คน
-  let pbApplied = false;
+  // 🌟 Path B v2 (v3.41): ส่ง overlays ล้วนให้ frontend
+  //   - v3.40 rewrite schedule ทำให้ frontend หา row เดิมไม่เจอ → chevron/dot/filter หายหมด
+  //   - v3.41: schedule คงเดิม ให้ frontend build _pbUsedMap เอง (union กับ OverlayManager)
+  //   - Timeline access: viewer อยู่ใน chain → ดูเต็ม; ไม่งั้น → เห็นแค่คนแรก+คนสุดท้าย
+  let pbOverlays = [];
   try {
     const pbLabel = String(label || '').trim();
     if (pbLabel) {
       const pbMonthId = 'm_' + pbLabel.replace(/\s+/g, '_');   // 'มิถุนายน 2569' → 'm_มิถุนายน_2569'
       const pbRes = phxGetAllActiveOverlaysForMonth(pbMonthId);
-      if (pbRes && pbRes.ok && pbRes.count > 0) {
-        schedule = _phxApplyOverlaysGlobally(schedule, pbRes.overlays);
-        pbApplied = true;
+      if (pbRes && pbRes.ok && Array.isArray(pbRes.overlays)) {
+        pbOverlays = pbRes.overlays;
       }
     }
   } catch (e) {
-    console.warn('Path B apply failed (non-fatal):', e && e.message);
+    console.warn('Path B fetch failed (non-fatal):', e && e.message);
   }
 
   return {
@@ -258,36 +257,36 @@ function getScheduleData(monthId) {
     sheetUrl: sheetUrl,
     diagnostics: {},
     audit: null,
-    _pbApplied: pbApplied
+    _pbOverlays: pbOverlays   // v3.41: raw overlays; frontend applies for chevron/dot rendering
   };
 }
 
 function saveMonthToDatabase_(label, jsonData, sheetUrl, diag, providedMonthId) {
   let list = getAvailableMonths();
   const existingIdx = list.findIndex(m => m.label === label);
-  
+
   // 🔧 FIX: ใช้ providedMonthId จาก uploadLocalFile (consistent กับ Sheet) > existing > new
-  const monthId = providedMonthId 
+  const monthId = providedMonthId
     || (existingIdx !== -1 ? list[existingIdx].id : "m_" + new Date().getTime() + Math.floor(Math.random()*1000));
-  
-  if (existingIdx !== -1) { 
-    try { DriveApp.getFileById(list[existingIdx].fileId).setTrashed(true); } catch(e) {} 
-    list.splice(existingIdx, 1); 
+
+  if (existingIdx !== -1) {
+    try { DriveApp.getFileById(list[existingIdx].fileId).setTrashed(true); } catch(e) {}
+    list.splice(existingIdx, 1);
   }
-  
+
   const dbFile = DriveApp.getFolderById(INPUT_FOLDER_ID).createFile(
     Utilities.newBlob(jsonData, MimeType.PLAIN_TEXT, `DB_${label.replace(/\s+/g, '_')}.json`)
   );
-  list.unshift({ 
-    id: monthId, 
-    label: label, 
-    updated: Utilities.formatDate(new Date(), "GMT+7", "dd/MM/yy HH:mm"), 
-    fileId: dbFile.getId(), 
-    sheetUrl: sheetUrl 
+  list.unshift({
+    id: monthId,
+    label: label,
+    updated: Utilities.formatDate(new Date(), "GMT+7", "dd/MM/yy HH:mm"),
+    fileId: dbFile.getId(),
+    sheetUrl: sheetUrl
   });
   PropertiesService.getScriptProperties().setProperty('MONTH_LIST', JSON.stringify(list));
-  PropertiesService.getScriptProperties().setProperty('LATEST_DIAG', JSON.stringify({ 
-    label, time: new Date().toLocaleString('th-TH'), ...diag 
+  PropertiesService.getScriptProperties().setProperty('LATEST_DIAG', JSON.stringify({
+    label, time: new Date().toLocaleString('th-TH'), ...diag
   }));
   return label;
 }
@@ -316,7 +315,7 @@ function uploadLocalFile(base64Data, filename, token) {
     const result = transformBlobData_(blob);
 
     const severity = classifyAuditSeverity_(auditResult, result.data.length);
-    
+
     // 🔴 Catastrophic → BLOCK ทันที
     if (severity.level === 'CATASTROPHIC') {
       try { sendAuditAlertEmail_(result.label, filename, auditResult, severity); } catch(e) {}
@@ -345,17 +344,17 @@ function uploadLocalFile(base64Data, filename, token) {
   // 🔧 FIX: Generate ONE consistent monthId — used for BOTH Sheet write AND MONTH_LIST
       const oldList = getAvailableMonths();
       const existingMonth = oldList.find(function(x) { return x.label === result.label; });
-      const _consistentMonthId = existingMonth 
-        ? existingMonth.id 
+      const _consistentMonthId = existingMonth
+        ? existingMonth.id
         : ("m_" + new Date().getTime() + Math.floor(Math.random()*1000));
 
       // 🌟 R2: เขียนลง Schedule Sheet (versioned) - surface errors
       let sheetWriteStatus = "skipped";
       try {
         const schedMonthId = _consistentMonthId;  // ← reuse same ID
-      
+
       console.log("📊 Attempting Sheet write — monthId: " + schedMonthId + " | label: " + result.label + " | existing: " + (existingMonth ? "yes" : "no"));
-      
+
       const sheetResult = writeScheduleToSheet_(schedMonthId, result.data, result.label, sheetUrl, filename);
       sheetWriteStatus = "✅ " + sheetResult.tabName + " (v" + sheetResult.version + ", " + sheetResult.rowCount + " rows)";
       console.log("📊 Sheet write SUCCESS: " + sheetWriteStatus);
@@ -449,7 +448,7 @@ function uploadLocalFile(base64Data, filename, token) {
         _phxAfterUploadHook(_hAction, result.label, monthIdForFirebase, result.data.length, filename);
       }
     } catch(_phxHookErr) { console.warn('[Phase H] hook error: ' + _phxHookErr.message); }
- 
+
 
     if (severity.level === 'MINOR') {
       try { sendAuditAlertEmail_(result.label, filename, auditResult, severity); } catch(e) {}
@@ -473,7 +472,7 @@ function classifyAuditSeverity_(auditResult, totalRecords) {
     const popDiffTotal = (L3.errors || []).reduce((s, e) => s + Math.abs(e.diff || 0), 0);
     const totalIssues = mismatchCount + popDiffTotal;
     const issuePct = totalRecords > 0 ? (totalIssues / totalRecords * 100) : 100;
-    
+
     if (totalIssues > CATASTROPHIC_MISMATCH_ABS || issuePct > CATASTROPHIC_MISMATCH_PCT) {
       return { level: 'CATASTROPHIC', reason: 'พบความผิดพลาด ' + totalIssues + ' รายการ (' + issuePct.toFixed(2) + '%)', summary: totalIssues + ' issues' };
     }
@@ -501,7 +500,7 @@ function sendAuditAlertEmail_(label, filename, auditResult, severity) {
 
 function pushToFirebase_(monthId, payload) {
   if (!FIREBASE_DB_URL || !FIREBASE_DB_URL.startsWith("http")) return;
-  
+
   // ✅ FIXED: ใช้ FIREBASE_DB_URL ที่ประกาศไว้ + encodeURIComponent สำหรับชื่อเดือนภาษาไทย
   const url = `${FIREBASE_DB_URL}/schedules/${encodeURIComponent(monthId)}.json`;
   const options = {
@@ -510,7 +509,7 @@ function pushToFirebase_(monthId, payload) {
     payload: JSON.stringify(payload),
     muteHttpExceptions: true
   };
-  
+
   try {
     const res = UrlFetchApp.fetch(url, options);
     console.log("🔥 Firebase Sync: " + res.getResponseCode() + " | URL: " + url);
@@ -553,8 +552,8 @@ function guessShiftFromTime_(timeStr) {
   return "รอบพิเศษ";
 }
 function isValidPersonName_(n) {
-  if (!n || n.length < 2 || n.length > 25) return false; 
-  if (/[0-9]/.test(n)) return false; 
+  if (!n || n.length < 2 || n.length > 25) return false;
+  if (/[0-9]/.test(n)) return false;
   const forbidden = ["หยุด", "พัก", "คลินิก", "เภสัช", "นาที", "ชั่วโมง", "ปิด", "เปิด", "เวลา"];
   for (let i = 0; i < forbidden.length; i++) { if (n.includes(forbidden[i])) return false; }
   return true;
@@ -563,19 +562,19 @@ function isValidPersonName_(n) {
 function transformBlobData_(blob) {
   const timeMap = {}; const validNames = new Set();
   const foundNamesThisMonth = new Set(); const newNamesSet = new Set();
-  
-  const diag = { 
+
+  const diag = {
     masterStatus: "", sheetsProcessed: [], sheetsSkipped: [], allSheetNames: [],
-    extraSheets: [], unmatchedPositions: new Set(), newNames: [], missingNames: [], 
-    rejectedDates: 0, mergedHeaders: 0, totalRecords: 0, uniqueNames: 0 
+    extraSheets: [], unmatchedPositions: new Set(), newNames: [], missingNames: [],
+    rejectedDates: 0, mergedHeaders: 0, totalRecords: 0, uniqueNames: 0
   };
-  
+
   // 🚀 อัปเกรดความเร็ว: ระบบ Cache จำ Master Data ไว้ 1 ชั่วโมง (ลดเวลาไป 2-3 วินาที)
   const cache = CacheService.getScriptCache();
   const cachedMaster = cache.get('MASTER_DATA_CACHE');
-  
+
   let masterData = [], nameData = [];
-  
+
   if (cachedMaster) {
     // ถ้าเคยจำไว้แล้ว ให้ดึงจากความจำมาใช้เลย (0.01 วินาที)
     const parsed = JSON.parse(cachedMaster);
@@ -601,7 +600,7 @@ function transformBlobData_(blob) {
     }
       masterData = (masterResp.valueRanges && masterResp.valueRanges[0].values) ? masterResp.valueRanges[0].values : [];
       nameData = (masterResp.valueRanges && masterResp.valueRanges[1].values) ? masterResp.valueRanges[1].values : [];
-      
+
       // บันทึกความจำไว้ 1 ชั่วโมง (3600 วินาที)
       cache.put('MASTER_DATA_CACHE', JSON.stringify({master: masterData, name: nameData}), 3600);
     } catch(e) {
@@ -646,17 +645,17 @@ function transformBlobData_(blob) {
 
   // แมปชื่อเข้า Set ด้วยข้อมูลจาก Sheets API
   nameData.forEach(r => { if (r[0]) validNames.add(normalizeName_(r[0])); });
-  
+
   const final = []; let foundLabel = "";
   const standardSheets = ["103", "NM5", "IPD", "clinic"];
   const blacklistPatterns = [/summary/i, /ตั้งค่า/i, /^name$/i, /ไม่\s*ok/i, /สำรอง/i, /เก่า/i];
 
   blob.sheetOrder.forEach(room => {
     diag.allSheetNames.push(room);
-    
+
     let isStandard = standardSheets.some(s => room.toLowerCase().includes(s.toLowerCase()));
     let isBlacklisted = blacklistPatterns.some(p => p.test(room));
-    
+
     if (!isStandard && !isBlacklisted) { diag.extraSheets.push(room); }
     if (isBlacklisted) { diag.sheetsSkipped.push(room + " (ถูกยกเว้น)"); return; }
 
@@ -666,10 +665,10 @@ function transformBlobData_(blob) {
 
       const displayData = sheetObj.display;
       const data = sheetObj.values;
-      
+
       let dateRowIdx = -1;
-      for (let i = 0; i < Math.min(15, displayData.length); i++) { 
-        if (displayData[i].some(c => c && c.toString().includes("วันที่"))) { dateRowIdx = i; break; } 
+      for (let i = 0; i < Math.min(15, displayData.length); i++) {
+        if (displayData[i].some(c => c && c.toString().includes("วันที่"))) { dateRowIdx = i; break; }
       }
       if (dateRowIdx === -1) { diag.sheetsSkipped.push(room + " (ไม่พบหัวตารางวันที่)"); return; }
 
@@ -684,7 +683,7 @@ function transformBlobData_(blob) {
 
       if (isClinic) {
         for (let r = dateRowIdx + 1; r < data.length; r++) {
-          let posA = normalizePos_(displayData[r][0]); 
+          let posA = normalizePos_(displayData[r][0]);
           let posB = displayData[r][1] ? fullTrim_(String(displayData[r][1])) : '';
           if (!posA || posA === "วัน") continue;
           let posCode = (posA === "เสริม") ? `เสริม (${room})` : posA;
@@ -696,12 +695,12 @@ function transformBlobData_(blob) {
               let isNew = !validNames.has(name);
               if (isNew) newNamesSet.add(name); else foundNamesThisMonth.add(name);
               let dInfo = processDate_(data[dateRowIdx][c]);
-              
+
               const shiftId = Utilities.base64Encode(dInfo.date + posCode + name).substring(0, 15);
-              final.push({ 
+              final.push({
                 shift_id: shiftId, status: "active", originOwner: name,
-                name, date: dInfo.date, timestamp: dInfo.ts, pos: posCode, 
-                shift: "⚠️", range: "ตรวจสอบ", isNew, room 
+                name, date: dInfo.date, timestamp: dInfo.ts, pos: posCode,
+                shift: "⚠️", range: "ตรวจสอบ", isNew, room
               });
             }
           }
@@ -713,9 +712,9 @@ function transformBlobData_(blob) {
 
         for (let j = 0; j < hRow.length; j++) {
           let cur = normalizePos_(hRow[j]);
-          if (cur) { lastP = (cur === "เสริม") ? `เสริม (${room})` : cur; fHead[j] = lastP; } 
+          if (cur) { lastP = (cur === "เสริม") ? `เสริม (${room})` : cur; fHead[j] = lastP; }
           else if (lastP && j >= 2) { fHead[j] = lastP; diag.mergedHeaders++; }
-          
+
           let cTime = timeRow[j] ? fullTrim_(timeRow[j]) : "";
           if (cTime) { lastT = cTime; fTime[j] = lastT; }
           else if (lastT && j >= 2) { fTime[j] = lastT; }
@@ -729,7 +728,7 @@ function transformBlobData_(blob) {
               let pFull = fHead[j];
               let pLookup = pFull.includes("เสริม (") ? "เสริม" : pFull;
               let tInfo = { shift: "-", range: "-" };
-              
+
               if (pLookup === "เสริม") {
                 let rawT = fTime[j];
                 if(rawT) {
@@ -739,16 +738,16 @@ function transformBlobData_(blob) {
               } else {
                 tInfo = lookupTime_(timeMap, pLookup) || { shift: "-", range: "-" };
               }
-              
+
               let isNew = !validNames.has(name);
               if (isNew) newNamesSet.add(name); else foundNamesThisMonth.add(name);
               let dInfo = processDate_(data[i][1]);
-              
+
               const shiftId = Utilities.base64Encode(dInfo.date + pFull + name).substring(0, 15);
-              final.push({ 
+              final.push({
                 shift_id: shiftId, status: "active", originOwner: name,
-                name, date: dInfo.date, timestamp: dInfo.ts, pos: pFull, 
-                shift: tInfo.shift, range: tInfo.range, isNew, room 
+                name, date: dInfo.date, timestamp: dInfo.ts, pos: pFull,
+                shift: tInfo.shift, range: tInfo.range, isNew, room
               });
             }
           }
@@ -810,9 +809,9 @@ function setupAdminPasswordFromEditor() {
   console.log("✅ ตั้งรหัส admin ใหม่แล้ว — ลอง login ด้วยรหัสที่เพิ่งตั้งได้เลย");
 }
 
-function guardCheck_(t) { 
-  if (t === SYSTEM_BOT_TOKEN) return; 
-  if (!t || CacheService.getScriptCache().get('ADMIN_TOKEN_' + t) !== 'VALID') throw new Error("❌ ล็อกอินหมดอายุ"); 
+function guardCheck_(t) {
+  if (t === SYSTEM_BOT_TOKEN) return;
+  if (!t || CacheService.getScriptCache().get('ADMIN_TOKEN_' + t) !== 'VALID') throw new Error("❌ ล็อกอินหมดอายุ");
 }
 
 function hashPassword_(t) {
@@ -826,7 +825,7 @@ function sortMonthsByDate(list) {
     let pA = a.label.split(' '), pB = b.label.split(' ');
     let sA = (pA.length === 2) ? (parseInt(pA[1], 10) * 100) + (thaiMonths.indexOf(pA[0]) + 1) : 0;
     let sB = (pB.length === 2) ? (parseInt(pB[1], 10) * 100) + (thaiMonths.indexOf(pB[0]) + 1) : 0;
-    return sB - sA; 
+    return sB - sA;
   });
 }
 
@@ -836,13 +835,13 @@ function logStatisticsToSheet_(sourceName, label, diag) {
     let unmatched = diag.unmatchedPositions && diag.unmatchedPositions.size > 0 ? Array.from(diag.unmatchedPositions).join(', ') : "-";
     let newN = diag.newNames && diag.newNames.length > 0 ? diag.newNames.join(', ') : "-";
     let missingN = diag.missingNames && diag.missingNames.length > 0 ? diag.missingNames.join(', ') : "-";
-    
+
     // 🚀 บันทึก Row สถิติด้วย Sheets API
     const valueRange = Sheets.newValueRange();
     valueRange.values = [[timestamp, sourceName, label, diag.uniqueNames || 0, diag.totalRecords || 0, diag.rejectedDates || 0, unmatched, newN, missingN]];
-    
-    Sheets.Spreadsheets.Values.append(valueRange, STATS_SHEET_ID, "A1", { 
-      valueInputOption: "USER_ENTERED" 
+
+    Sheets.Spreadsheets.Values.append(valueRange, STATS_SHEET_ID, "A1", {
+      valueInputOption: "USER_ENTERED"
     });
   } catch(e) { console.error("Stats Log Error: " + e.message); }
 }
@@ -895,11 +894,11 @@ function runAllMonthsAudit() {
 function debugPeopleMatching() {
   // ล้าง cache ก่อนทุกครั้งที่ debug
   CacheService.getScriptCache().remove('MASTER_DATA_CACHE');
-  
-  let result = { peopleStatus: "", peopleCount: 0, peopleExamples: [], 
-                 scheduleCount: 0, matched: 0, missed: 0, 
+
+  let result = { peopleStatus: "", peopleCount: 0, peopleExamples: [],
+                 scheduleCount: 0, matched: 0, missed: 0,
                  missingExamples: [], matchedExamples: [] };
-  
+
   // 1) อ่าน People
   let peopleNames = [];
   try {
@@ -916,17 +915,17 @@ function debugPeopleMatching() {
   }
   result.peopleCount = peopleNames.length;
   result.peopleExamples = peopleNames.slice(0, 5);
-  
+
   // 2) เทียบกับตารางเวรเดือนล่าสุด
   const list = getAvailableMonths();
   if (list.length === 0) { result.peopleStatus += " | ไม่มีเดือนให้เทียบ"; return result; }
-  
+
   const data = getScheduleData(list[0].id);
   if (!data.schedule) { result.peopleStatus += " | ดึงตารางเวรไม่ได้"; return result; }
-  
+
   const scheduleNames = [...new Set(data.schedule.map(i => i.name))];
   result.scheduleCount = scheduleNames.length;
-  
+
   // 3) Normalize เทียบกัน (ต้อง normalize ทั้ง 2 ฝั่งเหมือนกัน!)
   const peopleNormalized = new Set(peopleNames.map(n => normalizeName_(n)));
   const matches = [], misses = [];
@@ -934,12 +933,12 @@ function debugPeopleMatching() {
     if (peopleNormalized.has(normalizeName_(n))) matches.push(n);
     else misses.push(n);
   });
-  
+
   result.matched = matches.length;
   result.missed = misses.length;
   result.matchedExamples = matches.slice(0, 5);
   result.missingExamples = misses.slice(0, 15);  // ⚠️ ขึ้นกับชื่อพวกนี้
-  
+
   Logger.log(JSON.stringify(result, null, 2));
   return result;
 }
@@ -1003,24 +1002,24 @@ function debugScheduleMapping() {
       const data = sh.getDataRange().getValues();
       data.forEach((r, i) => Logger.log("Row " + i + ": " + JSON.stringify(r)));
     }
-    
+
     // แสดง tab ทั้งหมด
     Logger.log("\n=== All tabs in Schedule Sheet ===");
     ss.getSheets().forEach(s => Logger.log("  " + s.getName()));
   } catch(e) { Logger.log("❌ " + e.message); }
-  
+
   // 2. ดู MONTH_LIST (ระบบเก่า)
   Logger.log("\n=== MONTH_LIST (old system) ===");
   const list = getAvailableMonths();
   list.forEach(m => Logger.log("  id=" + m.id + " | label=" + m.label));
-  
+
   // 3. ดูว่า label ตรงกันไหม
   Logger.log("\n=== Matching attempt ===");
   if (list.length > 0) {
     const firstMonth = list[0];
     Logger.log("Frontend sends monthId: " + firstMonth.id);
     Logger.log("Looking for label: " + firstMonth.label);
-    
+
     try {
       const sh = SpreadsheetApp.openById(SCHEDULE_SHEET_ID).getSheetByName("Schedule_Index");
       if (sh) {
@@ -1050,7 +1049,7 @@ function cleanupBadMigration() {
   const ss = SpreadsheetApp.openById(SCHEDULE_SHEET_ID);
   const sheets = ss.getSheets();
   const deleted = [];
-  
+
   sheets.forEach(sh => {
     const name = sh.getName();
     // ลบทุก tab ที่ขึ้นต้นด้วย Schedule_ (รวม Schedule_Index)
@@ -1062,7 +1061,7 @@ function cleanupBadMigration() {
       }
     }
   });
-  
+
   Logger.log("🧹 ลบ " + deleted.length + " tabs: " + deleted.join(", "));
   return deleted;
 }
@@ -1075,20 +1074,20 @@ function migrateJSONtoSheets_v2() {
     Logger.log("❌ MONTH_LIST ว่าง ไม่มีข้อมูลให้ migrate");
     return [];
   }
-  
+
   const results = [];
-  
+
   oldList.forEach(function(m) {
     try {
       const raw = DriveApp.getFileById(m.fileId).getBlob().getDataAsString();
       const parsed = JSON.parse(raw);
       const schedule = Array.isArray(parsed) ? parsed : (parsed.data || parsed.schedule);
-      
+
       if (!schedule || !Array.isArray(schedule)) {
         results.push({ label: m.label, status: '⚠️ skipped', reason: 'no data array' });
         return;
       }
-      
+
       // 🌟 ใช้ monthId เดียวกับ MONTH_LIST → frontend ส่ง ID นี้มา → หาเจอทันที
       writeScheduleToSheet_(m.id, schedule, m.label, m.sheetUrl || "");
       results.push({ label: m.label, monthId: m.id, status: '✅ migrated', rows: schedule.length });
@@ -1096,7 +1095,7 @@ function migrateJSONtoSheets_v2() {
       results.push({ label: m.label, status: '❌ ' + e.message });
     }
   });
-  
+
   Logger.log("=== MIGRATION v2 COMPLETE ===");
   results.forEach(function(r) { Logger.log(JSON.stringify(r)); });
   return results;
@@ -1109,7 +1108,7 @@ function migrateJSONtoSheets_v2() {
 function syncAllSchedulesToFirebase() {
   const oldList = getAvailableMonths();
   const results = [];
-  
+
   oldList.forEach(function(m) {
     try {
       // อ่านจาก Sheet (ผ่าน getScheduleData)
@@ -1118,7 +1117,7 @@ function syncAllSchedulesToFirebase() {
         results.push({ label: m.label, status: '⚠️ ' + data.error });
         return;
       }
-      
+
       // Push ไป Firebase ด้วย monthId format เดียวกับ uploadLocalFile
       const firebaseMonthId = "m_" + m.label.replace(/\s+/g, '_');
       const payload = {
@@ -1136,7 +1135,7 @@ function syncAllSchedulesToFirebase() {
       results.push({ label: m.label, status: '❌ ' + e.message });
     }
   });
-  
+
   Logger.log("=== FIREBASE SYNC COMPLETE ===");
   results.forEach(function(r) { Logger.log(JSON.stringify(r)); });
   return results;
@@ -1150,10 +1149,10 @@ function syncMonthToFirebase(monthLabel) {
   const oldList = getAvailableMonths();
   const m = oldList.find(function(x) { return x.label === monthLabel; });
   if (!m) throw new Error("ไม่พบเดือน: " + monthLabel);
-  
+
   const data = getScheduleData(m.id);
   if (data.error) throw new Error(data.error);
-  
+
   const firebaseMonthId = "m_" + m.label.replace(/\s+/g, '_');
   const payload = {
     data: data.schedule,
@@ -1168,64 +1167,44 @@ function syncMonthToFirebase(monthLabel) {
   return "✅ " + m.label + " synced!";
 }
 // ==========================================
-// 📊 SCHEDULE STORAGE v2 — Versioning + Auto-sync
+// 📊 SCHEDULE STORAGE v3 — Single-tab + Overlay-only mutations
 // ==========================================
 
 /**
- * หา version ถัดไปสำหรับเดือนนี้
- */
-function getNextVersion_(monthId) {
-  const ss = SpreadsheetApp.openById(SCHEDULE_SHEET_ID);
-  const sheets = ss.getSheets();
-  const prefix = "Schedule_" + monthId;
-  let maxVer = 0;
-  
-  sheets.forEach(function(sh) {
-    const name = sh.getName();
-    if (name === prefix) maxVer = Math.max(maxVer, 1); // tab เก่าไม่มี _v
-    const m = name.match(new RegExp("^" + prefix.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + "_v(\\d+)$"));
-    if (m) maxVer = Math.max(maxVer, parseInt(m[1], 10));
-  });
-  
-  return maxVer + 1;
-}
-
-/**
- * ซ่อน tab versions เก่าของเดือนนี้ (เก็บไว้ไม่ลบ)
- */
-function hideOldVersions_(monthId, keepTabName) {
-  const ss = SpreadsheetApp.openById(SCHEDULE_SHEET_ID);
-  const prefix = "Schedule_" + monthId;
-  
-  ss.getSheets().forEach(function(sh) {
-    const name = sh.getName();
-    if (name === keepTabName) return; // ไม่ซ่อน active tab
-    if (name === "Schedule_Index") return;
-    if (name.startsWith(prefix)) {
-      try { sh.hideSheet(); } catch(e) { /* อาจเป็น tab เดียวที่เหลือ */ }
-    }
-  });
-}
-
-/**
- * เขียน schedule ลง Sheet tab แบบ versioned
- * คืน { tabName, version, rowCount }
+ * เขียน schedule ลง Sheet tab (single-tab, immutable master)
+ * - ชื่อ tab = label ไทย (เช่น "มิ.ย. 2569") | fallback = "Schedule_" + monthId
+ * - ถ้า tab มีอยู่ → clear + rewrite (re-upload replaces master)
+ * - Auto-lock ด้วย warning-only protection
+ * คืน { tabName, version: 1, rowCount, replaced }
  */
 function writeScheduleToSheet_(monthId, schedule, label, sheetUrl, sourceFile) {
   if (!Array.isArray(schedule)) throw new Error("schedule ต้องเป็น array");
-  
+
   const ss = SpreadsheetApp.openById(SCHEDULE_SHEET_ID);
-  const nextVer = getNextVersion_(monthId);
-  const tabName = "Schedule_" + monthId + "_v" + nextVer;
-  
-  // สร้าง tab ใหม่
-  let sh = ss.insertSheet(tabName);
+
+  const cleanLabel = String(label || '').trim();
+  const validLabel = cleanLabel && cleanLabel !== 'ไม่ระบุเดือน' && cleanLabel.length <= 100;
+  const tabName = validLabel ? cleanLabel : ('Schedule_' + monthId);
+
+  let sh = ss.getSheetByName(tabName);
+  const isReplace = !!sh;
+
+  if (sh) {
+    const protections = sh.getProtections(SpreadsheetApp.ProtectionType.SHEET);
+    protections.forEach(function(p) {
+      try { p.remove(); } catch(e) { console.warn('remove protection failed:', e.message); }
+    });
+    sh.clear();
+  } else {
+    sh = ss.insertSheet(tabName);
+  }
+
   sh.getRange(1, 1, 1, 12).setValues([[
     "shift_id", "name", "date", "timestamp", "pos", "shift", "range",
     "room", "isNew", "originOwner", "status", "last_modified"
   ]]);
   sh.setFrozenRows(1);
-  
+
   if (schedule.length > 0) {
     const now = new Date().toISOString();
     const rows = schedule.map(function(s) {
@@ -1238,14 +1217,293 @@ function writeScheduleToSheet_(monthId, schedule, label, sheetUrl, sourceFile) {
     });
     sh.getRange(2, 1, rows.length, 12).setValues(rows);
   }
-  
-  // ซ่อน versions เก่า
-  hideOldVersions_(monthId, tabName);
-  
-  // อัปเดต Schedule_Index
-  updateScheduleIndex_(monthId, label, tabName, nextVer, sheetUrl, schedule.length, sourceFile);
-  
-  return { tabName: tabName, version: nextVer, rowCount: schedule.length };
+
+  try {
+    const p = sh.protect().setDescription('ต้นฉบับ - ห้ามแก้ตรงนี้ ใช้ overlay ผ่าน UI');
+    p.setWarningOnly(true);
+  } catch (e) {
+    console.warn('Failed to protect tab ' + tabName + ':', e.message);
+  }
+
+  updateScheduleIndex_(monthId, label, tabName, 1, sheetUrl, schedule.length, sourceFile);
+
+  return { tabName: tabName, version: 1, rowCount: schedule.length, replaced: isReplace };
+}
+
+// ==========================================
+// 🚚 One-shot migration — v2 (versioned) → v3 (single-tab)
+// ใช้ครั้งเดียวเพื่อ:
+//   1. Rename Schedule_m_xxx_vN → ชื่อไทย (label จาก Schedule_Index)
+//   2. Delete hidden old versions (_v1, _v2, ฯลฯ)
+//   3. Apply warning-only protection
+//   4. Update Schedule_Index.active_tab ให้ตรงกับชื่อใหม่
+// รันจาก GAS Editor:
+//   phxMigrateToSingleTab_dryRun()  → เห็นแผน ไม่แตะ Sheet
+//   phxMigrateToSingleTab_apply()   → ทำจริง มี safety cap
+// ==========================================
+function phxMigrateToSingleTab_dryRun() { return _phxMigrateToSingleTab_({ apply: false }); }
+function phxMigrateToSingleTab_apply()  { return _phxMigrateToSingleTab_({ apply: true  }); }
+
+function _phxMigrateToSingleTab_(opts) {
+  const apply = !!(opts && opts.apply);
+  const ss = SpreadsheetApp.openById(SCHEDULE_SHEET_ID);
+  const idx = ss.getSheetByName(SCHEDULE_INDEX_TAB);
+  if (!idx) throw new Error('Schedule_Index not found — ยกเลิก');
+
+  const idxData = idx.getDataRange().getValues();
+  const plan = [];
+  const warnings = [];
+  const escapeRe = function(s) { return s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'); };
+
+  for (let i = 1; i < idxData.length; i++) {
+    const monthId = String(idxData[i][0] || '').trim();
+    const label = String(idxData[i][1] || '').trim();
+    const activeTab = String(idxData[i][2] || '').trim();
+    const status = String(idxData[i][8] || '').trim();
+    if (!monthId) continue;
+    if (status === 'archived') continue;
+
+    const validLabel = label && label !== 'ไม่ระบุเดือน' && label.length <= 100;
+    const targetName = validLabel ? label : ('Schedule_' + monthId);
+
+    if (!activeTab) { warnings.push(monthId + ': no active_tab in Schedule_Index'); continue; }
+    if (!ss.getSheetByName(activeTab)) { warnings.push(monthId + ': active_tab "' + activeTab + '" ไม่มีจริง'); continue; }
+
+    let renameAction = 'unchanged';
+    if (activeTab === targetName) {
+      renameAction = 'already-named';
+    } else if (ss.getSheetByName(targetName)) {
+      warnings.push(monthId + ': target "' + targetName + '" มีอยู่แล้ว — skip rename');
+      renameAction = 'target-conflict';
+    } else {
+      renameAction = 'rename';
+    }
+
+    // หา old versions ที่ต้องลบ (Schedule_<monthId> หรือ Schedule_<monthId>_vN, ไม่ใช่ active/target)
+    const versionRe = new RegExp('^Schedule_' + escapeRe(monthId) + '(?:_v\\d+)?$');
+    const oldVersions = [];
+    ss.getSheets().forEach(function(sh) {
+      const name = sh.getName();
+      if (name === SCHEDULE_INDEX_TAB) return;
+      if (!versionRe.test(name)) return;
+      if (name === activeTab || name === targetName) return;
+      oldVersions.push(name);
+    });
+
+    plan.push({ rowIdx: i, monthId: monthId, label: label, activeTab: activeTab,
+                targetName: targetName, renameAction: renameAction, oldVersions: oldVersions });
+  }
+
+  // Report
+  Logger.log('=== Migration ' + (apply ? 'APPLY' : 'DRY-RUN') + ' ===');
+  plan.forEach(function(p) {
+    Logger.log('\n▸ ' + p.monthId + ' (' + p.label + ')');
+    if (p.renameAction === 'rename') {
+      Logger.log('  🔤 Rename: "' + p.activeTab + '" → "' + p.targetName + '"');
+    } else if (p.renameAction === 'already-named') {
+      Logger.log('  ✓ Already named correctly: "' + p.activeTab + '"');
+    } else if (p.renameAction === 'target-conflict') {
+      Logger.log('  ⚠️ Target "' + p.targetName + '" มีอยู่แล้ว — คงชื่อเดิม');
+    }
+    if (p.oldVersions.length > 0) {
+      Logger.log('  🗑  Delete old versions (' + p.oldVersions.length + '): ' + p.oldVersions.join(', '));
+    }
+    Logger.log('  🔒 Apply warning-only protection');
+  });
+
+  if (warnings.length > 0) {
+    Logger.log('\n=== ⚠️ Warnings (' + warnings.length + ') ===');
+    warnings.forEach(function(w) { Logger.log('  ' + w); });
+  }
+
+  const totalDeletes = plan.reduce(function(a, p) { return a + p.oldVersions.length; }, 0);
+  const totalRenames = plan.filter(function(p) { return p.renameAction === 'rename'; }).length;
+  Logger.log('\n=== Summary ===');
+  Logger.log('  Months to process: ' + plan.length);
+  Logger.log('  Renames: ' + totalRenames);
+  Logger.log('  Tabs to delete: ' + totalDeletes);
+
+  if (apply && totalDeletes > 30) {
+    throw new Error('SAFETY STOP: จะลบ ' + totalDeletes + ' tabs (เกิน 30) — รัน dryRun ก่อน');
+  }
+
+  if (!apply) return { dryRun: true, plan: plan, warnings: warnings };
+
+  // Apply
+  const results = { renamed: [], deleted: [], protected: [], errors: [] };
+  plan.forEach(function(p) {
+    try {
+      // 1. Delete old versions
+      p.oldVersions.forEach(function(name) {
+        try {
+          const sh = ss.getSheetByName(name);
+          if (!sh) return;
+          sh.getProtections(SpreadsheetApp.ProtectionType.SHEET).forEach(function(pr) {
+            try { pr.remove(); } catch(e) {}
+          });
+          if (sh.isSheetHidden()) sh.showSheet();  // deleteSheet needs visible
+          ss.deleteSheet(sh);
+          results.deleted.push(name);
+        } catch(e) {
+          results.errors.push({ op: 'delete', target: name, err: e.message });
+        }
+      });
+
+      // 2. Rename active tab
+      if (p.renameAction === 'rename') {
+        const sh = ss.getSheetByName(p.activeTab);
+        if (sh) {
+          sh.setName(p.targetName);
+          results.renamed.push({ from: p.activeTab, to: p.targetName });
+          idx.getRange(p.rowIdx + 1, 3).setValue(p.targetName);
+        }
+      }
+
+      // 3. Apply warning-only protection to final tab
+      const finalName = (p.renameAction === 'rename') ? p.targetName : p.activeTab;
+      const finalSh = ss.getSheetByName(finalName);
+      if (finalSh) {
+        finalSh.getProtections(SpreadsheetApp.ProtectionType.SHEET).forEach(function(pr) {
+          try { pr.remove(); } catch(e) {}
+        });
+        const pr = finalSh.protect().setDescription('ต้นฉบับ - ห้ามแก้ตรงนี้ ใช้ overlay ผ่าน UI');
+        pr.setWarningOnly(true);
+        results.protected.push(finalName);
+      }
+    } catch(e) {
+      results.errors.push({ op: 'process', target: p.monthId, err: e.message });
+    }
+  });
+
+  Logger.log('\n=== Applied ===');
+  Logger.log('  ✅ Renamed: ' + results.renamed.length);
+  Logger.log('  ✅ Deleted: ' + results.deleted.length);
+  Logger.log('  ✅ Protected: ' + results.protected.length);
+  Logger.log('  ❌ Errors: ' + results.errors.length);
+  results.errors.forEach(function(e) {
+    Logger.log('    ' + e.op + ' ' + e.target + ': ' + e.err);
+  });
+
+  return { dryRun: false, plan: plan, results: results, warnings: warnings };
+}
+
+// ==========================================
+// 🧹 Dedup — aggressive: archive any Schedule_Index row not in MONTH_LIST
+// Canonical = monthId ใน MONTH_LIST (source of truth ปัจจุบัน)
+// ทุก row อื่นที่ status active = หนี้เก่า → archive + ลบ tab (รวม hidden versions)
+// ==========================================
+function phxDedupSchedule_dryRun() { return _phxDedupSchedule_({ apply: false }); }
+function phxDedupSchedule_apply()  { return _phxDedupSchedule_({ apply: true  }); }
+
+function _phxDedupSchedule_(opts) {
+  const apply = !!(opts && opts.apply);
+  const ss = SpreadsheetApp.openById(SCHEDULE_SHEET_ID);
+  const idx = ss.getSheetByName(SCHEDULE_INDEX_TAB);
+  if (!idx) throw new Error('Schedule_Index not found — ยกเลิก');
+
+  const monthList = getAvailableMonths();
+  if (!monthList || monthList.length === 0) {
+    throw new Error('MONTH_LIST ว่าง — ต้อง backfill ก่อน (ยกเลิก)');
+  }
+  const canonicalMap = {};
+  monthList.forEach(function(m) { if (m.id) canonicalMap[m.id] = m.label || ''; });
+
+  const escapeRe = function(s) { return s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'); };
+  const idxData = idx.getDataRange().getValues();
+  const keepPlan = [];
+  const archivePlan = [];
+
+  for (let i = 1; i < idxData.length; i++) {
+    const monthId = String(idxData[i][0] || '').trim();
+    const label = String(idxData[i][1] || '').trim();
+    const activeTab = String(idxData[i][2] || '').trim();
+    const status = String(idxData[i][8] || '').trim();
+    if (!monthId || status === 'archived') continue;
+
+    if (canonicalMap.hasOwnProperty(monthId)) {
+      keepPlan.push({ monthId: monthId, label: label, activeTab: activeTab });
+      continue;
+    }
+
+    // Non-canonical: find all related tabs (active + hidden versions)
+    const versionRe = new RegExp('^Schedule_' + escapeRe(monthId) + '(?:_v\\d+)?$');
+    const allTabs = [];
+    ss.getSheets().forEach(function(sh) {
+      const name = sh.getName();
+      if (versionRe.test(name)) allTabs.push(name);
+    });
+    if (activeTab && allTabs.indexOf(activeTab) === -1) allTabs.push(activeTab);
+
+    archivePlan.push({ rowIdx: i, monthId: monthId, label: label,
+                       activeTab: activeTab, allTabs: allTabs });
+  }
+
+  // Report
+  Logger.log('=== Dedup ' + (apply ? 'APPLY' : 'DRY-RUN') + ' (aggressive mode) ===');
+  Logger.log('MONTH_LIST size: ' + monthList.length);
+  Logger.log('Canonical monthIds:');
+  Object.keys(canonicalMap).forEach(function(id) {
+    Logger.log('  👑 ' + id + ' — ' + canonicalMap[id]);
+  });
+
+  Logger.log('\n▸ Keep (in MONTH_LIST): ' + keepPlan.length);
+  keepPlan.forEach(function(k) {
+    Logger.log('  ✓ ' + k.monthId + ' — ' + k.label + ' (tab: ' + k.activeTab + ')');
+  });
+
+  Logger.log('\n▸ Archive + delete tabs (not in MONTH_LIST): ' + archivePlan.length);
+  archivePlan.forEach(function(p) {
+    Logger.log('  🗑  ' + p.monthId + ' (' + p.label + ')');
+    if (p.allTabs.length === 0) {
+      Logger.log('       └─ ⚠️ ไม่พบ tab ใดๆ — archive row เท่านั้น');
+    } else {
+      p.allTabs.forEach(function(t) { Logger.log('       └─ tab: ' + t); });
+    }
+  });
+
+  const totalTabsToDelete = archivePlan.reduce(function(a, p) { return a + p.allTabs.length; }, 0);
+  Logger.log('\n=== Summary ===');
+  Logger.log('  Keep rows: ' + keepPlan.length);
+  Logger.log('  Archive rows: ' + archivePlan.length);
+  Logger.log('  Tabs to delete: ' + totalTabsToDelete);
+
+  if (apply && archivePlan.length > 20) {
+    throw new Error('SAFETY STOP: จะ archive ' + archivePlan.length + ' rows (เกิน 20) — รัน dryRun ก่อน');
+  }
+  if (!apply) return { dryRun: true, keepPlan: keepPlan, archivePlan: archivePlan };
+
+  // Apply
+  const results = { archived: [], deleted: [], errors: [] };
+  archivePlan.forEach(function(p) {
+    try {
+      idx.getRange(p.rowIdx + 1, 9).setValue('archived');
+      results.archived.push(p.monthId);
+      p.allTabs.forEach(function(tabName) {
+        try {
+          const sh = ss.getSheetByName(tabName);
+          if (!sh) return;
+          sh.getProtections(SpreadsheetApp.ProtectionType.SHEET).forEach(function(pr) {
+            try { pr.remove(); } catch(e) {}
+          });
+          if (sh.isSheetHidden()) sh.showSheet();
+          ss.deleteSheet(sh);
+          results.deleted.push(tabName);
+        } catch(e) {
+          results.errors.push({ op: 'delete', target: tabName, err: e.message });
+        }
+      });
+    } catch(e) {
+      results.errors.push({ op: 'archive', target: p.monthId, err: e.message });
+    }
+  });
+
+  Logger.log('\n=== Applied ===');
+  Logger.log('  ✅ Archived rows: ' + results.archived.length);
+  Logger.log('  ✅ Deleted tabs: ' + results.deleted.length);
+  Logger.log('  ❌ Errors: ' + results.errors.length);
+  results.errors.forEach(function(e) { Logger.log('    ' + e.op + ' ' + e.target + ': ' + e.err); });
+
+  return { dryRun: false, keepPlan: keepPlan, archivePlan: archivePlan, results: results };
 }
 
 /**
@@ -1254,7 +1512,7 @@ function writeScheduleToSheet_(monthId, schedule, label, sheetUrl, sourceFile) {
 
 function updateScheduleIndex_(monthId, label, activeTab, version, sheetUrl, rowCount, sourceFile) {
   const sh = getScheduleIndexSheet_();
-  
+
   // อัปเกรด header ถ้ายังเป็นแบบเก่า (6 cols)
   const currentHeaders = sh.getRange(1, 1, 1, 9).getValues()[0];
   if (currentHeaders[2] !== "active_tab") {
@@ -1262,11 +1520,11 @@ function updateScheduleIndex_(monthId, label, activeTab, version, sheetUrl, rowC
       "month_id", "label", "active_tab", "version", "sheet_url", "row_count", "last_modified", "source_file", "status"
     ]]);
   }
-  
+
   const data = sh.getDataRange().getValues();
   const now = new Date().toISOString();
   const newRow = [monthId, label || "", activeTab || "", version || 1, sheetUrl || "", rowCount || 0, now, sourceFile || "", "active"];
-  
+
   for (let i = 1; i < data.length; i++) {
     if (data[i][0] === monthId) {
       sh.getRange(i + 1, 1, 1, 9).setValues([newRow]);
@@ -1278,7 +1536,7 @@ function updateScheduleIndex_(monthId, label, activeTab, version, sheetUrl, rowC
 
 function readScheduleFromSheet_(monthId) {
   const ss = SpreadsheetApp.openById(SCHEDULE_SHEET_ID);
-  
+
   let tabName = null;
   try {
     const indexSh = ss.getSheetByName("Schedule_Index");
@@ -1292,15 +1550,15 @@ function readScheduleFromSheet_(monthId) {
       }
     }
   } catch(e) {}
-  
+
   if (!tabName) tabName = "Schedule_" + monthId;
-  
+
   const sh = ss.getSheetByName(tabName);
   if (!sh) return null;
-  
+
   const lastRow = sh.getLastRow();
   if (lastRow < 2) return [];
-  
+
   const data = sh.getRange(2, 1, lastRow - 1, 12).getValues();
   return data
     .filter(function(r) { return r[0]; })
@@ -1324,7 +1582,7 @@ function updateJSONFile_(monthLabel, scheduleData) {
   const list = getAvailableMonths();
   const m = list.find(function(x) { return x.label === monthLabel; });
   if (!m || !m.fileId) return false;
-  
+
   try {
     const file = DriveApp.getFileById(m.fileId);
     const payload = {
@@ -1614,9 +1872,9 @@ function logDeviceType(email, device) {
 
 // ═══════════════════════════════════════════════════════════════════
 // PHASE Z — Stage A: Sheet Setup + Email Queue
-// 
+//
 // Paste โค้ดนี้ "ท้ายไฟล์ Code.gs" ของ Gmail script
-// 
+//
 // หลัง paste:
 //   1. Run phxSetupAllSheets()      → สร้าง sheets ทั้งหมด (auto-hide)
 //   2. Run phxBootstrapMaster()      → copy รายชื่อจาก People sheet → Master
@@ -1688,7 +1946,7 @@ function phxBootstrapMaster() {
   const headers = peopleSh.getRange(1, 1, 1, peopleSh.getLastColumn()).getValues()[0]
                           .map(function(h) { return String(h || '').toLowerCase().trim(); });
   const emailColIdx = headers.findIndex(function(h) { return h === 'email' || h === 'อีเมล' || h === 'e-mail'; });
-  
+
   const peopleData = peopleSh.getRange(2, 1, lastRow - 1, Math.max(1, emailColIdx + 1)).getValues();
   const names = [];
   peopleData.forEach(function(row) {
@@ -1824,18 +2082,18 @@ function cleanupTestData() {
   var ss = SpreadsheetApp.openById(SCHEDULE_SHEET_ID);
   var sh = ss.getSheetByName('PHX_Overlays_v2');
   if (!sh || sh.getLastRow() < 2) { Logger.log('empty'); return; }
-  
+
   var data = sh.getRange(2, 1, sh.getLastRow() - 1, 6).getValues();
   var deleted = [];
-  
+
   // ลูป backward เพื่อ deleteRow ปลอดภัย
   for (var i = data.length - 1; i >= 0; i--) {
     var payload = {};
     try { payload = JSON.parse(data[i][4] || '{}'); } catch(e) {}
-    
+
     var action = String(payload.action || data[i][3] || '');
     var shiftKey = String(payload.shiftKey || '');
-    
+
     // ลบ action ที่ดูเหมือน test:
     //   - action มีคำว่า 'test' หรือ 'console-'
     //   - หรือ shiftKey = 'fake-key'
@@ -1844,7 +2102,7 @@ function cleanupTestData() {
       sh.deleteRow(i + 2);
     }
   }
-  
+
   Logger.log('ลบ ' + deleted.length + ' rows:');
   deleted.forEach(function(d) { Logger.log('  ' + JSON.stringify(d)); });
 }
