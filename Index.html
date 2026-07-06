@@ -2085,6 +2085,15 @@ window.allPharmacistNames = [];
       const dateKey = s._origDate || s.date || '';
       return [dateKey, s.pos || '', s.name || '', s.range || ''].join('|');
     }
+    // v3.42.8: per-row hash to disambiguate chevron aids when multiple rows share an actionId
+    //          (swap: actor's row + partner's row both marked with same _pbUsedMap.actionId;
+    //           bilateral: same swap's ghost synthesized for both recipients under same _ghostKey).
+    function _rowAidHash(shiftKey, name) {
+      const s = String(shiftKey || '') + '|' + String(name || '');
+      let h = 5381;
+      for (let i = 0; i < s.length; i++) h = ((h << 5) + h) + s.charCodeAt(i) | 0;
+      return (h >>> 0).toString(36);
+    }
     // v15: shift key index — built once per rawData change for O(1) lookups
     let _shiftKeyIndex = null;
     let _shiftKeyIndexFor = null;
@@ -2194,7 +2203,16 @@ window.allPharmacistNames = [];
       // Use action ids + count as fingerprint (cheap, deterministic)
       let fp = '';
       for (let i = 0; i < actions.length; i++) fp += actions[i].id + '|';
-      return monthId + '::' + viewerName + '::' + (rawArr ? rawArr.length : 0) + '::' + fp;
+      // v3.42: also fingerprint pathBOverlays — bilateral ghosts depend on it
+      let pbFp = '';
+      if (Array.isArray(pathBOverlays)) {
+        pbFp = pathBOverlays.length + '@';
+        if (pathBOverlays.length > 0) {
+          pbFp += (pathBOverlays[0] && pathBOverlays[0].actionId) + '#'
+                + (pathBOverlays[pathBOverlays.length - 1] && pathBOverlays[pathBOverlays.length - 1].actionId);
+        }
+      }
+      return monthId + '::' + viewerName + '::' + (rawArr ? rawArr.length : 0) + '::' + fp + '::' + pbFp;
     }
     function invalidateGhostCache() { _ghostCache = null; _ghostCacheKey = ''; }
 
@@ -2208,17 +2226,101 @@ window.allPharmacistNames = [];
       const actions = OverlayManager.getActions(monthId, viewerName);
       const usedMap = OverlayManager.getUsedMap(monthId, viewerName);
 
-      // Pass 1: build all ghosts (no conflict info yet)
-      // v9: handle chained actions where shiftKey is a ghost key (_g_*)
-      // v11: capture source pos for swap-type ghost labels
+      // v3.42.11: chain resolver — walk parent overlays until a real shiftKey.
+      //   consumerVN (the viewerName of the overlay that references this key) picks
+      //   the correct side of a swap parent: if consumer was the swap's actor, they
+      //   inherited partnerShiftKey; if the swap's partner, they inherited shiftKey.
+      //   Without consumerVN we default to actor side (backwards-compat).
+      const _resolveToReal = (key, consumerVN) => {
+        let k = String(key || ''), consumer = consumerVN || '', hops = 0;
+        while (k.indexOf('_g_') === 0 && hops++ < 10) {
+          const parentId = k.substring(3);
+          const parent = (Array.isArray(pathBOverlays) ? pathBOverlays : []).find(p => p && p.actionId === parentId);
+          if (!parent) return null;
+          const pact = String(parent.action || '');
+          if (pact === 'give' || pact === 'add') {
+            k = String(parent.shiftKey || '');
+            consumer = (pact === 'give') ? String(parent.viewerName || '') : String(parent.partnerName || '');
+          } else if (pact === 'swap') {
+            if (consumer && String(consumer) === String(parent.partnerName || '')) {
+              // Consumer was the swap's partner → they received shiftKey side
+              k = String(parent.shiftKey || '');
+              consumer = String(parent.viewerName || '');
+            } else {
+              // Default: actor side (consumer was viewer of swap)
+              k = String(parent.partnerShiftKey || '');
+              consumer = String(parent.partnerName || '');
+            }
+          } else return null;
+        }
+        return rawArr.find(s => makeShiftKey(s) === k) || null;
+      };
+
+      // v3.42.11: reordered. Pass 0 (bilateral synth) runs FIRST so that Pass 1's
+      //   own-action swap can use bilateral-created ghosts as its source. Without this
+      //   reorder, a chain like `Alpha give→Beta (bilateral), Beta swap↔Gamma (own)` left
+      //   Beta with no ghost — Pass 1 couldn't find `_g_g1` and Pass 0 hadn't run yet.
       const ghosts = [];
+
+      // Pass 0: bilateral synth — for viewers named as partnerName in someone else's overlay
+      if (Array.isArray(pathBOverlays) && pathBOverlays.length > 0) {
+        const ownReceivedKeys = new Set();
+        actions.forEach(a => {
+          if (a.action === 'add' && a.shiftKey) ownReceivedKeys.add('add::' + a.shiftKey);
+          else if (a.action === 'swap' && a.partnerShiftKey) ownReceivedKeys.add('swap::' + a.partnerShiftKey);
+        });
+        pathBOverlays.forEach(o => {
+          if (!o) return;
+          if (String(o.viewerName || '') === String(viewerName)) return;
+          if (String(o.partnerName || '') !== String(viewerName)) return;
+          const act = String(o.action || '');
+          let g = null;
+          if (act === 'give') {
+            if (ownReceivedKeys.has('add::' + o.shiftKey)) return;
+            const source = _resolveToReal(o.shiftKey, String(o.viewerName || ''));
+            if (!source) return;
+            g = Object.assign({}, source, {
+              _ghostKey: '_g_' + o.actionId,
+              name: viewerName,
+              _ghost: 'received',
+              _ghostType: 'add',
+              _ghostActionId: o.actionId,
+              _ghostPartnerName: String(o.viewerName || '')
+            });
+          } else if (act === 'swap') {
+            if (ownReceivedKeys.has('swap::' + o.shiftKey)) return;
+            const sourceShift = _resolveToReal(o.partnerShiftKey, String(o.viewerName || ''));
+            if (!sourceShift || sourceShift.name !== viewerName) return;
+            const partner = _resolveToReal(o.shiftKey, String(o.viewerName || ''));
+            if (!partner) return;
+            g = Object.assign({}, partner, {
+              _ghostKey: '_g_' + o.actionId,
+              name: viewerName,
+              _ghost: 'received',
+              _ghostType: 'swap',
+              _ghostSourcePos: sourceShift.pos,
+              _ghostActionId: o.actionId,
+              _ghostPartnerName: String(o.viewerName || '')
+            });
+          }
+          if (g) ghosts.push(g);
+        });
+      }
+
+      // Pass 1: own actions
       actions.forEach(act => {
         let g = null;
         if (act.action === 'swap') {
-          // Source can be own real shift OR a ghost from earlier action
           let sourceShift = null;
           if (act.shiftKey && act.shiftKey.indexOf('_g_') === 0) {
+            // First try local ghosts (Pass 0 bilateral + earlier Pass 1 iterations)
             sourceShift = ghosts.find(gg => gg._ghostKey === act.shiftKey);
+            if (!sourceShift) {
+              // v3.42.11: fall back to chain resolver — the source ghost may live only
+              // in pathBOverlays (viewer received via bilateral but didn't record 'add')
+              const resolved = _resolveToReal(act.shiftKey, viewerName);
+              if (resolved) sourceShift = Object.assign({}, resolved, { name: viewerName });
+            }
           } else {
             sourceShift = rawArr.find(s => makeShiftKey(s) === act.shiftKey);
           }
@@ -2246,13 +2348,23 @@ window.allPharmacistNames = [];
             _ghostPartnerName: act.partnerName
           });
         }
-        if (g) ghosts.push(g);
+        // v3.42.11: guard against duplicate if bilateral already covered same actionId
+        if (g && !ghosts.find(gg => gg._ghostKey === g._ghostKey)) ghosts.push(g);
       });
 
       // Pass 2: annotate each ghost with conflict status
       // v9: also exclude ghosts that have been further given/swapped (chained)
-      const ownEffective = rawArr.filter(s => s.name === viewerName && !usedMap[makeShiftKey(s)]);
-      const ghostsEffective = ghosts.filter(g => !usedMap[g._ghostKey]);
+      // v3.42.6: also exclude rows marked via PB overlays — e.g., partner authored the swap,
+      //          so viewer's original row has no entry in local usedMap but IS struck via _pbUsedMap.
+      //          Without this, a still-active struck row was treated as a conflicting shift
+      //          for the bilateral ghost that replaced it.
+      const _pbMapForPass2 = (typeof PBOverlays !== 'undefined') ? PBOverlays.getUsedMap(_pbGetLoggedInName()) : {};
+      const ownEffective = rawArr.filter(s => {
+        if (s.name !== viewerName) return false;
+        const k = makeShiftKey(s);
+        return !usedMap[k] && !_pbMapForPass2[k];
+      });
+      const ghostsEffective = ghosts.filter(g => !usedMap[g._ghostKey] && !_pbMapForPass2[g._ghostKey]);
       const allViewerShifts = ownEffective.concat(ghostsEffective);
 
       ghosts.forEach(g => {
@@ -2310,7 +2422,35 @@ window.allPharmacistNames = [];
       try {
         const mid = getCurrentMonthId();
         const user = getCurrentUser();
-        const ghosts = user ? buildGhostRows(rawData || [], mid, user) : [];
+        let ghosts = [];
+        if (user) {
+          ghosts = buildGhostRows(rawData || [], mid, user);
+        } else if (Array.isArray(pathBOverlays) && pathBOverlays.length > 0) {
+          // v3.42.7: no name filter (room/date view) — collect ghosts for every recipient
+          //          so the current holder shows up next to the giver's struck-out row.
+          const recipients = new Set();
+          pathBOverlays.forEach(o => {
+            if (!o) return;
+            const act = String(o.action || '');
+            const vn = String(o.viewerName || '');
+            const pn = String(o.partnerName || '');
+            if (act === 'add' && vn) recipients.add(vn);
+            if (act === 'give' && pn) recipients.add(pn);
+            if (act === 'swap') { if (vn) recipients.add(vn); if (pn) recipients.add(pn); }
+          });
+          const seenKeys = new Set();
+          recipients.forEach(name => {
+            try {
+              buildGhostRows(rawData || [], mid, name).forEach(g => {
+                // v3.42.8: key by (_ghostKey + name) — a swap generates ghosts for
+                //          BOTH sides that share the same _ghostKey; without name in
+                //          the dedup key we would drop one of the two recipients.
+                const dedupKey = g._ghostKey + '|' + (g.name || '');
+                if (!seenKeys.has(dedupKey)) { seenKeys.add(dedupKey); ghosts.push(g); }
+              });
+            } catch(e) {}
+          });
+        }
         return (rawData || []).concat(ghosts);
       } catch(err) {
         v10ShowError('getEffectiveData', err);
@@ -2492,17 +2632,25 @@ window.allPharmacistNames = [];
       } catch(e) {}
       return null;
     }
+    // v3.42.10: Combined "used map" — unions OverlayManager (own actions) with PBOverlays
+    //           (everyone else's actions). Any struck-out shift, whether authored by the
+    //           viewer or by someone whose swap/give lands on this viewer's row, appears here.
+    //           Use at count/filter sites (banner total, export PNG/PDF/ICS, day-picker) to
+    //           avoid double-counting given-away shifts.
+    function _combinedUsedMap(monthId, viewerName) {
+      const om = (typeof OverlayManager !== 'undefined') ? OverlayManager.getUsedMap(monthId, viewerName) : {};
+      const pb = (typeof PBOverlays !== 'undefined') ? PBOverlays.getUsedMap(_pbGetLoggedInName()) : {};
+      return Object.assign({}, pb, om);   // OverlayManager wins on key collision (own > public)
+    }
     const PBOverlays = {
-      _getExcluding(loggedInName) {
-        const arr = Array.isArray(pathBOverlays) ? pathBOverlays : [];
-        if (!loggedInName) return arr;
-        return arr.filter(o => String(o.viewerName || '') !== String(loggedInName));
-      },
       /** shiftKey → {label, actionId, color, _pbSource:true}.
-       *  Pass logged-in name (P2B.boundName) — NOT display filter — so decorations
-       *  appear for everyone except the actual authoring user. */
+       *  v3.42.3: no longer excludes logged-in user's overlays.
+       *   Reason: their add/swap marks fall on PARTNER's row (e.g., ณรพล's add from ณัชชพล
+       *   marks ณัชชพล's O11 as "ยกให้ ณรพล แล้ว"). If we exclude, ณัชชพล's row shows
+       *   unmarked when logged-in ณรพล views ณัชชพล's filter. OverlayManager wins via
+       *   `||` in the render code, so same-row double-marking is harmless. */
       getUsedMap(loggedInName) {
-        const overlays = this._getExcluding(loggedInName);
+        const overlays = Array.isArray(pathBOverlays) ? pathBOverlays : [];
         const map = {};
         const colors = {};
         let idx = 0;
@@ -2513,8 +2661,11 @@ window.allPharmacistNames = [];
           const act = String(o.action || '');
           if (act === 'swap') {
             const c = colors[o.actionId];
-            if (o.shiftKey)        map[o.shiftKey]        = { label: 'สลับกับ ' + o.partnerName + ' แล้ว', actionId: o.actionId, color: c, _pbSource: true };
-            if (o.partnerShiftKey) map[o.partnerShiftKey] = { label: 'สลับกับ ' + o.viewerName  + ' แล้ว', actionId: o.actionId, color: c, _pbSource: true };
+            // v3.42.9: tag side ('actor' vs 'partner') so timeline endpoint can pick
+            //          the right person after a swap — actor's row goes to partner,
+            //          partner's row goes to actor
+            if (o.shiftKey)        map[o.shiftKey]        = { label: 'สลับกับ ' + o.partnerName + ' แล้ว', actionId: o.actionId, color: c, _pbSource: true, _pbSide: 'actor'   };
+            if (o.partnerShiftKey) map[o.partnerShiftKey] = { label: 'สลับกับ ' + o.viewerName  + ' แล้ว', actionId: o.actionId, color: c, _pbSource: true, _pbSide: 'partner' };
           } else if (act === 'give') {
             if (o.shiftKey) map[o.shiftKey] = { label: 'ยกให้ ' + o.partnerName + ' แล้ว', actionId: o.actionId, _pbSource: true };
           } else if (act === 'add') {
@@ -2559,8 +2710,12 @@ window.allPharmacistNames = [];
           String(o.originalOwner || '') === viewer
         );
       },
-      /** Endpoint names for limited "A ↔ D" display */
-      getChainEndpoints(chain) {
+      /** Endpoint names for limited "A ↔ D" display.
+       *  v3.42.9: pbSide ('actor'|'partner'|null) distinguishes which side of a swap
+       *  the ROW belongs to — a swap moves the actor's shift to partner AND partner's
+       *  shift to actor, so the correct "current holder" flips based on which row we
+       *  clicked from. */
+      getChainEndpoints(chain, pbSide) {
         if (!chain || chain.length === 0) return { first: '', last: '' };
         const f = chain[0];
         const l = chain[chain.length - 1];
@@ -2568,9 +2723,24 @@ window.allPharmacistNames = [];
         if (String(f.action) === 'add') firstPerson = f.originalOwner || f.partnerName || f.viewerName;
         else firstPerson = f.originalOwner || f.viewerName;
         let lastPerson;
-        if (String(l.action) === 'add') lastPerson = l.viewerName;
-        else lastPerson = l.partnerName;  // swap: recipient of viewer's original; give: recipient
+        if (String(l.action) === 'add')       lastPerson = l.viewerName;
+        else if (String(l.action) === 'swap' && pbSide === 'partner') lastPerson = l.viewerName;
+        else                                  lastPerson = l.partnerName;  // swap actor-side or give
         return { first: String(firstPerson || ''), last: String(lastPerson || '') };
+      },
+      /** v3.42.4: swap-pair color for bilateral ghosts.
+       *  OverlayManager.getSwapColor filters by viewerName — returns null when the
+       *  receiver never recorded. Walk pathBOverlays swap actions in order for a
+       *  deterministic palette shared across viewers. */
+      getSwapColor(actionId) {
+        const arr = Array.isArray(pathBOverlays) ? pathBOverlays : [];
+        let i = 0;
+        for (const o of arr) {
+          if (!o || String(o.action || '') !== 'swap') continue;
+          if (String(o.actionId || '') === String(actionId)) return swapPairColor(i);
+          i++;
+        }
+        return null;
       }
     };
 
@@ -2632,7 +2802,8 @@ window.allPharmacistNames = [];
       // v9: count = own active + ghosts active (not used); v10: wrap in safe
       let total;
       try {
-        const _bUsedMap = OverlayManager.getUsedMap(getCurrentMonthId(), target);
+        // v3.42.10: use combined map so PB-struck rows (partner's swap → own row) don't count
+        const _bUsedMap = _combinedUsedMap(getCurrentMonthId(), target);
         const _ownActive = (rawData || []).filter(s => s.name === target && !_bUsedMap[makeShiftKey(s)]).length;
         const _ghostsActive = buildGhostRows(rawData || [], getCurrentMonthId(), target).filter(g => !_bUsedMap[g._ghostKey]).length;
         total = _ownActive + _ghostsActive;
@@ -2754,18 +2925,22 @@ window.allPharmacistNames = [];
 
 
     // v17: inline timeline expand/collapse
-    function buildTimelineHTML(actionId) {
+    function buildTimelineHTML(actionId, pbSide) {
       try {
         const monthId = getCurrentMonthId();
         const viewer = getCurrentUser();
         const actions = OverlayManager.getActions(monthId, viewer);
         // Patch TL1: actionId อาจมี side suffix (__src / __ghost)
+        // v3.42.8: suffix may also include row-hash (e.g. 'src_1a2b3') — strip it to recover 'src' or 'ghost'
         const _sepIdx = String(actionId).lastIndexOf('__');
         let _side = 'ghost', _baseId = actionId;
-        if (_sepIdx >= 0) { _baseId = actionId.substring(0, _sepIdx); _side = actionId.substring(_sepIdx + 2); }
+        if (_sepIdx >= 0) {
+          _baseId = actionId.substring(0, _sepIdx);
+          _side = actionId.substring(_sepIdx + 2).split('_')[0];
+        }
         const targetAction = actions.find(a => a.id === _baseId);
         // v3.41: dispatch to Path B builder when action isn't in viewer's local OverlayManager
-        if (!targetAction) return _buildPBTimelineHTML(_baseId, _side);
+        if (!targetAction) return _buildPBTimelineHTML(_baseId, _side, pbSide);   // v3.42.9
 
         const chain = [targetAction];
         let cur = targetAction;
@@ -2848,7 +3023,7 @@ window.allPharmacistNames = [];
       const parts = String(shiftKey).split('|');
       return parts.length >= 2 ? parts[1] : '';
     }
-    function _buildPBTimelineHTML(baseId, side) {
+    function _buildPBTimelineHTML(baseId, side, pbSide) {
       try {
         if (typeof PBOverlays === 'undefined') return '<div style="color:#dc2626;">ไม่พบประวัติ</div>';
         // v3.41 update: access gate ปลด — ทุกคน (รวม anonymous) เห็นเชนเต็ม
@@ -2856,14 +3031,17 @@ window.allPharmacistNames = [];
         if (!chain || chain.length === 0) return '<div style="color:#dc2626;">ไม่พบประวัติ</div>';
 
         // ── Full view — match OverlayManager format exactly ──
+        // v3.42: prepend actor name so bilateral viewers can tell "who did what" —
+        //        without it, "ยกให้ นภักษร" reads as "นภักษร ยกให้ตัวเอง" when นภักษร is viewer
         let html = '';
         chain.forEach((ov, idx) => {
           const act = String(ov.action || '');
+          const actor = String(ov.viewerName || '');
           let kind = '', desc = '';
           if (act === 'add') {
             kind = 'add';
             const p = _pbShiftPosFromKey(ov.shiftKey);
-            desc = 'รับ <b>' + p + '</b> จาก <b>' + ov.partnerName + '</b>';
+            desc = '<b>' + actor + '</b> รับ <b>' + p + '</b> จาก <b>' + ov.partnerName + '</b>';
           } else if (act === 'swap') {
             let srcStr = '';
             if (ov.shiftKey && ov.shiftKey.indexOf('_g_') !== 0) {
@@ -2872,7 +3050,7 @@ window.allPharmacistNames = [];
             }
             const tp = _pbShiftPosFromKey(ov.partnerShiftKey);
             kind = 'swap';
-            desc = 'แลก ' + srcStr + '<b>' + (tp || '') + '</b> กับ <b>' + ov.partnerName + '</b>';
+            desc = '<b>' + actor + '</b> แลก ' + srcStr + '<b>' + (tp || '') + '</b> กับ <b>' + ov.partnerName + '</b>';
           } else if (act === 'give') {
             let srcStr = '';
             if (ov.shiftKey && ov.shiftKey.indexOf('_g_') !== 0) {
@@ -2880,7 +3058,7 @@ window.allPharmacistNames = [];
               if (sp) srcStr = '<b>' + sp + '</b> ';
             }
             kind = 'give';
-            desc = (srcStr ? 'ยก ' + srcStr : 'ยก') + 'ให้ <b>' + ov.partnerName + '</b>';
+            desc = '<b>' + actor + '</b> ' + (srcStr ? 'ยก ' + srcStr : 'ยก') + 'ให้ <b>' + ov.partnerName + '</b>';
           }
           const tsStr = ov.createdAt ? new Date(ov.createdAt).toLocaleString('th-TH', {dateStyle:'short', timeStyle:'short'}) : '';
           if (tsStr) desc += ' <span class="tl-inline-ts">· ' + tsStr + '</span>';
@@ -2888,7 +3066,7 @@ window.allPharmacistNames = [];
           html += '<div class="tl-inline-num">' + (idx + 1) + '</div>';
           html += '<div class="tl-inline-body">' + desc + '</div></div>';
         });
-        const ep = PBOverlays.getChainEndpoints(chain);
+        const ep = PBOverlays.getChainEndpoints(chain, pbSide);   // v3.42.9: pbSide picks correct holder for swap
         html += '<div class="tl-inline-end active">ปัจจุบันเวรนี้อยู่กับ: <b>' + (ep.last || '?') + '</b></div>';
         return html;
       } catch (err) {
@@ -2897,16 +3075,18 @@ window.allPharmacistNames = [];
       }
     }
 
-    function toggleTimelineInline(actionId, chevElement) {
+    function toggleTimelineInline(actionId, chevElement, pbSide) {
       const row = document.querySelector('tr.tl-inline-row[data-tlrow-for="' + actionId + '"]');
       if (!row) return;
+      // v3.42.9: recover pbSide from the row attr if not passed (belt-and-suspenders)
+      const _pbSide = pbSide || row.getAttribute('data-tl-pbside') || null;
       const isHidden = row.style.display === 'none' || row.style.display === '';
       if (isHidden) {
-        // Lazy render content on first expand
+        // v3.42.5: always rebuild content on expand — pathBOverlays may have
+        //          loaded after the initial render, so cached "ไม่พบประวัติ"
+        //          from an earlier click would otherwise stick until re-render
         const content = document.getElementById('tlContent_' + actionId);
-        if (content && content.innerHTML.indexOf('lazy rendered') >= 0) {
-          content.innerHTML = buildTimelineHTML(actionId);
-        }
+        if (content) content.innerHTML = buildTimelineHTML(actionId, _pbSide);
         row.style.display = 'table-row';
         if (chevElement) {
           chevElement.textContent = '▼';
@@ -2927,7 +3107,8 @@ window.allPharmacistNames = [];
       if (chev) {
         e.stopPropagation();
         const aid = chev.getAttribute('data-tl-toggle');
-        toggleTimelineInline(aid, chev);
+        const pbSide = chev.getAttribute('data-tl-pbside') || null;   // v3.42.9
+        toggleTimelineInline(aid, chev, pbSide);
       }
     }, true);
 
@@ -3047,7 +3228,8 @@ window.allPharmacistNames = [];
     function openActionModalForKey(key) {
       if (!editModeActive) return;
       const mid = getCurrentMonthId();
-      const usedMap = OverlayManager.getUsedMap(mid, getCurrentUser());
+      // v3.42.10: include PB marks so user can't re-give a shift someone else already took
+      const usedMap = _combinedUsedMap(mid, getCurrentUser());
       const shift = findShiftByKey(key);
       if (!shift) {
         console.warn('[overlay] shift not found:', key);
@@ -3110,7 +3292,7 @@ window.allPharmacistNames = [];
       // ZZ5: แยก alive shifts กับ struck shifts (เวรที่แลก/ยกไปแล้ว)
       const _pickerMid = getCurrentMonthId();
       const _pickerUser = getCurrentUser();
-      const _pickerUsedMap = OverlayManager.getUsedMap(_pickerMid, _pickerUser);
+      const _pickerUsedMap = _combinedUsedMap(_pickerMid, _pickerUser);
 
       const _renderPickRow = function(s) {
         const key = s._ghost ? s._ghostKey : makeShiftKey(s);
@@ -4072,8 +4254,15 @@ window.allPharmacistNames = [];
       google.script.run
         .withSuccessHandler(function(res) {
           const overlays = (res && Array.isArray(res._pbOverlays)) ? res._pbOverlays : [];
+          _pbSaveCached(monthId, overlays);   // v3.42.5: always cache — useful for a future revisit
+          // v3.42.5: stale-response guard — user may have switched months mid-flight;
+          //          clobbering pathBOverlays with the old month would render mismatched.
+          const _sel = document.getElementById('mainMonthSelector');
+          if (_sel && _sel.value && _sel.value !== monthId) {
+            console.log('🕒 Path B: stale response for ' + monthId + ' (current=' + _sel.value + '), cache-only');
+            return;
+          }
           pathBOverlays = overlays;
-          _pbSaveCached(monthId, overlays);
           console.log('🎯 Path B: loaded ' + overlays.length + ' global overlays (rawData preserved)');
           if (typeof invalidateGhostCache === 'function') invalidateGhostCache();
           _shiftKeyIndex = null; _shiftKeyIndexFor = null;
@@ -4360,20 +4549,26 @@ window.allPharmacistNames = [];
         let _overlayActionId = null;
         // v22: NO label text — only dot + chevron. Strikethrough/ghost border convey state;
         //      full details in expandable timeline.
+        // v3.42.8: per-row hash makes swap-partner and bilateral-ghost aids unique
+        const _rowUniq = _rowAidHash(_shiftKey, i.name);
         if (_used) {
           const dot = _used.color ? `<span class="swap-pair-dot" style="background:${_used.color}"></span>` : '';
           _overlayActionId = _used.actionId;
-          const chev = `<span class="tl-chevron" data-tl-toggle="${_used.actionId}__src" title="ดูประวัติ">▶</span>`;
+          // v3.42.9: pass _pbSide so partner-side swap rows resolve to correct "current holder"
+          const _pbSideAttr = _used._pbSide ? ` data-tl-pbside="${_used._pbSide}"` : '';
+          const chev = `<span class="tl-chevron" data-tl-toggle="${_used.actionId}__src_${_rowUniq}"${_pbSideAttr} title="ดูประวัติ">▶</span>`;
           _suffix = `${dot}${chev}`;
         } else if (_isGhost) {
           let ghostDot = '';
           if (i._ghostType === 'swap' && i._ghostActionId) {
-            const gc = OverlayManager.getSwapColor(_mid, _curUser, i._ghostActionId);
+            // v3.42.4: fall back to PBOverlays when the swap wasn't authored by viewer (bilateral)
+            const gc = OverlayManager.getSwapColor(_mid, _curUser, i._ghostActionId)
+                    || (typeof PBOverlays !== 'undefined' ? PBOverlays.getSwapColor(i._ghostActionId) : null);
             if (gc) ghostDot = `<span class="swap-pair-dot" style="background:${gc}"></span>`;
           }
           _overlayActionId = i._ghostActionId;
           const chev = i._ghostActionId
-            ? `<span class="tl-chevron" data-tl-toggle="${i._ghostActionId}__ghost" title="ดูประวัติ">▶</span>`
+            ? `<span class="tl-chevron" data-tl-toggle="${i._ghostActionId}__ghost_${_rowUniq}" title="ดูประวัติ">▶</span>`
             : '';
           _suffix = `${ghostDot}${chev}`;
         }
@@ -4417,15 +4612,19 @@ window.allPharmacistNames = [];
         _rowsHtml.push(_rowHtml);
         // v17: append inline timeline row right after, if this row has overlay
         // Patch TL1: side suffix → source/ghost rows ของ swap เดียวกันไม่ใช้ id ซ้ำ
+        // v3.42.8: also disambiguate two rows sharing an actionId (swap actor+partner, bilateral ghost pair)
         const _isGhostX = !!i._ghost;
         const _shiftKeyX = _isGhostX ? i._ghostKey : makeShiftKey(i);
         const _usedX = _usedMap[_shiftKeyX] || _pbUsedMap[_shiftKeyX];
+        const _rowUniqX = _rowAidHash(_shiftKeyX, i.name);
         let _aid = null;
-        if (_usedX) _aid = _usedX.actionId + '__src';
-        else if (_isGhostX && i._ghostActionId) _aid = i._ghostActionId + '__ghost';
+        if (_usedX) _aid = _usedX.actionId + '__src_' + _rowUniqX;
+        else if (_isGhostX && i._ghostActionId) _aid = i._ghostActionId + '__ghost_' + _rowUniqX;
         if (_aid) {
+          // v3.42.9: also stash _pbSide on the row so rebuild-on-expand can pass it through
+          const _pbSideRowAttr = (_usedX && _usedX._pbSide) ? ' data-tl-pbside="' + _usedX._pbSide + '"' : '';
           _rowsHtml.push(
-            '<tr class="tl-inline-row" data-tlrow-for="' + _aid + '" style="display:none;">' +
+            '<tr class="tl-inline-row" data-tlrow-for="' + _aid + '"' + _pbSideRowAttr + ' style="display:none;">' +
               '<td colspan="4"><div class="tl-inline-content" id="tlContent_' + _aid + '">' +
                 '<!-- lazy rendered on first expand -->' +
               '</div></td>' +
@@ -4553,7 +4752,9 @@ window.allPharmacistNames = [];
           let _pairColor = null;
           if (_calUsed && _calUsed.color) _pairColor = _calUsed.color;
           else if (_isGhostBadge && s._ghostType === 'swap' && s._ghostActionId) {
-            _pairColor = OverlayManager.getSwapColor(_calMid, getCurrentUser(), s._ghostActionId);
+            // v3.42.4: fall back to PBOverlays for bilateral swap ghosts
+            _pairColor = OverlayManager.getSwapColor(_calMid, getCurrentUser(), s._ghostActionId)
+                      || (typeof PBOverlays !== 'undefined' ? PBOverlays.getSwapColor(s._ghostActionId) : null);
           }
           if (_pairColor) _calDot = `<span class="cal-pair-dot" style="background:${_pairColor}"></span>`;
           // Patch ZZ3: VIEW mode trigger — hospital → Phase J, clinic → clinic note
@@ -4858,8 +5059,8 @@ window.allPharmacistNames = [];
       const _eff = (typeof getEffectiveData === 'function' ? getEffectiveData() : rawData);
       const _mid = (typeof getCurrentMonthId === 'function') ? getCurrentMonthId() : '';
       const _user = (typeof getCurrentUser === 'function') ? getCurrentUser() : null;
-      const _usedMap = (_user && typeof OverlayManager !== 'undefined')
-                       ? OverlayManager.getUsedMap(_mid, _user) : {};
+      // v3.42.10: combined map so PB-struck rows are excluded from export
+      const _usedMap = _user ? _combinedUsedMap(_mid, _user) : {};
       return _eff.filter(i => {
         // Skip struck-out (used) shifts in export
         const _key = i._ghostKey || (typeof makeShiftKey === 'function' ? makeShiftKey(i) : null);
@@ -5113,7 +5314,7 @@ async function _exportTablePDF_perPerson(persons) {
   try {
     for (let pi = 0; pi < persons.length; pi++) {
       const target = persons[pi];
-      const usedMap = (typeof OverlayManager !== 'undefined') ? OverlayManager.getUsedMap(_midT, target) : {};
+      const usedMap = _combinedUsedMap(_midT, target);
       const ownShifts = (rawData || []).filter(s => s && s.name === target && !usedMap[makeShiftKey(s)]);
       const ghosts = (typeof buildGhostRows === 'function')
         ? buildGhostRows(rawData || [], _midT, target).filter(g => !usedMap[g._ghostKey])
@@ -5339,7 +5540,7 @@ async function _exportCalendarPDF_v2(personList) {
   try {
     for (let i = 0; i < persons.length; i++) {
       const target = persons[i];
-      const _usedMapC = (typeof OverlayManager !== 'undefined') ? OverlayManager.getUsedMap(_midC, target) : {};
+      const _usedMapC = _combinedUsedMap(_midC, target);
       const allShifts = _effData.filter(item => {
         if (item.name !== target) return false;
         const _k = item._ghostKey || (typeof makeShiftKey === 'function' ? makeShiftKey(item) : null);
@@ -5619,7 +5820,7 @@ async function _exportCombinedPDF_perPerson(persons) {
   try {
     for (let pi = 0; pi < persons.length; pi++) {
       const target = persons[pi];
-      const usedMap = (typeof OverlayManager !== 'undefined') ? OverlayManager.getUsedMap(_midX, target) : {};
+      const usedMap = _combinedUsedMap(_midX, target);
       const ownShifts = (rawData || []).filter(s => s && s.name === target && !usedMap[makeShiftKey(s)]);
       const ghosts = (typeof buildGhostRows === 'function')
         ? buildGhostRows(rawData || [], _midX, target).filter(g => !usedMap[g._ghostKey])
@@ -5732,7 +5933,7 @@ async function _exportCombinedPDF_v2(personList) {
   // Use the same effective data the table/calendar do
   const _effDataX = (typeof getEffectiveData === 'function' ? getEffectiveData() : rawData);
   const _midX = (typeof getCurrentMonthId === 'function') ? getCurrentMonthId() : '';
-  const _usedMapX = (typeof OverlayManager !== 'undefined') ? OverlayManager.getUsedMap(_midX, target) : {};
+  const _usedMapX = _combinedUsedMap(_midX, target);
   const allShifts = _effDataX.filter(i => {
     if (i.name !== target) return false;
     const k = i._ghostKey || (typeof makeShiftKey === 'function' ? makeShiftKey(i) : null);
@@ -5843,7 +6044,7 @@ async function _exportCalendarPNG_v2() {
   const monthLabel = document.getElementById('customSelectText').innerText.replace(/⏳/g, '').trim();
   const _effData = (typeof getEffectiveData === 'function' ? getEffectiveData() : rawData);
   const _midC = (typeof getCurrentMonthId === 'function') ? getCurrentMonthId() : '';
-  const _usedMapC = (typeof OverlayManager !== 'undefined') ? OverlayManager.getUsedMap(_midC, target) : {};
+  const _usedMapC = _combinedUsedMap(_midC, target);
   const allShifts = _effData.filter(item => {
     if (item.name !== target) return false;
     const _k = item._ghostKey || (typeof makeShiftKey === 'function' ? makeShiftKey(item) : null);
@@ -5974,7 +6175,7 @@ async function _exportCombinedPNG_v2() {
   const monthLabel = document.getElementById('customSelectText').innerText.replace(/⏳/g, '').trim();
   const _effDataY = (typeof getEffectiveData === 'function' ? getEffectiveData() : rawData);
   const _midY = (typeof getCurrentMonthId === 'function') ? getCurrentMonthId() : '';
-  const _usedMapY = (typeof OverlayManager !== 'undefined') ? OverlayManager.getUsedMap(_midY, target) : {};
+  const _usedMapY = _combinedUsedMap(_midY, target);
   const allShifts = _effDataY.filter(i => {
     if (i.name !== target) return false;
     const k = i._ghostKey || (typeof makeShiftKey === 'function' ? makeShiftKey(i) : null);
@@ -7852,7 +8053,7 @@ table.exp-tbl .tm{margin-left:3px;opacity:0.75;}
       const person = (typeof _getTargetPerson === 'function') ? _getTargetPerson() : null;
       const daysWithShifts = new Set();
       if (person && mid) {
-        const usedMap = (typeof OverlayManager !== 'undefined') ? OverlayManager.getUsedMap(mid, person) : {};
+        const usedMap = _combinedUsedMap(mid, person);
         const ownShifts = (rawData || []).filter(function(s) {
           return s && s.name === person && !usedMap[makeShiftKey(s)];
         });
@@ -7886,7 +8087,7 @@ table.exp-tbl .tm{margin-left:3px;opacity:0.75;}
       const selSet = window._ecmSelectedShifts;
       const dayShifts = {};  // day → array of shifts
       if (person && mid) {
-        const usedMap = (typeof OverlayManager !== 'undefined') ? OverlayManager.getUsedMap(mid, person) : {};
+        const usedMap = _combinedUsedMap(mid, person);
         const ownShifts = (rawData || []).filter(function(s) {
           return s && s.name === person && !usedMap[makeShiftKey(s)];
         });
@@ -7971,7 +8172,7 @@ table.exp-tbl .tm{margin-left:3px;opacity:0.75;}
       const mid = 'm_' + monthLabel.replace(/\s+/g, '_');
       const person = (typeof _getTargetPerson === 'function') ? _getTargetPerson() : null;
       if (!person) return;
-      const usedMap = (typeof OverlayManager !== 'undefined') ? OverlayManager.getUsedMap(mid, person) : {};
+      const usedMap = _combinedUsedMap(mid, person);
       const ownShifts = (rawData || []).filter(function(s) {
         return s && s.name === person && !usedMap[makeShiftKey(s)];
       });
@@ -8120,7 +8321,7 @@ table.exp-tbl .tm{margin-left:3px;opacity:0.75;}
       const _shiftRound3 = (_userPrefsForExport.round3Mode === 'next');
 
       // Get effective shifts for this person
-      const usedMap = (typeof OverlayManager !== 'undefined') ? OverlayManager.getUsedMap(mid, person) : {};
+      const usedMap = _combinedUsedMap(mid, person);
       const ownShifts = (rawData || []).filter(function(s) {
         return s && s.name === person && !usedMap[makeShiftKey(s)];
       });
@@ -11126,7 +11327,7 @@ table.exp-tbl .tm{margin-left:3px;opacity:0.75;}
         if (!userName || !monthId) return [];
         if (typeof OverlayManager === 'undefined') return [];
         if (typeof rawData === 'undefined' || !Array.isArray(rawData)) return [];
-        const usedMap = OverlayManager.getUsedMap(monthId, userName);
+        const usedMap = _combinedUsedMap(monthId, userName);
         const ownShifts = rawData.filter(function(s) {
           return s && s.name === userName && !usedMap[makeShiftKey(s)];
         });
