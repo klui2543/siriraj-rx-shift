@@ -367,3 +367,152 @@ function devCheckOverlays() {
     return null;
   }
 }
+
+// ==========================================
+// 🧪 Smoke test — writeScheduleToSheet_ v3 (single-tab)
+// รันจาก GAS Editor: เลือก testWriteScheduleToSheet_smoke → Run
+// ทดสอบ + cleanup อัตโนมัติ (ไม่แตะข้อมูล production)
+// ==========================================
+function testWriteScheduleToSheet_smoke() {
+  const stamp = Date.now();
+  const TEST_LABEL_1 = 'SMOKETEST_' + stamp + '_th';
+  const TEST_LABEL_3 = 'SMOKETEST_' + stamp + '_empty';
+  const TEST_MONTHID_1 = 'smoketest1_' + stamp;
+  const TEST_MONTHID_2 = 'smoketest2_' + stamp;
+  const TEST_MONTHID_3 = 'smoketest3_' + stamp;
+  const testMonthIds = [TEST_MONTHID_1, TEST_MONTHID_2, TEST_MONTHID_3];
+
+  const fakeSchedule = [
+    { shift_id: 'SMOKE1', name: 'Alice', date: '01/07 (จ.)', timestamp: 20260701, pos: 'A', shift: 'รอบ 1', range: '16:30-21:30', room: 'IPD', isNew: false, originOwner: 'Alice', status: 'active' },
+    { shift_id: 'SMOKE2', name: 'Bob', date: '02/07 (อ.)', timestamp: 20260702, pos: 'B', shift: 'รอบ 2', range: '21:30-02:30', room: 'NM5', isNew: false, originOwner: 'Bob', status: 'active' }
+  ];
+
+  const results = [];
+  const cleanupTabs = [];
+  const ss = SpreadsheetApp.openById(SCHEDULE_SHEET_ID);
+
+  try {
+    // === T1: Fresh insert with Thai label ===
+    Logger.log('\n=== T1: Fresh insert (Thai label) ===');
+    const r1 = writeScheduleToSheet_(TEST_MONTHID_1, fakeSchedule, TEST_LABEL_1, 'http://test.url', 'smoketest.xlsx');
+    cleanupTabs.push(r1.tabName);
+    const sh1 = ss.getSheetByName(TEST_LABEL_1);
+    const protections1 = sh1 ? sh1.getProtections(SpreadsheetApp.ProtectionType.SHEET) : [];
+    const t1 = [
+      ['tabName === TEST_LABEL_1', r1.tabName === TEST_LABEL_1, r1.tabName],
+      ['replaced === false', r1.replaced === false, r1.replaced],
+      ['rowCount === 2', r1.rowCount === 2, r1.rowCount],
+      ['version === 1', r1.version === 1, r1.version],
+      ['tab exists', !!sh1, !!sh1],
+      ['1 warning-only protection', protections1.length === 1 && protections1[0].isWarningOnly(),
+       protections1.length + ' protections']
+    ];
+    t1.forEach(function(c) { Logger.log('  ' + (c[1] ? '✅' : '❌') + ' ' + c[0] + ' (got: ' + c[2] + ')'); });
+    results.push({ name: 'T1 fresh insert', pass: t1.every(function(c) { return c[1]; }) });
+
+    // === T2: Replace (re-upload same monthId + label) ===
+    Logger.log('\n=== T2: Replace (re-upload) ===');
+    const updated = [
+      { shift_id: 'SMOKE3', name: 'Charlie', date: '01/07 (จ.)', timestamp: 20260701, pos: 'C', shift: 'รอบ 1', range: '16:30-21:30', room: 'clinic', isNew: false, originOwner: 'Charlie', status: 'active' }
+    ];
+    const r2 = writeScheduleToSheet_(TEST_MONTHID_1, updated, TEST_LABEL_1, 'http://test2.url', 'smoketest2.xlsx');
+    const sh2 = ss.getSheetByName(TEST_LABEL_1);
+    const nameCell = sh2.getRange(2, 2).getValue();
+    const lastRow2 = sh2.getLastRow();
+    const protections2 = sh2.getProtections(SpreadsheetApp.ProtectionType.SHEET);
+    const t2 = [
+      ['replaced === true', r2.replaced === true, r2.replaced],
+      ['rowCount === 1', r2.rowCount === 1, r2.rowCount],
+      ['same tabName', r2.tabName === TEST_LABEL_1, r2.tabName],
+      ['row 2 name = "Charlie"', nameCell === 'Charlie', nameCell],
+      ['lastRow === 2 (no stale)', lastRow2 === 2, lastRow2],
+      ['protection re-applied', protections2.length === 1 && protections2[0].isWarningOnly(),
+       protections2.length]
+    ];
+    t2.forEach(function(c) { Logger.log('  ' + (c[1] ? '✅' : '❌') + ' ' + c[0] + ' (got: ' + c[2] + ')'); });
+    results.push({ name: 'T2 replace', pass: t2.every(function(c) { return c[1]; }) });
+
+    // === T3: Fallback label ===
+    Logger.log('\n=== T3: Fallback "ไม่ระบุเดือน" ===');
+    const r3 = writeScheduleToSheet_(TEST_MONTHID_2, fakeSchedule, 'ไม่ระบุเดือน', '', '');
+    cleanupTabs.push(r3.tabName);
+    const expectedFallback = 'Schedule_' + TEST_MONTHID_2;
+    const t3 = [
+      ['tabName === fallback', r3.tabName === expectedFallback, r3.tabName]
+    ];
+    t3.forEach(function(c) { Logger.log('  ' + (c[1] ? '✅' : '❌') + ' ' + c[0] + ' (got: ' + c[2] + ')'); });
+    results.push({ name: 'T3 fallback label', pass: t3.every(function(c) { return c[1]; }) });
+
+    // === T4: Empty schedule ===
+    Logger.log('\n=== T4: Empty schedule ===');
+    const r4 = writeScheduleToSheet_(TEST_MONTHID_3, [], TEST_LABEL_3, '', '');
+    cleanupTabs.push(r4.tabName);
+    const sh4 = ss.getSheetByName(TEST_LABEL_3);
+    const t4 = [
+      ['rowCount === 0', r4.rowCount === 0, r4.rowCount],
+      ['header only (lastRow=1)', !!sh4 && sh4.getLastRow() === 1, sh4 && sh4.getLastRow()]
+    ];
+    t4.forEach(function(c) { Logger.log('  ' + (c[1] ? '✅' : '❌') + ' ' + c[0] + ' (got: ' + c[2] + ')'); });
+    results.push({ name: 'T4 empty schedule', pass: t4.every(function(c) { return c[1]; }) });
+
+    // === T5: Schedule_Index update ===
+    Logger.log('\n=== T5: Schedule_Index reflects new tabs ===');
+    const idxSh = ss.getSheetByName(SCHEDULE_INDEX_TAB);
+    const idxData = idxSh.getDataRange().getValues();
+    let foundRow = null;
+    for (let i = 1; i < idxData.length; i++) {
+      if (idxData[i][0] === TEST_MONTHID_1) { foundRow = idxData[i]; break; }
+    }
+    const t5 = [
+      ['row for TEST_MONTHID_1 exists', !!foundRow, !!foundRow],
+      ['active_tab (col 2) === TEST_LABEL_1', foundRow && foundRow[2] === TEST_LABEL_1,
+       foundRow ? foundRow[2] : 'N/A'],
+      ['label (col 1) === TEST_LABEL_1', foundRow && foundRow[1] === TEST_LABEL_1,
+       foundRow ? foundRow[1] : 'N/A']
+    ];
+    t5.forEach(function(c) { Logger.log('  ' + (c[1] ? '✅' : '❌') + ' ' + c[0] + ' (got: ' + c[2] + ')'); });
+    results.push({ name: 'T5 Schedule_Index update', pass: t5.every(function(c) { return c[1]; }) });
+
+  } finally {
+    // === Cleanup ===
+    Logger.log('\n=== Cleanup ===');
+    cleanupTabs.forEach(function(tabName) {
+      const sh = ss.getSheetByName(tabName);
+      if (!sh) return;
+      try {
+        sh.getProtections(SpreadsheetApp.ProtectionType.SHEET).forEach(function(p) {
+          try { p.remove(); } catch(e) {}
+        });
+        ss.deleteSheet(sh);
+        Logger.log('  🗑  Deleted tab: ' + tabName);
+      } catch(e) {
+        Logger.log('  ⚠️ Failed to delete ' + tabName + ': ' + e.message);
+      }
+    });
+
+    try {
+      const idxSh = ss.getSheetByName(SCHEDULE_INDEX_TAB);
+      if (idxSh && idxSh.getLastRow() > 1) {
+        const idxData = idxSh.getDataRange().getValues();
+        for (let i = idxData.length - 1; i >= 1; i--) {
+          if (testMonthIds.indexOf(String(idxData[i][0])) !== -1) {
+            idxSh.deleteRow(i + 1);
+            Logger.log('  🗑  Removed Schedule_Index row for ' + idxData[i][0]);
+          }
+        }
+      }
+    } catch(e) {
+      Logger.log('  ⚠️ Schedule_Index cleanup failed: ' + e.message);
+    }
+  }
+
+  // === Summary ===
+  Logger.log('\n=== Summary ===');
+  let allPass = true;
+  results.forEach(function(r) {
+    Logger.log('  ' + (r.pass ? '✅' : '❌') + ' ' + r.name);
+    if (!r.pass) allPass = false;
+  });
+  Logger.log(allPass ? '\n🎉 ALL PASS — พร้อม migrate เดือนจริง' : '\n💥 SOME FAILED — อย่า push production');
+  return { allPass: allPass, results: results };
+}

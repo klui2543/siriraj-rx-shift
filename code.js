@@ -1168,64 +1168,44 @@ function syncMonthToFirebase(monthLabel) {
   return "✅ " + m.label + " synced!";
 }
 // ==========================================
-// 📊 SCHEDULE STORAGE v2 — Versioning + Auto-sync
+// 📊 SCHEDULE STORAGE v3 — Single-tab + Overlay-only mutations
 // ==========================================
 
 /**
- * หา version ถัดไปสำหรับเดือนนี้
- */
-function getNextVersion_(monthId) {
-  const ss = SpreadsheetApp.openById(SCHEDULE_SHEET_ID);
-  const sheets = ss.getSheets();
-  const prefix = "Schedule_" + monthId;
-  let maxVer = 0;
-  
-  sheets.forEach(function(sh) {
-    const name = sh.getName();
-    if (name === prefix) maxVer = Math.max(maxVer, 1); // tab เก่าไม่มี _v
-    const m = name.match(new RegExp("^" + prefix.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + "_v(\\d+)$"));
-    if (m) maxVer = Math.max(maxVer, parseInt(m[1], 10));
-  });
-  
-  return maxVer + 1;
-}
-
-/**
- * ซ่อน tab versions เก่าของเดือนนี้ (เก็บไว้ไม่ลบ)
- */
-function hideOldVersions_(monthId, keepTabName) {
-  const ss = SpreadsheetApp.openById(SCHEDULE_SHEET_ID);
-  const prefix = "Schedule_" + monthId;
-  
-  ss.getSheets().forEach(function(sh) {
-    const name = sh.getName();
-    if (name === keepTabName) return; // ไม่ซ่อน active tab
-    if (name === "Schedule_Index") return;
-    if (name.startsWith(prefix)) {
-      try { sh.hideSheet(); } catch(e) { /* อาจเป็น tab เดียวที่เหลือ */ }
-    }
-  });
-}
-
-/**
- * เขียน schedule ลง Sheet tab แบบ versioned
- * คืน { tabName, version, rowCount }
+ * เขียน schedule ลง Sheet tab (single-tab, immutable master)
+ * - ชื่อ tab = label ไทย (เช่น "มิ.ย. 2569") | fallback = "Schedule_" + monthId
+ * - ถ้า tab มีอยู่ → clear + rewrite (re-upload replaces master)
+ * - Auto-lock ด้วย warning-only protection
+ * คืน { tabName, version: 1, rowCount, replaced }
  */
 function writeScheduleToSheet_(monthId, schedule, label, sheetUrl, sourceFile) {
   if (!Array.isArray(schedule)) throw new Error("schedule ต้องเป็น array");
-  
+
   const ss = SpreadsheetApp.openById(SCHEDULE_SHEET_ID);
-  const nextVer = getNextVersion_(monthId);
-  const tabName = "Schedule_" + monthId + "_v" + nextVer;
-  
-  // สร้าง tab ใหม่
-  let sh = ss.insertSheet(tabName);
+
+  const cleanLabel = String(label || '').trim();
+  const validLabel = cleanLabel && cleanLabel !== 'ไม่ระบุเดือน' && cleanLabel.length <= 100;
+  const tabName = validLabel ? cleanLabel : ('Schedule_' + monthId);
+
+  let sh = ss.getSheetByName(tabName);
+  const isReplace = !!sh;
+
+  if (sh) {
+    const protections = sh.getProtections(SpreadsheetApp.ProtectionType.SHEET);
+    protections.forEach(function(p) {
+      try { p.remove(); } catch(e) { console.warn('remove protection failed:', e.message); }
+    });
+    sh.clear();
+  } else {
+    sh = ss.insertSheet(tabName);
+  }
+
   sh.getRange(1, 1, 1, 12).setValues([[
     "shift_id", "name", "date", "timestamp", "pos", "shift", "range",
     "room", "isNew", "originOwner", "status", "last_modified"
   ]]);
   sh.setFrozenRows(1);
-  
+
   if (schedule.length > 0) {
     const now = new Date().toISOString();
     const rows = schedule.map(function(s) {
@@ -1238,14 +1218,293 @@ function writeScheduleToSheet_(monthId, schedule, label, sheetUrl, sourceFile) {
     });
     sh.getRange(2, 1, rows.length, 12).setValues(rows);
   }
-  
-  // ซ่อน versions เก่า
-  hideOldVersions_(monthId, tabName);
-  
-  // อัปเดต Schedule_Index
-  updateScheduleIndex_(monthId, label, tabName, nextVer, sheetUrl, schedule.length, sourceFile);
-  
-  return { tabName: tabName, version: nextVer, rowCount: schedule.length };
+
+  try {
+    const p = sh.protect().setDescription('ต้นฉบับ - ห้ามแก้ตรงนี้ ใช้ overlay ผ่าน UI');
+    p.setWarningOnly(true);
+  } catch (e) {
+    console.warn('Failed to protect tab ' + tabName + ':', e.message);
+  }
+
+  updateScheduleIndex_(monthId, label, tabName, 1, sheetUrl, schedule.length, sourceFile);
+
+  return { tabName: tabName, version: 1, rowCount: schedule.length, replaced: isReplace };
+}
+
+// ==========================================
+// 🚚 One-shot migration — v2 (versioned) → v3 (single-tab)
+// ใช้ครั้งเดียวเพื่อ:
+//   1. Rename Schedule_m_xxx_vN → ชื่อไทย (label จาก Schedule_Index)
+//   2. Delete hidden old versions (_v1, _v2, ฯลฯ)
+//   3. Apply warning-only protection
+//   4. Update Schedule_Index.active_tab ให้ตรงกับชื่อใหม่
+// รันจาก GAS Editor:
+//   phxMigrateToSingleTab_dryRun()  → เห็นแผน ไม่แตะ Sheet
+//   phxMigrateToSingleTab_apply()   → ทำจริง มี safety cap
+// ==========================================
+function phxMigrateToSingleTab_dryRun() { return _phxMigrateToSingleTab_({ apply: false }); }
+function phxMigrateToSingleTab_apply()  { return _phxMigrateToSingleTab_({ apply: true  }); }
+
+function _phxMigrateToSingleTab_(opts) {
+  const apply = !!(opts && opts.apply);
+  const ss = SpreadsheetApp.openById(SCHEDULE_SHEET_ID);
+  const idx = ss.getSheetByName(SCHEDULE_INDEX_TAB);
+  if (!idx) throw new Error('Schedule_Index not found — ยกเลิก');
+
+  const idxData = idx.getDataRange().getValues();
+  const plan = [];
+  const warnings = [];
+  const escapeRe = function(s) { return s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'); };
+
+  for (let i = 1; i < idxData.length; i++) {
+    const monthId = String(idxData[i][0] || '').trim();
+    const label = String(idxData[i][1] || '').trim();
+    const activeTab = String(idxData[i][2] || '').trim();
+    const status = String(idxData[i][8] || '').trim();
+    if (!monthId) continue;
+    if (status === 'archived') continue;
+
+    const validLabel = label && label !== 'ไม่ระบุเดือน' && label.length <= 100;
+    const targetName = validLabel ? label : ('Schedule_' + monthId);
+
+    if (!activeTab) { warnings.push(monthId + ': no active_tab in Schedule_Index'); continue; }
+    if (!ss.getSheetByName(activeTab)) { warnings.push(monthId + ': active_tab "' + activeTab + '" ไม่มีจริง'); continue; }
+
+    let renameAction = 'unchanged';
+    if (activeTab === targetName) {
+      renameAction = 'already-named';
+    } else if (ss.getSheetByName(targetName)) {
+      warnings.push(monthId + ': target "' + targetName + '" มีอยู่แล้ว — skip rename');
+      renameAction = 'target-conflict';
+    } else {
+      renameAction = 'rename';
+    }
+
+    // หา old versions ที่ต้องลบ (Schedule_<monthId> หรือ Schedule_<monthId>_vN, ไม่ใช่ active/target)
+    const versionRe = new RegExp('^Schedule_' + escapeRe(monthId) + '(?:_v\\d+)?$');
+    const oldVersions = [];
+    ss.getSheets().forEach(function(sh) {
+      const name = sh.getName();
+      if (name === SCHEDULE_INDEX_TAB) return;
+      if (!versionRe.test(name)) return;
+      if (name === activeTab || name === targetName) return;
+      oldVersions.push(name);
+    });
+
+    plan.push({ rowIdx: i, monthId: monthId, label: label, activeTab: activeTab,
+                targetName: targetName, renameAction: renameAction, oldVersions: oldVersions });
+  }
+
+  // Report
+  Logger.log('=== Migration ' + (apply ? 'APPLY' : 'DRY-RUN') + ' ===');
+  plan.forEach(function(p) {
+    Logger.log('\n▸ ' + p.monthId + ' (' + p.label + ')');
+    if (p.renameAction === 'rename') {
+      Logger.log('  🔤 Rename: "' + p.activeTab + '" → "' + p.targetName + '"');
+    } else if (p.renameAction === 'already-named') {
+      Logger.log('  ✓ Already named correctly: "' + p.activeTab + '"');
+    } else if (p.renameAction === 'target-conflict') {
+      Logger.log('  ⚠️ Target "' + p.targetName + '" มีอยู่แล้ว — คงชื่อเดิม');
+    }
+    if (p.oldVersions.length > 0) {
+      Logger.log('  🗑  Delete old versions (' + p.oldVersions.length + '): ' + p.oldVersions.join(', '));
+    }
+    Logger.log('  🔒 Apply warning-only protection');
+  });
+
+  if (warnings.length > 0) {
+    Logger.log('\n=== ⚠️ Warnings (' + warnings.length + ') ===');
+    warnings.forEach(function(w) { Logger.log('  ' + w); });
+  }
+
+  const totalDeletes = plan.reduce(function(a, p) { return a + p.oldVersions.length; }, 0);
+  const totalRenames = plan.filter(function(p) { return p.renameAction === 'rename'; }).length;
+  Logger.log('\n=== Summary ===');
+  Logger.log('  Months to process: ' + plan.length);
+  Logger.log('  Renames: ' + totalRenames);
+  Logger.log('  Tabs to delete: ' + totalDeletes);
+
+  if (apply && totalDeletes > 30) {
+    throw new Error('SAFETY STOP: จะลบ ' + totalDeletes + ' tabs (เกิน 30) — รัน dryRun ก่อน');
+  }
+
+  if (!apply) return { dryRun: true, plan: plan, warnings: warnings };
+
+  // Apply
+  const results = { renamed: [], deleted: [], protected: [], errors: [] };
+  plan.forEach(function(p) {
+    try {
+      // 1. Delete old versions
+      p.oldVersions.forEach(function(name) {
+        try {
+          const sh = ss.getSheetByName(name);
+          if (!sh) return;
+          sh.getProtections(SpreadsheetApp.ProtectionType.SHEET).forEach(function(pr) {
+            try { pr.remove(); } catch(e) {}
+          });
+          if (sh.isSheetHidden()) sh.showSheet();  // deleteSheet needs visible
+          ss.deleteSheet(sh);
+          results.deleted.push(name);
+        } catch(e) {
+          results.errors.push({ op: 'delete', target: name, err: e.message });
+        }
+      });
+
+      // 2. Rename active tab
+      if (p.renameAction === 'rename') {
+        const sh = ss.getSheetByName(p.activeTab);
+        if (sh) {
+          sh.setName(p.targetName);
+          results.renamed.push({ from: p.activeTab, to: p.targetName });
+          idx.getRange(p.rowIdx + 1, 3).setValue(p.targetName);
+        }
+      }
+
+      // 3. Apply warning-only protection to final tab
+      const finalName = (p.renameAction === 'rename') ? p.targetName : p.activeTab;
+      const finalSh = ss.getSheetByName(finalName);
+      if (finalSh) {
+        finalSh.getProtections(SpreadsheetApp.ProtectionType.SHEET).forEach(function(pr) {
+          try { pr.remove(); } catch(e) {}
+        });
+        const pr = finalSh.protect().setDescription('ต้นฉบับ - ห้ามแก้ตรงนี้ ใช้ overlay ผ่าน UI');
+        pr.setWarningOnly(true);
+        results.protected.push(finalName);
+      }
+    } catch(e) {
+      results.errors.push({ op: 'process', target: p.monthId, err: e.message });
+    }
+  });
+
+  Logger.log('\n=== Applied ===');
+  Logger.log('  ✅ Renamed: ' + results.renamed.length);
+  Logger.log('  ✅ Deleted: ' + results.deleted.length);
+  Logger.log('  ✅ Protected: ' + results.protected.length);
+  Logger.log('  ❌ Errors: ' + results.errors.length);
+  results.errors.forEach(function(e) {
+    Logger.log('    ' + e.op + ' ' + e.target + ': ' + e.err);
+  });
+
+  return { dryRun: false, plan: plan, results: results, warnings: warnings };
+}
+
+// ==========================================
+// 🧹 Dedup — aggressive: archive any Schedule_Index row not in MONTH_LIST
+// Canonical = monthId ใน MONTH_LIST (source of truth ปัจจุบัน)
+// ทุก row อื่นที่ status active = หนี้เก่า → archive + ลบ tab (รวม hidden versions)
+// ==========================================
+function phxDedupSchedule_dryRun() { return _phxDedupSchedule_({ apply: false }); }
+function phxDedupSchedule_apply()  { return _phxDedupSchedule_({ apply: true  }); }
+
+function _phxDedupSchedule_(opts) {
+  const apply = !!(opts && opts.apply);
+  const ss = SpreadsheetApp.openById(SCHEDULE_SHEET_ID);
+  const idx = ss.getSheetByName(SCHEDULE_INDEX_TAB);
+  if (!idx) throw new Error('Schedule_Index not found — ยกเลิก');
+
+  const monthList = getAvailableMonths();
+  if (!monthList || monthList.length === 0) {
+    throw new Error('MONTH_LIST ว่าง — ต้อง backfill ก่อน (ยกเลิก)');
+  }
+  const canonicalMap = {};
+  monthList.forEach(function(m) { if (m.id) canonicalMap[m.id] = m.label || ''; });
+
+  const escapeRe = function(s) { return s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'); };
+  const idxData = idx.getDataRange().getValues();
+  const keepPlan = [];
+  const archivePlan = [];
+
+  for (let i = 1; i < idxData.length; i++) {
+    const monthId = String(idxData[i][0] || '').trim();
+    const label = String(idxData[i][1] || '').trim();
+    const activeTab = String(idxData[i][2] || '').trim();
+    const status = String(idxData[i][8] || '').trim();
+    if (!monthId || status === 'archived') continue;
+
+    if (canonicalMap.hasOwnProperty(monthId)) {
+      keepPlan.push({ monthId: monthId, label: label, activeTab: activeTab });
+      continue;
+    }
+
+    // Non-canonical: find all related tabs (active + hidden versions)
+    const versionRe = new RegExp('^Schedule_' + escapeRe(monthId) + '(?:_v\\d+)?$');
+    const allTabs = [];
+    ss.getSheets().forEach(function(sh) {
+      const name = sh.getName();
+      if (versionRe.test(name)) allTabs.push(name);
+    });
+    if (activeTab && allTabs.indexOf(activeTab) === -1) allTabs.push(activeTab);
+
+    archivePlan.push({ rowIdx: i, monthId: monthId, label: label,
+                       activeTab: activeTab, allTabs: allTabs });
+  }
+
+  // Report
+  Logger.log('=== Dedup ' + (apply ? 'APPLY' : 'DRY-RUN') + ' (aggressive mode) ===');
+  Logger.log('MONTH_LIST size: ' + monthList.length);
+  Logger.log('Canonical monthIds:');
+  Object.keys(canonicalMap).forEach(function(id) {
+    Logger.log('  👑 ' + id + ' — ' + canonicalMap[id]);
+  });
+
+  Logger.log('\n▸ Keep (in MONTH_LIST): ' + keepPlan.length);
+  keepPlan.forEach(function(k) {
+    Logger.log('  ✓ ' + k.monthId + ' — ' + k.label + ' (tab: ' + k.activeTab + ')');
+  });
+
+  Logger.log('\n▸ Archive + delete tabs (not in MONTH_LIST): ' + archivePlan.length);
+  archivePlan.forEach(function(p) {
+    Logger.log('  🗑  ' + p.monthId + ' (' + p.label + ')');
+    if (p.allTabs.length === 0) {
+      Logger.log('       └─ ⚠️ ไม่พบ tab ใดๆ — archive row เท่านั้น');
+    } else {
+      p.allTabs.forEach(function(t) { Logger.log('       └─ tab: ' + t); });
+    }
+  });
+
+  const totalTabsToDelete = archivePlan.reduce(function(a, p) { return a + p.allTabs.length; }, 0);
+  Logger.log('\n=== Summary ===');
+  Logger.log('  Keep rows: ' + keepPlan.length);
+  Logger.log('  Archive rows: ' + archivePlan.length);
+  Logger.log('  Tabs to delete: ' + totalTabsToDelete);
+
+  if (apply && archivePlan.length > 20) {
+    throw new Error('SAFETY STOP: จะ archive ' + archivePlan.length + ' rows (เกิน 20) — รัน dryRun ก่อน');
+  }
+  if (!apply) return { dryRun: true, keepPlan: keepPlan, archivePlan: archivePlan };
+
+  // Apply
+  const results = { archived: [], deleted: [], errors: [] };
+  archivePlan.forEach(function(p) {
+    try {
+      idx.getRange(p.rowIdx + 1, 9).setValue('archived');
+      results.archived.push(p.monthId);
+      p.allTabs.forEach(function(tabName) {
+        try {
+          const sh = ss.getSheetByName(tabName);
+          if (!sh) return;
+          sh.getProtections(SpreadsheetApp.ProtectionType.SHEET).forEach(function(pr) {
+            try { pr.remove(); } catch(e) {}
+          });
+          if (sh.isSheetHidden()) sh.showSheet();
+          ss.deleteSheet(sh);
+          results.deleted.push(tabName);
+        } catch(e) {
+          results.errors.push({ op: 'delete', target: tabName, err: e.message });
+        }
+      });
+    } catch(e) {
+      results.errors.push({ op: 'archive', target: p.monthId, err: e.message });
+    }
+  });
+
+  Logger.log('\n=== Applied ===');
+  Logger.log('  ✅ Archived rows: ' + results.archived.length);
+  Logger.log('  ✅ Deleted tabs: ' + results.deleted.length);
+  Logger.log('  ❌ Errors: ' + results.errors.length);
+  results.errors.forEach(function(e) { Logger.log('    ' + e.op + ' ' + e.target + ': ' + e.err); });
+
+  return { dryRun: false, keepPlan: keepPlan, archivePlan: archivePlan, results: results };
 }
 
 /**
