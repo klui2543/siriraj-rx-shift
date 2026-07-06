@@ -55,14 +55,23 @@ function phxGetAllActiveOverlaysForMonth(monthId) {
       
       overlays.push({
         actionId: actionId,
-        viewerName: String(r[1] || '').trim(),
+        // v3.43: retro chains push actions with `viewerName` != authenticated pusher.
+        //        Trust the payload viewerName if present; fall back to the auth column.
+        viewerName: (payload.viewerName ? String(payload.viewerName).trim() : String(r[1] || '').trim()),
         monthId: rowMonth,
         action: String(payload.action || payload.type || r[3] || '').trim(),
         shiftKey: String(payload.shiftKey || ''),
         partnerShiftKey: String(payload.partnerShiftKey || ''),
         partnerName: String(payload.partnerName || '').trim(),
         originalOwner: String(payload.originalOwner || '').trim(),
-        createdAt: payload.createdAt || ''
+        createdAt: payload.createdAt || '',
+        // v3.43: pass through Draft/Publish + Retro fields so all viewers see the retro badge
+        _visibility: payload._visibility || 'public',
+        _retroBy: payload._retroBy || null,
+        _retroAt: payload._retroAt || null,
+        // v3.43: retro override — the recorder pinned this hop's receiver as the current holder
+        //        (earlier chain unknown). Kept so every viewer resolves the same current holder.
+        _retroFinal: payload._retroFinal || false
       });
     });
     

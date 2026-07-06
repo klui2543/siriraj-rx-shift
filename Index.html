@@ -486,6 +486,12 @@
     /* ===== EDIT MODE + OVERLAY v6 (mockup v11) ===== */
     .shift-used { opacity: 0.55; }
     .shift-line-through { text-decoration: line-through; }
+    /* v3.43: dashed strikethrough signals a draft — only the author sees this */
+    .shift-line-through-draft { text-decoration: line-through dashed; text-decoration-thickness: 1.5px; }
+    /* v3.43: dashed left-border on draft ghost rows (received-side of an unpublished action) */
+    .shift-ghost-received.shift-draft td:first-child,
+    .shift-ghost-adjacent.shift-draft td:first-child,
+    .shift-ghost-overlap.shift-draft td:first-child { border-left-style: dashed; }
     .shift-used-label {
       display: inline-block; font-size: 90%; color: #b91c1c;
       font-weight: 600; margin-left: 3px;
@@ -504,6 +510,15 @@
     }
     .inline-pencil:hover { background: rgba(37, 99, 235, 0.28); transform: scale(1.15); }
     body.dark-theme .inline-pencil { color: #60a5fa; background: rgba(96, 165, 250, 0.18); }
+    /* v3.43: inline "publish this draft" — sits where the pencil would, only on the author's own draft rows */
+    .inline-publish {
+      display: inline-block; margin-left: 4px; font-size: 11px; vertical-align: baseline;
+      cursor: pointer; padding: 2px 6px; border-radius: 5px; font-weight: 700;
+      color: #1e40af; background: rgba(37, 99, 235, 0.14); transition: all 0.15s;
+      border: 1px dashed #93c5fd;
+    }
+    .inline-publish:hover { background: rgba(37, 99, 235, 0.30); transform: scale(1.1); }
+    body.dark-theme .inline-publish { color: #dbeafe; background: rgba(59, 130, 246, 0.22); border-color: #1e40af; }
 
     .banner-pencil-btn {
       display: inline-flex; align-items: center; justify-content: center;
@@ -537,6 +552,9 @@
     body.edit-mode-on .cal-badge[data-shift-key] { cursor: pointer; transition: transform 0.1s; }
     body.edit-mode-on .cal-badge[data-shift-key]:hover { transform: scale(1.08); box-shadow: 0 2px 6px rgba(0,0,0,0.15); }
     .cal-badge.cal-badge-used { opacity: 0.45; text-decoration: line-through; }
+    /* v3.43: dashed line-through + outline signal a private draft to the author only */
+    .cal-badge.cal-badge-used.cal-badge-draft { text-decoration: line-through dashed; }
+    .cal-badge.cal-badge-draft:not(.cal-badge-used) { outline-style: dashed !important; }
     .cal-empty-plus {
       margin-top: 4px; opacity: 0.5; font-size: 16px; font-weight: 700;
       color: #2563eb; line-height: 1; text-align: center;
@@ -657,6 +675,45 @@
     .tl-inline-end.active { background: #dcfce7; color: #166534; }
     body.dark-theme .tl-inline-end.ended { background: #450a0a; color: #fca5a5; }
     body.dark-theme .tl-inline-end.active { background: #052e16; color: #86efac; }
+    /* v3.43: Publish/Unpublish controls at the end of a timeline panel */
+    .tl-inline-actions {
+      margin-top: 6px; display: flex; gap: 6px; flex-wrap: wrap; justify-content: center;
+    }
+    .pb-visibility-btn {
+      border: 1px solid transparent; border-radius: 6px;
+      padding: 4px 10px; font-size: 11px; font-weight: 600; cursor: pointer;
+      transition: background 0.15s, border-color 0.15s;
+    }
+    .pb-vb-publish { background: #dbeafe; color: #1e40af; border-color: #93c5fd; }
+    .pb-vb-publish:hover { background: #bfdbfe; border-color: #60a5fa; }
+    .pb-vb-unpublish { background: #f1f5f9; color: #475569; border-color: #cbd5e1; }
+    .pb-vb-unpublish:hover { background: #e2e8f0; border-color: #94a3b8; }
+    body.dark-theme .pb-vb-publish { background: #1e3a8a; color: #dbeafe; border-color: #1e40af; }
+    body.dark-theme .pb-vb-publish:hover { background: #1e40af; }
+    body.dark-theme .pb-vb-unpublish { background: #334155; color: #cbd5e1; border-color: #475569; }
+    body.dark-theme .pb-vb-unpublish:hover { background: #475569; }
+    /* v3.43: Retro badge on chain steps */
+    .tl-retro-badge {
+      display: inline-block;
+      background: #fed7aa; color: #9a3412;
+      font-size: 0.85em; font-weight: 600;
+      padding: 1px 5px; border-radius: 4px;
+      margin-right: 4px;
+    }
+    body.dark-theme .tl-retro-badge { background: #7c2d12; color: #fed7aa; }
+    /* v3.43: Retro chain builder — pill + arrow layout */
+    .retro-chain-view { padding: 8px; background: var(--bg-alt,#f9fafb); border-radius: 6px; }
+    .retro-chain-pill {
+      display: inline-block; background: #dbeafe; color: #1e40af;
+      padding: 4px 10px; border-radius: 999px; font-size: 12px; font-weight: 600;
+    }
+    body.dark-theme .retro-chain-pill { background: #1e3a8a; color: #dbeafe; }
+    .retro-chain-arrow { color: #6b7280; font-weight: 700; margin: 0 2px; }
+    .retro-chain-del {
+      background: transparent; border: none; color: #dc2626;
+      cursor: pointer; padding: 0 4px; font-size: 12px;
+    }
+    .retro-chain-del:hover { background: #fee2e2; border-radius: 4px; }
 
     /* v17: spacing before pair dot */
     .swap-pair-dot { margin-left: 6px !important; }
@@ -1953,6 +2010,11 @@
     <div class="act-modal-box" id="actionModalBox"></div>
   </div>
 
+  <!-- v3.43: Retro chain builder — records offline swap sequences after the fact -->
+  <div id="retroModal" class="act-modal-overlay" style="display:none;" onclick="if(event.target===this)closeRetroModal()">
+    <div class="act-modal-box" id="retroModalBox"></div>
+  </div>
+
   <script>
     
     // ==========================================
@@ -2513,7 +2575,13 @@ window.allPharmacistNames = [];
               partnerName: String(o.partnerName || ''),
               originalOwner: String(o.originalOwner || ''),
               createdAt: o.createdAt || '',
-              viewerName: viewerName
+              viewerName: viewerName,
+              // v3.43: anything reaching this fallback was fetched from server → public by nature.
+              //        Preserve the incoming _visibility if server actually stored it, else default public.
+              _visibility: o._visibility || 'public',
+              _retroBy: o._retroBy || null,
+              _retroAt: o._retroAt || null,
+              _retroFinal: o._retroFinal || false
             }));
         }
 
@@ -2525,23 +2593,62 @@ window.allPharmacistNames = [];
         action.id = 'ovl_' + Date.now() + '_' + Math.random().toString(36).substr(2,5);
         action.createdAt = new Date().toISOString();
         // v14: snapshot the viewer at creation time
-        action.viewerName = getCurrentUser();
+        if (!action.viewerName) action.viewerName = getCurrentUser();
+        // v3.43: Draft/Publish — new actions are private by default; user opts in to share.
+        //   Anything without _visibility is treated as 'public' downstream (backwards compat).
+        if (typeof action._visibility === 'undefined') action._visibility = 'draft';
         this._data[monthId].actions.push(action);
         this.save();
-        if (typeof invalidateGhostCache === 'function') invalidateGhostCache();  // v15
-        // Phase Y: sync to server if Cloud Sync enabled
-        if (typeof SYNC !== 'undefined' && SYNC.enabled) SYNC.pushAction(monthId, action);
+        if (typeof invalidateGhostCache === 'function') invalidateGhostCache();
+        if (typeof _invalidateDraftLookup === 'function') _invalidateDraftLookup();  // v3.43  // v15
+        // v3.43: gate SYNC — only public actions leave this device
+        if (typeof SYNC !== 'undefined' && SYNC.enabled && action._visibility === 'public') {
+          SYNC.pushAction(monthId, action);
+        }
         return action;
       },
       removeAction(monthId, actionId) {
         this.load();
         if (!this._data[monthId]) return;
+        // v3.43: only push server-remove if the action was ever public
+        const _prev = (this._data[monthId].actions || []).find(a => a.id === actionId);
+        const _wasPublic = _prev && _prev._visibility !== 'draft';   // undefined counts as public
         this._data[monthId].actions = (this._data[monthId].actions || []).filter(a => a.id !== actionId);
         if (this._data[monthId].actions.length === 0) delete this._data[monthId];
         this.save();
-        if (typeof invalidateGhostCache === 'function') invalidateGhostCache();  // v15
-        // Phase Y: sync to server if Cloud Sync enabled
+        if (typeof invalidateGhostCache === 'function') invalidateGhostCache();
+        if (typeof _invalidateDraftLookup === 'function') _invalidateDraftLookup();  // v3.43  // v15
+        if (typeof SYNC !== 'undefined' && SYNC.enabled && _wasPublic) SYNC.removeAction(actionId);
+      },
+      // v3.43: Draft→Public. Persists the flip locally, then pushes to server if sync enabled.
+      publishAction(monthId, actionId) {
+        this.load();
+        const bucket = this._data[monthId];
+        if (!bucket || !bucket.actions) return null;
+        const act = bucket.actions.find(a => a.id === actionId);
+        if (!act) return null;
+        if (act._visibility === 'public') return act;   // idempotent
+        act._visibility = 'public';
+        this.save();
+        if (typeof invalidateGhostCache === 'function') invalidateGhostCache();
+        if (typeof _invalidateDraftLookup === 'function') _invalidateDraftLookup();  // v3.43
+        if (typeof SYNC !== 'undefined' && SYNC.enabled) SYNC.pushAction(monthId, act);
+        return act;
+      },
+      // v3.43: Public→Draft. Server delete happens; the local action stays as private draft.
+      unpublishAction(monthId, actionId) {
+        this.load();
+        const bucket = this._data[monthId];
+        if (!bucket || !bucket.actions) return null;
+        const act = bucket.actions.find(a => a.id === actionId);
+        if (!act) return null;
+        if (act._visibility === 'draft') return act;   // idempotent
+        act._visibility = 'draft';
+        this.save();
+        if (typeof invalidateGhostCache === 'function') invalidateGhostCache();
+        if (typeof _invalidateDraftLookup === 'function') _invalidateDraftLookup();  // v3.43
         if (typeof SYNC !== 'undefined' && SYNC.enabled) SYNC.removeAction(actionId);
+        return act;
       },
       clearMonth(monthId, viewerName) {
         // v14: only clear actions of the viewer (don't nuke others' on same device)
@@ -2551,7 +2658,8 @@ window.allPharmacistNames = [];
         this._data[monthId].actions = (this._data[monthId].actions || []).filter(a => a.viewerName !== viewerName);
         if (this._data[monthId].actions.length === 0) delete this._data[monthId];
         this.save();
-        if (typeof invalidateGhostCache === 'function') invalidateGhostCache();  // v15
+        if (typeof invalidateGhostCache === 'function') invalidateGhostCache();
+        if (typeof _invalidateDraftLookup === 'function') _invalidateDraftLookup();  // v3.43  // v15
         // Phase Y: sync to server if Cloud Sync enabled
         if (typeof SYNC !== 'undefined' && SYNC.enabled) SYNC.clearMonth(monthId, viewerName);
       },
@@ -2641,6 +2749,90 @@ window.allPharmacistNames = [];
       const om = (typeof OverlayManager !== 'undefined') ? OverlayManager.getUsedMap(monthId, viewerName) : {};
       const pb = (typeof PBOverlays !== 'undefined') ? PBOverlays.getUsedMap(_pbGetLoggedInName()) : {};
       return Object.assign({}, pb, om);   // OverlayManager wins on key collision (own > public)
+    }
+    // v3.43: Lookup helper for Draft/Publish visual state.
+    //   actionId → true if the local OverlayManager action is draft. Public and unknown → false.
+    //   Called in the render loop, so cache each unique actionId per render tick.
+    let _draftLookupCache = null;
+    let _draftLookupCacheGen = 0;
+    function _isActionDraft(actionId) {
+      if (!actionId) return false;
+      if (typeof OverlayManager === 'undefined') return false;
+      if (!_draftLookupCache) {
+        OverlayManager.load();   // v3.43: only touch localStorage on a cache miss, not per render row
+        _draftLookupCache = {};
+        const data = OverlayManager._data || {};
+        Object.keys(data).forEach(mid => {
+          const acts = (data[mid] && data[mid].actions) || [];
+          acts.forEach(a => { _draftLookupCache[a.id] = (a._visibility === 'draft'); });
+        });
+        _draftLookupCacheGen++;
+      }
+      return !!_draftLookupCache[actionId];
+    }
+    function _invalidateDraftLookup() { _draftLookupCache = null; }
+
+    // v3.43: Retro-draft preview mirror.
+    //   Retro chains are stored in the recorder's OverlayManager under the HISTORICAL actors'
+    //   viewerNames (A, B, C…) — not the recorder's own name — so the recorder's `getActions`
+    //   never returns them and the chain would be invisible until published + fetched back.
+    //   To let the recorder preview an offline chain (draft-first), we project their local retro
+    //   hops into `pathBOverlays` for the CURRENT month only. These entries are tagged
+    //   `_pbLocalMirror` and NEVER sync — they exist only in this browser. Once a hop is
+    //   published and the server echoes it back, the real server row supersedes the mirror.
+    function _projectLocalRetro(serverIds) {
+      const out = [];
+      if (typeof OverlayManager === 'undefined') return out;
+      OverlayManager.load();
+      const data = OverlayManager._data || {};
+      const curMid = (typeof getCurrentMonthId === 'function') ? getCurrentMonthId() : null;
+      Object.keys(data).forEach(mid => {
+        if (curMid && mid !== curMid) return;                 // only the loaded month
+        ((data[mid] && data[mid].actions) || []).forEach(a => {
+          if (!a || !a._retroBy) return;                      // only retro hops need a mirror
+          if (serverIds && serverIds.has(a.id)) return;       // server already has this one
+          out.push({
+            actionId: a.id, viewerName: a.viewerName || '', monthId: mid,
+            action: a.action || '', shiftKey: a.shiftKey || '', partnerShiftKey: a.partnerShiftKey || '',
+            partnerName: a.partnerName || '', originalOwner: a.originalOwner || '',
+            createdAt: a.createdAt || '',
+            _visibility: a._visibility || 'public', _retroBy: a._retroBy, _retroAt: a._retroAt || null,
+            _retroFinal: !!a._retroFinal, _pbLocalMirror: true
+          });
+        });
+      });
+      return out;
+    }
+    // Rebuild pathBOverlays = <server rows> + <local retro mirror>, de-duped by actionId.
+    function _applyRetroMirror() {
+      const base = (Array.isArray(pathBOverlays) ? pathBOverlays : []).filter(o => o && !o._pbLocalMirror);
+      const serverIds = new Set(base.map(o => o.actionId));
+      pathBOverlays = base.concat(_projectLocalRetro(serverIds));
+      if (typeof invalidateGhostCache === 'function') invalidateGhostCache();
+      if (typeof _invalidateDraftLookup === 'function') _invalidateDraftLookup();
+    }
+    // v3.43: every action linked to `actionId` through _g_ parent/child hops. Publishing or
+    //   unpublishing moves a whole chain together — a child whose parent is still a draft can't
+    //   resolve on other devices, so a partial publish would render a broken (vanishing) ghost.
+    function _collectConnectedChain(monthId, actionId) {
+      if (typeof OverlayManager === 'undefined') return [actionId];
+      OverlayManager.load();
+      const bucket = OverlayManager._data && OverlayManager._data[monthId];
+      const acts = (bucket && bucket.actions) || [];
+      const byId = {};
+      acts.forEach(a => { if (a && a.id) byId[a.id] = a; });
+      const seen = new Set();
+      const stack = [actionId];
+      while (stack.length) {
+        const id = stack.pop();
+        if (!id || seen.has(id)) continue;
+        const a = byId[id];
+        if (!a) continue;
+        seen.add(id);
+        if (typeof a.shiftKey === 'string' && a.shiftKey.indexOf('_g_') === 0) stack.push(a.shiftKey.substring(3));
+        acts.forEach(c => { if (c && c.shiftKey === '_g_' + id) stack.push(c.id); });
+      }
+      return Array.from(seen);
     }
     const PBOverlays = {
       /** shiftKey → {label, actionId, color, _pbSource:true}.
@@ -2941,6 +3133,13 @@ window.allPharmacistNames = [];
         const targetAction = actions.find(a => a.id === _baseId);
         // v3.41: dispatch to Path B builder when action isn't in viewer's local OverlayManager
         if (!targetAction) return _buildPBTimelineHTML(_baseId, _side, pbSide);   // v3.42.9
+        // v3.43: dispatch to PB builder when viewing someone else's chain — retro chains span
+        //        multiple viewerNames, and local getActions only returns hops matching this viewer.
+        //        PBOverlays.buildChain sees every hop across all users → full chain shows.
+        const _boundView = (typeof _pbGetLoggedInName === 'function') ? _pbGetLoggedInName() : null;
+        if (_boundView && String(viewer) !== String(_boundView)) {
+          return _buildPBTimelineHTML(_baseId, _side, pbSide);
+        }
 
         const chain = [targetAction];
         let cur = targetAction;
@@ -2991,6 +3190,14 @@ window.allPharmacistNames = [];
           }
           const tsStr = act.createdAt ? new Date(act.createdAt).toLocaleString('th-TH', {dateStyle:'short', timeStyle:'short'}) : '';
           if (tsStr) desc += ' <span class="tl-inline-ts">· ' + tsStr + '</span>';
+          // v3.43: retro badge — someone else recorded this after the fact
+          if (act._retroBy && act._retroBy !== act.viewerName) {
+            const _retroAtStr = act._retroAt
+              ? new Date(act._retroAt).toLocaleString('th-TH', {dateStyle:'short', timeStyle:'short'})
+              : '';
+            const _title = 'บันทึกย้อนหลังโดย ' + act._retroBy + (_retroAtStr ? ' · ' + _retroAtStr : '');
+            desc = '<span class="tl-retro-badge" title="' + _title + '">🔄</span>' + desc;
+          }
           html += '<div class="tl-inline-step tl-' + kind + '">';
           html += '<div class="tl-inline-num">' + (idx + 1) + '</div>';
           html += '<div class="tl-inline-body">' + desc + '</div></div>';
@@ -3007,7 +3214,39 @@ window.allPharmacistNames = [];
         } else {
           _curHolder = viewer;
         }
-        html += '<div class="tl-inline-end active">ปัจจุบันเวรนี้อยู่กับ: <b>' + (_curHolder || '?') + '</b></div>';
+        const _pinnedSrc = chain.some(a => a && a._retroFinal);
+        html += '<div class="tl-inline-end active">ปัจจุบันเวรนี้อยู่กับ: <b>' + (_curHolder || '?') + '</b>' +
+                (_pinnedSrc ? ' <span title="ปักหมุดจากการบันทึกย้อนหลัง (ข้ามช่วงที่ไม่ทราบ)">🔒</span>' : '') + '</div>';
+        // v3.43: Publish/Unpublish controls — only when the logged-in user authored these actions.
+        //   The chain is in local OverlayManager (this branch), so we already know they own it,
+        //   BUT edit only makes sense when they're logged in (drafts can only leave via SYNC).
+        try {
+          const _bound = _pbGetLoggedInName();
+          if (_bound && String(viewer) === String(_bound)) {
+            const _draftIds = [];
+            const _publicIds = [];
+            chain.forEach(a => {
+              if (a._visibility === 'draft') _draftIds.push(a.id);
+              else _publicIds.push(a.id);
+            });
+            if (_draftIds.length > 0 || _publicIds.length > 0) {
+              html += '<div class="tl-inline-actions">';
+              if (_draftIds.length > 0) {
+                html += '<button type="button" class="pb-visibility-btn pb-vb-publish" ' +
+                        'data-pb-publish="' + _draftIds.join(',') + '" ' +
+                        'data-pb-mid="' + monthId + '">🌐 เผยแพร่' +
+                        (_draftIds.length > 1 ? ' (' + _draftIds.length + ' ขั้น)' : '') + '</button>';
+              }
+              if (_publicIds.length > 0) {
+                html += '<button type="button" class="pb-visibility-btn pb-vb-unpublish" ' +
+                        'data-pb-unpublish="' + _publicIds.join(',') + '" ' +
+                        'data-pb-mid="' + monthId + '">🔒 เอากลับเป็นส่วนตัว' +
+                        (_publicIds.length > 1 ? ' (' + _publicIds.length + ' ขั้น)' : '') + '</button>';
+              }
+              html += '</div>';
+            }
+          }
+        } catch (_e) { /* button is optional */ }
         return html;
       } catch(err) {
         v10ShowError('buildTimelineHTML', err);
@@ -3062,12 +3301,22 @@ window.allPharmacistNames = [];
           }
           const tsStr = ov.createdAt ? new Date(ov.createdAt).toLocaleString('th-TH', {dateStyle:'short', timeStyle:'short'}) : '';
           if (tsStr) desc += ' <span class="tl-inline-ts">· ' + tsStr + '</span>';
+          // v3.43: retro badge — someone else recorded this after the fact
+          if (ov._retroBy && ov._retroBy !== ov.viewerName) {
+            const _retroAtStr = ov._retroAt
+              ? new Date(ov._retroAt).toLocaleString('th-TH', {dateStyle:'short', timeStyle:'short'})
+              : '';
+            const _title = 'บันทึกย้อนหลังโดย ' + ov._retroBy + (_retroAtStr ? ' · ' + _retroAtStr : '');
+            desc = '<span class="tl-retro-badge" title="' + _title + '">🔄</span>' + desc;
+          }
           html += '<div class="tl-inline-step tl-' + kind + '">';
           html += '<div class="tl-inline-num">' + (idx + 1) + '</div>';
           html += '<div class="tl-inline-body">' + desc + '</div></div>';
         });
         const ep = PBOverlays.getChainEndpoints(chain, pbSide);   // v3.42.9: pbSide picks correct holder for swap
-        html += '<div class="tl-inline-end active">ปัจจุบันเวรนี้อยู่กับ: <b>' + (ep.last || '?') + '</b></div>';
+        const _pinnedPB = chain.some(o => o && o._retroFinal);
+        html += '<div class="tl-inline-end active">ปัจจุบันเวรนี้อยู่กับ: <b>' + (ep.last || '?') + '</b>' +
+                (_pinnedPB ? ' <span title="ปักหมุดจากการบันทึกย้อนหลัง (ข้ามช่วงที่ไม่ทราบ)">🔒</span>' : '') + '</div>';
         return html;
       } catch (err) {
         v10ShowError('_buildPBTimelineHTML', err);
@@ -3111,6 +3360,308 @@ window.allPharmacistNames = [];
         toggleTimelineInline(aid, chev, pbSide);
       }
     }, true);
+
+    // v3.43: Publish/Unpublish buttons inside a timeline panel.
+    //   Whole chain publishes or unpublishes together so partial states don't confuse readers.
+    //   After the mutation we rebuild the same panel in place — chevron stays open, user sees new state.
+    document.addEventListener('click', function(e) {
+      const _pubBtn = e.target.closest('[data-pb-publish]');
+      const _unpubBtn = e.target.closest('[data-pb-unpublish]');
+      const btn = _pubBtn || _unpubBtn;
+      if (!btn) return;
+      e.stopPropagation();
+      const mid = btn.getAttribute('data-pb-mid');
+      const ids = (_pubBtn ? btn.getAttribute('data-pb-publish') : btn.getAttribute('data-pb-unpublish'))
+                  .split(',').filter(Boolean);
+      if (!mid || ids.length === 0) return;
+      let ok = 0;
+      ids.forEach(id => {
+        const r = _pubBtn ? OverlayManager.publishAction(mid, id) : OverlayManager.unpublishAction(mid, id);
+        if (r) ok++;
+      });
+      if (typeof _p2bShowToast === 'function') {
+        _p2bShowToast(_pubBtn ? ('เผยแพร่ ' + ok + ' ขั้นแล้ว') : ('ซ่อน ' + ok + ' ขั้นแล้ว'), 'ok');
+      }
+      // v3.43: keep the retro preview mirror in step with the new visibility, then reconcile
+      //   with the server so published rows arrive via the normal path on the next fetch.
+      if (typeof _applyRetroMirror === 'function') _applyRetroMirror();
+      if (typeof fetchPathBOverlays === 'function') fetchPathBOverlays(mid);
+      // Rebuild the enclosing timeline panel so state (button + steps + dashed marks) updates
+      const panel = btn.closest('.tl-inline-content');
+      const row = btn.closest('.tl-inline-row');
+      if (panel && row) {
+        const aidFull = row.getAttribute('data-tlrow-for');
+        const pbSide = row.getAttribute('data-tl-pbside') || null;
+        panel.innerHTML = buildTimelineHTML(aidFull, pbSide);
+      }
+      // Refresh table + calendar so dashed↔solid strikes update outside this panel
+      if (typeof triggerUpdate === 'function') triggerUpdate();
+    }, true);
+
+    // v3.43: inline 🌐 publish button (on the row, beside the pencil). Publishes the WHOLE
+    //   connected chain the clicked action belongs to — never a partial chain (see
+    //   _collectConnectedChain). Used for the common single-overlay case and for retro chains.
+    document.addEventListener('click', function(e) {
+      const btn = e.target.closest('[data-pb-publish-row]');
+      if (!btn) return;
+      e.stopPropagation();
+      const mid = btn.getAttribute('data-pb-mid');
+      const rootId = btn.getAttribute('data-pb-publish-row');
+      if (!mid || !rootId) return;
+      const ids = _collectConnectedChain(mid, rootId);
+      ids.forEach(id => OverlayManager.publishAction(mid, id));
+      if (typeof _applyRetroMirror === 'function') _applyRetroMirror();
+      if (typeof _p2bShowToast === 'function') {
+        _p2bShowToast('เผยแพร่แล้ว' + (ids.length > 1 ? ' (' + ids.length + ' ขั้น)' : ''), 'ok');
+      }
+      if (typeof triggerUpdate === 'function') triggerUpdate();
+      if (typeof fetchPathBOverlays === 'function') fetchPathBOverlays(mid);
+    }, true);
+
+    // ============================================
+    // v3.43: Retro Chain Modal — record offline swap sequences after the fact
+    // ============================================
+    //   Data model per hop: {action:'give', shiftKey, viewerName: hopActor, partnerName: nextActor,
+    //                        originalOwner, _visibility, _retroBy, _retroAt}
+    //   Middle-hop shiftKey chains via '_g_ovl_<prevActionId>'.
+    //   Klui's rule: the recorder (boundName) must appear somewhere in the chain.
+    let retroState = null;
+    function _retroInit() {
+      retroState = {
+        step: 'pick-shift',      // 'pick-shift' | 'build-chain' | 'confirm'
+        target: null,            // { shiftKey, date, pos, range, ownerName }
+        chain: [],               // array of pharmacist names, starting with the target owner
+        pickerQuery: '',
+        override: false          // v3.43: unknown earlier holders — start mid-chain + pin the tail as current
+      };
+    }
+    function openRetroModal() {
+      const bound = (typeof _pbGetLoggedInName === 'function') ? _pbGetLoggedInName() : null;
+      if (!bound) {
+        if (typeof _p2bShowToast === 'function') _p2bShowToast('ต้อง login ก่อนบันทึกย้อนหลัง', 'warn');
+        return;
+      }
+      _retroInit();
+      renderRetroModal();
+      document.getElementById('retroModal').style.display = 'flex';
+    }
+    function closeRetroModal() {
+      document.getElementById('retroModal').style.display = 'none';
+      retroState = null;
+    }
+    function renderRetroModal() {
+      const box = document.getElementById('retroModalBox');
+      if (!box || !retroState) return;
+      const bound = _pbGetLoggedInName();
+      let html = '<div class="act-modal-header"><h3>📝 บันทึกย้อนหลัง (offline chain)</h3>' +
+                 '<button class="act-modal-close" onclick="closeRetroModal()">✕</button></div>';
+      html += '<div class="act-modal-body">';
+
+      if (retroState.step === 'pick-shift') {
+        html += '<div class="act-prompt">1) เลือกเวรที่ต้องการบันทึก (เวรของใครก็ได้)</div>';
+        html += '<input type="text" id="retroPickerQuery" placeholder="ค้นหา ชื่อ / ตำแหน่ง / วันที่" ' +
+                'oninput="retroState.pickerQuery=this.value; _renderRetroPickList()" ' +
+                'style="width:100%; padding:8px; border:1px solid var(--border); border-radius:6px; margin-bottom:8px;" />';
+        html += '<div id="retroPickList" style="max-height:320px; overflow-y:auto;"></div>';
+      } else if (retroState.step === 'build-chain') {
+        const t = retroState.target;
+        const startName = retroState.chain[0] || t.ownerName;
+        html += '<div class="act-prompt">2) เชนผู้ถือเวร ' +
+                (retroState.override
+                  ? '(เริ่มจาก <b>' + startName + '</b> — คนก่อนหน้าไม่ทราบ)'
+                  : '(เดินจาก <b>' + t.ownerName + '</b> ผ่านมือใครบ้าง)') + '</div>';
+        html += '<div style="background:var(--bg-alt,#f9fafb); padding:8px 10px; border-radius:6px; margin-bottom:10px; font-size:12px;">' +
+                '<b>เวรเป้าหมาย:</b> ' + t.date + ' · ' + t.pos + ' · ' + t.range + ' <span style="color:#6b7280;">(เจ้าของเดิม: ' + t.ownerName + ')</span></div>';
+        // v3.43: override toggle — for offline chains where the earliest holders are unknown.
+        html += '<label style="display:flex; align-items:flex-start; gap:6px; margin-bottom:10px; font-size:12px; cursor:pointer;">' +
+                '<input type="checkbox" ' + (retroState.override ? 'checked' : '') + ' onchange="_retroSetOverride(this.checked)" style="margin-top:2px;" />' +
+                '<span>🔒 ไม่รู้ว่าใครถือก่อนหน้า — เริ่มกลางเชนได้ แล้วปักหมุดว่าคนสุดท้ายคือผู้ถือปัจจุบัน</span></label>';
+        html += '<div id="retroChainView" class="retro-chain-view"></div>';
+        html += '<div style="margin-top:10px;">';
+        html += '<button class="act-btn" onclick="_retroAddHop()">➕ เพิ่มคนถัดไป</button>';
+        html += '</div>';
+        // validation warning
+        const hasSelf = retroState.chain.some(n => n === bound);
+        const chainOk = retroState.chain.length >= 2 && hasSelf;
+        if (!hasSelf) {
+          html += '<div style="color:#dc2626; font-size:11px; margin-top:8px;">⚠️ คุณ (<b>' + bound + '</b>) ต้องอยู่ในเชนอย่างน้อย 1 ตำแหน่ง</div>';
+        }
+        html += '<div style="display:flex; gap:8px; margin-top:12px;">';
+        html += '<button class="act-btn act-btn-cancel" style="flex:1;" onclick="retroState.step=\'pick-shift\'; renderRetroModal();">◀ กลับ</button>';
+        html += '<button class="act-btn" style="flex:1;' + (chainOk ? '' : ' opacity:0.5; pointer-events:none;') + '" ' +
+                'onclick="retroState.step=\'confirm\'; renderRetroModal();">ถัดไป ▶</button>';
+        html += '</div>';
+      } else if (retroState.step === 'confirm') {
+        const t = retroState.target;
+        html += '<div class="act-prompt">3) ตรวจสอบก่อนบันทึก</div>';
+        html += '<div style="background:var(--bg-alt,#f9fafb); padding:8px 10px; border-radius:6px; margin-bottom:10px; font-size:12px;">' +
+                '<b>เวร:</b> ' + t.date + ' · ' + t.pos + ' · ' + t.range + ' (ของ ' + t.ownerName + ')</div>';
+        html += '<div style="margin-bottom:10px;">';
+        for (let i = 0; i < retroState.chain.length - 1; i++) {
+          const _isLast = (i === retroState.chain.length - 2);
+          html += '<div style="padding:6px 10px; background:#fff7ed; border-left:3px solid #f97316; border-radius:4px; margin-bottom:4px; font-size:12px;">' +
+                  '<b>' + retroState.chain[i] + '</b> ยกให้ <b>' + retroState.chain[i+1] + '</b>' +
+                  (retroState.override && _isLast ? ' <span style="color:#9a3412;">🔒 ผู้ถือปัจจุบัน</span>' : '') +
+                  '</div>';
+        }
+        html += '</div>';
+        html += '<div style="color:#6b7280; font-size:11px; margin-bottom:10px;">' +
+                'บันทึกเป็น <b>ร่าง (ส่วนตัว)</b> ก่อน — เห็นแค่คุณ (ขีดเส้นประ) ' +
+                'จนกว่าจะกด <b>🌐 เผยแพร่</b> ในตารางหรือไทม์ไลน์ ทุกขั้นติดสัญลักษณ์ 🔄' +
+                (retroState.override ? '<br>🔒 ปักหมุด <b>' + retroState.chain[retroState.chain.length - 1] + '</b> เป็นผู้ถือปัจจุบัน (ข้ามช่วงที่ไม่ทราบ)' : '') +
+                '</div>';
+        html += '<div style="display:flex; gap:8px;">';
+        html += '<button class="act-btn act-btn-cancel" style="flex:1;" onclick="retroState.step=\'build-chain\'; renderRetroModal();">◀ กลับ</button>';
+        html += '<button class="act-btn" style="flex:1; background:#f97316; color:#fff;" onclick="_retroCommit()">💾 บันทึกเป็นร่าง</button>';
+        html += '</div>';
+      }
+      html += '</div>';
+      box.innerHTML = html;
+      if (retroState.step === 'pick-shift') _renderRetroPickList();
+      if (retroState.step === 'build-chain') _renderRetroChainView();
+    }
+    function _renderRetroPickList() {
+      const list = document.getElementById('retroPickList');
+      if (!list || !retroState || retroState.step !== 'pick-shift') return;
+      const q = String(retroState.pickerQuery || '').toLowerCase();
+      const eff = (rawData || []);
+      // exclude shifts that already have a public action (avoid double-recording)
+      const pbUsed = (typeof PBOverlays !== 'undefined')
+                     ? PBOverlays.getUsedMap(_pbGetLoggedInName()) : {};
+      let rows = eff.filter(s => {
+        const k = makeShiftKey(s);
+        if (pbUsed[k]) return false;
+        if (!q) return true;
+        return (s.name + ' ' + s.pos + ' ' + s.date + ' ' + (s.range || '') + ' ' + (s.shift || '')).toLowerCase().indexOf(q) >= 0;
+      });
+      rows = rows.slice(0, 60);
+      if (rows.length === 0) {
+        list.innerHTML = '<div class="pick-empty">ไม่พบเวร</div>';
+        return;
+      }
+      list.innerHTML = rows.map(s => {
+        const k = makeShiftKey(s);
+        const enc = encodeURIComponent(k);
+        return '<button class="pick-result" onclick="_retroPickShift(\'' + enc + '\')" style="margin-bottom:4px;">' +
+               '<div style="flex:1;"><div class="pick-result-name">' + s.name + '</div>' +
+               '<div style="font-size:11px; color:#6b7280;">' + s.date + ' · ' + s.pos + ' · ' + (s.range || '') + '</div></div>' +
+               '</button>';
+      }).join('');
+    }
+    function _retroPickShift(encKey) {
+      const key = decodeURIComponent(encKey);
+      const s = findShiftByKey(key);
+      if (!s) return;
+      retroState.target = { shiftKey: key, date: s.date, pos: s.pos, range: s.range || '', ownerName: s.name };
+      retroState.chain = [s.name];  // start with the original owner
+      retroState.step = 'build-chain';
+      renderRetroModal();
+    }
+    function _renderRetroChainView() {
+      const c = document.getElementById('retroChainView');
+      if (!c) return;
+      const names = window.allPharmacistNames || [];
+      let html = '<div style="display:flex; flex-wrap:wrap; gap:4px; align-items:center;">';
+      retroState.chain.forEach((n, i) => {
+        // v3.43: in override mode the FIRST holder is editable (start mid-chain from anyone).
+        if (i === 0 && retroState.override) {
+          html += '<select class="retro-chain-pill" style="border:none; cursor:pointer;" ' +
+                  'onchange="_retroSetFirstHolder(this.value)">';
+          names.forEach(nm => {
+            html += '<option value="' + encodeURIComponent(nm) + '"' + (nm === n ? ' selected' : '') + '>' + nm + '</option>';
+          });
+          html += '</select>';
+        } else {
+          html += '<span class="retro-chain-pill">' + n + '</span>';
+        }
+        if (i > 0) {
+          html += '<button class="retro-chain-del" onclick="_retroRemoveHop(' + i + ')" title="ลบตำแหน่งนี้">✕</button>';
+        }
+        if (i < retroState.chain.length - 1) html += '<span class="retro-chain-arrow">→</span>';
+      });
+      html += '</div>';
+      // Show inline picker after the last name
+      html += '<div style="margin-top:10px;">';
+      html += '<div style="font-size:11px; color:#6b7280; margin-bottom:4px;">เลือกคนถัดไป:</div>';
+      html += '<select id="retroNextHop" style="width:100%; padding:6px; border:1px solid var(--border); border-radius:4px;">';
+      html += '<option value="">-- เลือก --</option>';
+      names.filter(n => n !== retroState.chain[retroState.chain.length - 1])
+           .forEach(n => { html += '<option value="' + encodeURIComponent(n) + '">' + n + '</option>'; });
+      html += '</select></div>';
+      c.innerHTML = html;
+    }
+    function _retroAddHop() {
+      const sel = document.getElementById('retroNextHop');
+      if (!sel || !sel.value) return;
+      const nm = decodeURIComponent(sel.value);
+      retroState.chain.push(nm);
+      _renderRetroChainView();
+      renderRetroModal();
+    }
+    function _retroRemoveHop(idx) {
+      if (idx <= 0 || idx >= retroState.chain.length) return;
+      // dropping a middle person invalidates everything after it — truncate the tail
+      retroState.chain = retroState.chain.slice(0, idx);
+      _renderRetroChainView();
+      renderRetroModal();
+    }
+    // v3.43: toggle "unknown earlier holders". Turning it OFF restores the true owner as the
+    //   chain root so we never accidentally keep a mid-chain start without the override intent.
+    function _retroSetOverride(checked) {
+      if (!retroState) return;
+      retroState.override = !!checked;
+      if (!checked && retroState.target) retroState.chain[0] = retroState.target.ownerName;
+      renderRetroModal();
+    }
+    function _retroSetFirstHolder(encName) {
+      if (!retroState) return;
+      const nm = decodeURIComponent(encName || '');
+      if (nm) retroState.chain[0] = nm;
+      renderRetroModal();
+    }
+    function _retroCommit() {
+      try {
+        const bound = _pbGetLoggedInName();
+        const t = retroState.target;
+        const mid = getCurrentMonthId();
+        const now = new Date().toISOString();
+        const override = !!retroState.override;   // v3.43: "I don't know earlier holders — pin the tail as current"
+        let prevActionId = null;
+        let hopsWritten = 0;
+        const lastHopIdx = retroState.chain.length - 2;   // index of the final give
+        // v3.43: write each hop as a DRAFT give in OverlayManager under the HISTORICAL actor's name.
+        //   Nothing syncs yet — the recorder reviews the chain locally (via the retro mirror) and
+        //   publishes it from the timeline / inline 🌐 when ready.
+        for (let i = 0; i < retroState.chain.length - 1; i++) {
+          const actor = retroState.chain[i];
+          const receiver = retroState.chain[i + 1];
+          const action = {
+            action: 'give',
+            shiftKey: prevActionId ? ('_g_' + prevActionId) : t.shiftKey,
+            partnerName: receiver,
+            originalOwner: t.ownerName,
+            viewerName: actor,      // preserved — addAction respects a pre-set viewerName
+            _visibility: 'draft',   // draft-first: consistent with ordinary overlays
+            _retroBy: bound,
+            _retroAt: now
+          };
+          // Pin the last hop as the definitive current holder when the earlier chain is unknown.
+          if (override && i === lastHopIdx) action._retroFinal = true;
+          const stored = OverlayManager.addAction(mid, action);
+          if (stored) { prevActionId = stored.id; hopsWritten++; }
+        }
+        // Project the fresh drafts into pathBOverlays so the recorder previews the chain immediately.
+        if (typeof _applyRetroMirror === 'function') _applyRetroMirror();
+        else if (typeof invalidateGhostCache === 'function') invalidateGhostCache();
+        if (typeof _p2bShowToast === 'function') {
+          _p2bShowToast('บันทึก ' + hopsWritten + ' ขั้น (ร่าง 🔄) — กด 🌐 เพื่อเผยแพร่', 'ok');
+        }
+        closeRetroModal();
+        if (typeof triggerUpdate === 'function') triggerUpdate();
+      } catch (err) {
+        v10ShowError('_retroCommit', err);
+      }
+    }
 
     // ============================================
     // v16: Timeline Modal — shows action chain history
@@ -4088,6 +4639,7 @@ window.allPharmacistNames = [];
       // v3.41: if response includes global overlays (GAS path), adopt them.
       //        Firebase path won't have _pbOverlays — fetchPathBOverlays fills it separately.
       if (Array.isArray(res._pbOverlays)) pathBOverlays = res._pbOverlays;
+      if (typeof _applyRetroMirror === 'function') _applyRetroMirror();   // v3.43: keep local retro drafts visible
       currentSheetUrl = res.sheetUrl || "";
       window.currentAuditInfo = res.audit || null;
       
@@ -4185,6 +4737,7 @@ window.allPharmacistNames = [];
       // v3.41: seed pathBOverlays from localStorage cache → chevron/dot appear instantly
       //        (fresh fetch runs in parallel below — cache updates on success)
       pathBOverlays = _pbLoadCached(selectEl.value);
+      if (typeof _applyRetroMirror === 'function') _applyRetroMirror();   // v3.43: re-apply local retro drafts after month switch
       if (firebasePollTimer) { clearInterval(firebasePollTimer); firebasePollTimer = null; }
 
       const fetchViaGAS = () => {
@@ -4264,7 +4817,11 @@ window.allPharmacistNames = [];
           }
           pathBOverlays = overlays;
           console.log('🎯 Path B: loaded ' + overlays.length + ' global overlays (rawData preserved)');
-          if (typeof invalidateGhostCache === 'function') invalidateGhostCache();
+          // v3.43: re-apply this device's local retro-draft mirror on top of the fresh server rows,
+          //   so an in-progress offline chain keeps previewing after a refresh (also invalidates caches).
+          if (typeof _applyRetroMirror === 'function') _applyRetroMirror();
+          else if (typeof invalidateGhostCache === 'function') invalidateGhostCache();
+          if (typeof _invalidateDraftLookup === 'function') _invalidateDraftLookup();  // v3.43
           _shiftKeyIndex = null; _shiftKeyIndexFor = null;
           // Guard: only re-render if rawData already populated (else Firebase's own trigger picks it up)
           if (rawData && rawData.length > 0 && typeof triggerUpdate === 'function') {
@@ -4515,6 +5072,9 @@ window.allPharmacistNames = [];
       // v3.41: PB usedMap for anonymous / non-owner chevron+dot
       const _pbUsedMap = (typeof PBOverlays !== 'undefined') ? PBOverlays.getUsedMap(_pbGetLoggedInName()) : {};
       const _rowsHtml = [];
+      // v3.43: show the inline 🌐 publish button once per draft action. Real rows precede ghosts
+      //   in `items`, so the struck source row wins the button; a pure 'add' lands it on the ghost.
+      const _draftBtnShown = new Set();
       items.forEach(i => {
         const _rowHtml = (function(i) {
         const _isGhost = !!i._ghost;
@@ -4573,15 +5133,28 @@ window.allPharmacistNames = [];
           _suffix = `${ghostDot}${chev}`;
         }
         const _pencil = (editModeActive && _isOwn && !_used) ? '<span class="inline-pencil">✎</span>' : '';
-        const _strike = _used ? 'shift-line-through' : '';
+        // v3.43: dashed strike when the action behind this strikethrough is still a draft.
+        //   Only the author's OverlayManager holds drafts, so _isActionDraft returns true only in their session.
+        const _strikeActionId = _used ? _used.actionId : (_isGhost ? i._ghostActionId : null);
+        const _isDraftLocal = _strikeActionId ? _isActionDraft(_strikeActionId) : false;
+        const _strike = _used ? (_isDraftLocal ? 'shift-line-through-draft' : 'shift-line-through') : '';
+        // v3.43: inline publish — sits beside the pencil, shown once per own draft action.
+        //   _isDraftLocal is true only on the author's device, so it already implies "my draft".
+        let _pubInline = '';
+        if (editModeActive && _isDraftLocal && _strikeActionId && !_draftBtnShown.has(_strikeActionId)) {
+          _draftBtnShown.add(_strikeActionId);
+          _pubInline = '<span class="inline-publish" data-pb-publish-row="' + _strikeActionId + '" data-pb-mid="' + _mid + '" title="เผยแพร่ให้ทุกคนเห็น (ตอนนี้ยังเป็นส่วนตัว)">🌐 เผยแพร่</span>';
+        }
         const _nameBase = i.isNew ? 'text-orange-600 font-bold leading-none' : 'text-blue-900 font-bold leading-none';
-        const nameDisplay = `<span class="col-name-wrap"><span class="ncw-left"></span><span class="ncw-center"><span class="${_nameBase} ${_strike}">${i.isNew?'⚠️ ':''}${i.name}</span>${_pencil}</span><span class="ncw-right">${_suffix}</span></span>`;
+        const nameDisplay = `<span class="col-name-wrap"><span class="ncw-left"></span><span class="ncw-center"><span class="${_nameBase} ${_strike}">${i.isNew?'⚠️ ':''}${i.name}</span>${_pencil}${_pubInline}</span><span class="ncw-right">${_suffix}</span></span>`;
         let _ghostCls = '';
         if (_isGhost) {
           if (i._conflict === 'overlap') _ghostCls = 'shift-ghost-overlap';
           else if (i._conflict === 'adjacent') _ghostCls = 'shift-ghost-adjacent';
           else _ghostCls = 'shift-ghost-received';
         }
+        // v3.43: mark ghost rows created by an unpublished action so their border reads dashed
+        if (_isGhost && _isDraftLocal) _ghostCls += ' shift-draft';
         const _rowClasses = [
           'bg-white hover:bg-gray-50 border-b border-gray-100 transition-all',
           _used ? 'shift-used' : '',
@@ -4747,6 +5320,9 @@ window.allPharmacistNames = [];
             else if (s._conflict === 'adjacent') _calExtraCls = ' cal-badge-adjacent';
             else _calExtraCls = ' cal-badge-ghost';
           }
+          // v3.43: dashed outline on the badge when the underlying action is a private draft
+          const _calDraftAid = _calUsed ? _calUsed.actionId : (_isGhostBadge ? s._ghostActionId : null);
+          if (_calDraftAid && _isActionDraft(_calDraftAid)) _calExtraCls += ' cal-badge-draft';
           // v14: pair-color dot for swaps
           let _calDot = '';
           let _pairColor = null;
@@ -6599,6 +7175,9 @@ table.exp-tbl .tm{margin-left:3px;opacity:0.75;}
         serverActions.forEach(a => {
           if (seen[a.id]) return;
           if (!data[a.monthId]) data[a.monthId] = { actions: [] };
+          // v3.43: server only stores actions that were pushed → all pulled actions are public.
+          //        Missing field on the wire = public (defensive default).
+          if (typeof a._visibility === 'undefined') a._visibility = 'public';
           data[a.monthId].actions.push(a);
           added++;
         });
@@ -6606,6 +7185,7 @@ table.exp-tbl .tm{margin-left:3px;opacity:0.75;}
           OverlayManager._data = data;
           OverlayManager.save();
           if (typeof invalidateGhostCache === 'function') invalidateGhostCache();
+        if (typeof _invalidateDraftLookup === 'function') _invalidateDraftLookup();  // v3.43
         }
       },
 
@@ -7055,6 +7635,7 @@ table.exp-tbl .tm{margin-left:3px;opacity:0.75;}
         localStorage.setItem(ROUND3_KEY, mode);
         _applyRound3Transform();
         if (typeof invalidateGhostCache === 'function') invalidateGhostCache();
+        if (typeof _invalidateDraftLookup === 'function') _invalidateDraftLookup();  // v3.43
         if (typeof triggerUpdate === 'function') triggerUpdate();
         // Patch R3-Sync: trigger B3b backend sync after Round 3 mode change
         // (transform mutates rawData in-place → compute reads new dates automatically)
@@ -10101,6 +10682,7 @@ table.exp-tbl .tm{margin-left:3px;opacity:0.75;}
             OverlayManager._data = data;
             OverlayManager.save();
             if (typeof invalidateGhostCache === 'function') invalidateGhostCache();
+        if (typeof _invalidateDraftLookup === 'function') _invalidateDraftLookup();  // v3.43
             if (typeof triggerUpdate === 'function') triggerUpdate();
             PHX_SYNC.lastSyncAt = Date.now();
             PHX_SYNC.error = null;
@@ -10271,6 +10853,7 @@ table.exp-tbl .tm{margin-left:3px;opacity:0.75;}
         OverlayManager._data = data;
         OverlayManager.save();
         if (typeof invalidateGhostCache === 'function') invalidateGhostCache();
+        if (typeof _invalidateDraftLookup === 'function') _invalidateDraftLookup();  // v3.43
         if (typeof triggerUpdate === 'function') triggerUpdate();
       } catch(e) {
         console.error('_phxApplyMergedState failed:', e);
@@ -10607,6 +11190,10 @@ table.exp-tbl .tm{margin-left:3px;opacity:0.75;}
           const u = (typeof phxAuthGetUser === 'function') ? phxAuthGetUser() : null;
           const willSync = !!(u && u.name === target);
           if (floppyBtn) floppyBtn.style.display = willSync ? 'none' : 'flex';
+          // v3.43: retro chain button — only useful when logged in (draft/publish needs identity)
+          const retroBtn = document.getElementById('phxFabRetro');
+          const bound = (typeof _pbGetLoggedInName === 'function') ? _pbGetLoggedInName() : null;
+          if (retroBtn) retroBtn.style.display = bound ? 'flex' : 'none';
         } else {
           // Edit mode off — show just pencil
           fab.style.display = 'flex';
@@ -10649,6 +11236,7 @@ table.exp-tbl .tm{margin-left:3px;opacity:0.75;}
         OverlayManager._data[item.monthId].actions.push(item.action);
         OverlayManager.save();
         if (typeof invalidateGhostCache === 'function') invalidateGhostCache();
+        if (typeof _invalidateDraftLookup === 'function') _invalidateDraftLookup();  // v3.43
         if (typeof triggerUpdate === 'function') triggerUpdate();
         phxUpdateUndoRedoUI();
       } catch(e) {
@@ -11759,6 +12347,10 @@ table.exp-tbl .tm{margin-left:3px;opacity:0.75;}
     </button>
     <button id="phxFabFloppy" class="phx-fab-action phx-fab-floppy" onclick="phxSaveAndConfirm()" style="display:none;" title="บันทึก local">
       <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 21H5a2 2 0 01-2-2V5a2 2 0 012-2h11l5 5v11a2 2 0 01-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg>
+    </button>
+    <!-- v3.43: retroactive multi-hop chain (offline swaps that already happened) -->
+    <button id="phxFabRetro" class="phx-fab-action" onclick="openRetroModal()" style="display:none;" title="บันทึกย้อนหลัง">
+      <span style="font-size:16px; line-height:1;">📝</span>
     </button>
     <button class="phx-fab-done" onclick="toggleEditMode()" title="ออกจากโหมดแก้ไข">
       <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
