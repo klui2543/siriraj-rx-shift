@@ -5558,9 +5558,11 @@ window.allPharmacistNames = [];
     function renderTable(items) {
       const _mid = getCurrentMonthId();
       const _curUser = getCurrentUser();
-      const _usedMap = OverlayManager.getUsedMap(_mid, _curUser);
+      // v3.44 Path B: strikes (given-away rows) must come from the SAME LWW brain as the
+      //   ghosts when the engine flag is on — else received shows but the origin row isn't struck.
+      const _usedMap = window._lwwEngine ? _lwwBackedUsedMap(_mid, _curUser) : OverlayManager.getUsedMap(_mid, _curUser);
       // v3.41: PB usedMap for anonymous / non-owner chevron+dot
-      const _pbUsedMap = (typeof PBOverlays !== 'undefined') ? PBOverlays.getUsedMap(_pbGetLoggedInName()) : {};
+      const _pbUsedMap = window._lwwEngine ? {} : ((typeof PBOverlays !== 'undefined') ? PBOverlays.getUsedMap(_pbGetLoggedInName()) : {});
       const _rowsHtml = [];
       // v3.43: show the inline 🌐 publish button once per draft action. Real rows precede ghosts
       //   in `items`, so the struck source row wins the button; a pure 'add' lands it on the ghost.
