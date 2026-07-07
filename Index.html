@@ -2497,12 +2497,14 @@ window.allPharmacistNames = [];
     //   all keep working — only WHO-holds-what is computed correctly (chains fixed).
     //   Records = public pathBOverlays + the VIEWER's own local drafts (author preview).
     // ═══════════════════════════════════════════════════════════
-    window._lwwEngine = window._lwwEngine || false;
+    // Persisted so the flag survives the app's auto-refresh during testing.
+    window._lwwEngine = (function() { try { return localStorage.getItem('lww_engine') === '1'; } catch (e) { return false; } })();
     window.setLwwEngine = function(on) {
       window._lwwEngine = !!on;
+      try { localStorage.setItem('lww_engine', on ? '1' : '0'); } catch (e) {}
       if (typeof invalidateGhostCache === 'function') invalidateGhostCache();
       if (typeof triggerUpdate === 'function') triggerUpdate();
-      console.log('[LWW engine] ' + (on ? 'ON' : 'OFF'));
+      console.log('[LWW engine] ' + (on ? 'ON (persisted)' : 'OFF'));
     };
     function _lwwViewerRecords(monthId, viewerName) {
       var pub = (Array.isArray(pathBOverlays) ? pathBOverlays : []).filter(function(o) { return o && String(o._visibility || 'public') !== 'draft'; });
