@@ -1814,6 +1814,13 @@
             </button>
           </div>
           <div id="tableWrapper" class="hidden">
+            <!-- v3.44 Step 4a: view toggle — legacy (default) vs LWW "current owner" view -->
+            <div id="lwwViewToggle" style="display:flex; gap:6px; align-items:center; margin-bottom:8px; font-size:12px; flex-wrap:wrap;">
+              <span style="color:var(--sub);">มุมมอง:</span>
+              <button type="button" id="lwwBtnLegacy" onclick="setLwwView(false)" style="padding:4px 10px; border-radius:6px; border:1px solid #2563eb; background:#2563eb; color:#fff; font-family:inherit; font-size:12px; cursor:pointer;">ปกติ</button>
+              <button type="button" id="lwwBtnNow" onclick="setLwwView(true)" style="padding:4px 10px; border-radius:6px; border:1px solid var(--border); background:var(--surface); color:var(--text); font-family:inherit; font-size:12px; cursor:pointer;">ปัจจุบัน · LWW</button>
+              <span id="lwwViewNote" style="font-size:10px; color:var(--sub);"></span>
+            </div>
             <div id="tableContainer">
               <table>
                 <thead>
@@ -5314,7 +5321,10 @@ window.allPharmacistNames = [];
         return naturalCompare(a.name, b.name);
       });
 
-      renderTable(fData);
+      // v3.44 Step 4a: LWW "current owner" view swaps ONLY the table-body render.
+      //   Legacy path (banner, calendar, pos dropdown) is untouched — pure additive toggle.
+      if (window._lwwView) renderLWWTable(_lwwBuildRows(filters));
+      else renderTable(fData);
 
       const targetPerson = filters.multiNames.length === 1 ? filters.multiNames[0]
         : ([...new Set(fData.map(i => i.name))].length === 1 ? fData[0].name : null);
@@ -5492,6 +5502,123 @@ window.allPharmacistNames = [];
         }
       });
       document.getElementById('resBody').innerHTML = _rowsHtml.join('');
+    }
+
+    // ═══════════════════════════════════════════════════════════
+    // v3.44 STEP 4a — LWW "current owner" view (opt-in toggle)
+    //   Clean render: one name per cell = LWW.currentOwner. No ghosts, no
+    //   strikethroughs. Moved cells get a blue dot + tap → ledger popup.
+    //   Reads the SAME columns/classes as renderTable so it looks native.
+    //   Default is OFF (legacy) — this only runs when window._lwwView is true.
+    // ═══════════════════════════════════════════════════════════
+    window._lwwView = window._lwwView || false;
+    function setLwwView(on) {
+      window._lwwView = !!on;
+      var a = document.getElementById('lwwBtnLegacy'), b = document.getElementById('lwwBtnNow');
+      var note = document.getElementById('lwwViewNote');
+      var actS = 'padding:4px 10px; border-radius:6px; font-family:inherit; font-size:12px; cursor:pointer; border:1px solid #2563eb; background:#2563eb; color:#fff;';
+      var inaS = 'padding:4px 10px; border-radius:6px; font-family:inherit; font-size:12px; cursor:pointer; border:1px solid var(--border); background:var(--surface); color:var(--text);';
+      if (a) a.setAttribute('style', on ? inaS : actS);
+      if (b) b.setAttribute('style', on ? actS : inaS);
+      if (note) note.textContent = on ? 'ใครถือตอนนี้ · แตะช่องที่มีจุดเพื่อดูที่มา' : '';
+      if (typeof triggerUpdate === 'function') triggerUpdate();
+    }
+
+    // Build display rows from master (rawData), owner = LWW.currentOwner, then
+    // apply the same filters renderTable used. Only slots a person HOLDS now show.
+    function _lwwBuildRows(filters) {
+      if (typeof LWW === 'undefined') return [];
+      var raw = (typeof rawData !== 'undefined' && Array.isArray(rawData)) ? rawData : [];
+      var moved = LWW.movedOwners();   // slotKey → current owner (moved slots only)
+      var rows = raw.map(function(s) {
+        var key = makeShiftKey(s);
+        var owner = moved[key] || s.name;
+        return Object.assign({}, s, { name: owner, _lwwKey: key, _lwwOrig: s.name, _lwwMoved: !!moved[key] });
+      }).filter(function(i) {
+        var matchN = (filters.multiNames.length === 0 || filters.multiNames.includes(i.name))
+                  && (filters.nameS === '' || (i.name || '').toLowerCase().includes(filters.nameS));
+        var matchD = filters.dateD === '' || i.date === filters.dateD;
+        var matchR = filters.room === '' || (i.room && String(i.room).toLowerCase().includes(filters.room.toLowerCase()));
+        var matchP = !filters.posD || i.pos === filters.posD;
+        return matchN && matchD && matchR && matchP;
+      });
+      rows.sort(function(a, b) {
+        var t = (a.timestamp || 0) - (b.timestamp || 0); if (t !== 0) return t;
+        var p = naturalCompare(a.pos, b.pos); if (p !== 0) return p;
+        return naturalCompare(a.name, b.name);
+      });
+      return rows;
+    }
+
+    function renderLWWTable(items) {
+      var html = items.map(function(i) {
+        var s = (i.shift || '').toLowerCase();
+        var badge = 'badge-other';
+        if (s.includes('⚠️')) badge = 'badge-purple';
+        else if (s.includes('กลางวัน') || s.includes('เช้า')) badge = 'badge-day';
+        else if (s.includes('รอบ 1') || s.includes('รอบ1')) badge = 'badge-s1';
+        else if (s.includes('รอบ 2') || s.includes('รอบ2')) badge = 'badge-s2';
+        else if (s.includes('รอบ 3') || s.includes('รอบ3')) badge = 'badge-s3';
+        var shiftName = (i.shift && i.shift !== '-') ? i.shift : '';
+        var timeRange = (i.range && i.range !== '-') ? i.range : '';
+        var disp;
+        if (timeRange === 'ตรวจสอบ') disp = '<span class="font-bold text-[9px] text-purple-700">ตรวจสอบ</span>';
+        else if (shiftName && timeRange) disp = '<span class="font-bold tracking-tight">' + shiftName + '</span><span class="font-light opacity-90 tracking-tighter ml-1">' + timeRange + '</span>';
+        else if (shiftName) disp = '<span class="font-bold tracking-tight">' + shiftName + '</span>';
+        else if (timeRange) disp = '<span class="font-bold tracking-tight">' + timeRange + '</span>';
+        else disp = '-';
+        var moved = i._lwwMoved;
+        var dot = moved ? '<span class="swap-pair-dot" style="background:#2563eb;"></span> ' : '';
+        var chev = moved ? ' <span class="tl-chevron" title="ดูที่มา">▶</span>' : '';
+        var nameCls = i.isNew ? 'text-orange-600 font-bold leading-none' : 'text-blue-900 font-bold leading-none';
+        var rowCls = 'bg-white hover:bg-gray-50 border-b border-gray-100 transition-all' + (moved ? ' shift-row-tappable' : '');
+        var tapAttr = moved ? ' data-lww-key="' + encodeURIComponent(i._lwwKey) + '" style="cursor:pointer; font-size: var(--table-font-size);"' : ' style="font-size: var(--table-font-size);"';
+        return '<tr class="' + rowCls + '"' + tapAttr + '>' +
+          '<td class="px-0.5 py-1.5 font-semibold text-gray-600 align-middle text-center whitespace-nowrap">' + i.date + '</td>' +
+          '<td class="px-1 py-1.5 align-middle col-name leading-tight"><span class="' + nameCls + '">' + dot + (i.isNew ? '⚠️ ' : '') + i.name + '</span>' + chev + '</td>' +
+          '<td class="px-0.5 py-1.5 pl-5 text-center font-bold text-gray-800 align-middle whitespace-nowrap">' + i.pos + '</td>' +
+          '<td class="px-0.5 py-1.5 text-center align-middle whitespace-nowrap"><div class="inline-flex items-center justify-center ' + badge + ' px-1.5 py-1 rounded font-bold shadow-2xs whitespace-nowrap text-center box-border leading-none">' + disp + '</div></td>' +
+          '</tr>';
+      });
+      var body = document.getElementById('resBody');
+      body.innerHTML = html.join('');
+      Array.prototype.forEach.call(body.querySelectorAll('tr[data-lww-key]'), function(tr) {
+        tr.addEventListener('click', function() { _lwwOpenLedger(decodeURIComponent(tr.getAttribute('data-lww-key'))); });
+      });
+    }
+
+    // Tap a moved cell → "สมุด" (ledger): original → each transfer → current holder.
+    function _lwwFmtAt(iso) { try { var d = new Date(iso); return isNaN(d) ? String(iso) : d.toLocaleString('th-TH', { dateStyle: 'short', timeStyle: 'short' }); } catch (e) { return String(iso); } }
+    function _lwwStep(title, sub, cur) {
+      var pill = cur ? 'background:#dbeafe; color:#1d4ed8;' : 'background:#eef2f7; color:var(--sub);';
+      return '<div style="display:flex; gap:10px; align-items:flex-start; padding:7px 0;">' +
+        '<div style="width:20px;height:20px;border-radius:50%;flex:none;' + pill + '"></div>' +
+        '<div><div style="font-size:13px;' + (cur ? 'font-weight:700;' : '') + '">' + title + '</div>' +
+        (sub ? '<div style="font-size:12px;color:' + (cur ? '#2563eb' : 'var(--sub)') + ';">' + sub + '</div>' : '') + '</div></div>';
+    }
+    function _lwwCloseLedger() { var e = document.getElementById('lwwLedgerOverlay'); if (e) e.remove(); }
+    function _lwwOpenLedger(slotKey) {
+      if (typeof LWW === 'undefined') return;
+      var parts = String(slotKey).split('|');
+      var date = parts[0] || '', pos = parts[1] || '', orig = parts[2] || '', range = parts[3] || '';
+      var cur = LWW.currentOwner(slotKey) || orig;
+      var led = LWW.ledger(slotKey) || [];
+      var steps = _lwwStep('เดิม (ต้นฉบับ)', orig, false);
+      led.forEach(function(r) {
+        var verb = r.action === 'swap' ? 'สลับกับ' : 'รับจาก';
+        steps += _lwwStep(verb + ' ' + (r.fromNote || '?') + ' → ' + r.newOwner,
+                          'โดย ' + (r.recordedBy || '?') + (r.at ? ' · ' + _lwwFmtAt(r.at) : ''), false);
+      });
+      steps += _lwwStep('ตอนนี้', cur, true);
+      var ov = document.createElement('div');
+      ov.id = 'lwwLedgerOverlay';
+      ov.style.cssText = 'position:fixed; inset:0; background:rgba(0,0,0,0.45); z-index:9999; display:flex; align-items:flex-end; justify-content:center;';
+      ov.innerHTML = '<div style="background:var(--surface); width:100%; max-width:460px; border-radius:16px 16px 0 0; padding:18px; font-family:inherit;">' +
+        '<div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:4px;"><div style="font-weight:700; font-size:15px;">เวร ' + pos + '</div>' +
+        '<button type="button" onclick="_lwwCloseLedger()" style="border:none; background:none; font-size:18px; cursor:pointer; color:var(--sub);">✕</button></div>' +
+        '<div style="font-size:12px; color:var(--sub); margin-bottom:10px;">' + date + ' · ' + range + '</div>' + steps + '</div>';
+      ov.addEventListener('click', function(e) { if (e.target === ov) _lwwCloseLedger(); });
+      document.body.appendChild(ov);
     }
 
     function renderCalendar(name) {
