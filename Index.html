@@ -2340,6 +2340,7 @@ window.allPharmacistNames = [];
         });
         pathBOverlays.forEach(o => {
           if (!o) return;
+          if (String(o._visibility || 'public') === 'draft') return;   // v3.44 Step 4b: drafts don't synth ghosts for others
           if (String(o.viewerName || '') === String(viewerName)) return;
           if (String(o.partnerName || '') !== String(viewerName)) return;
           const act = String(o.action || '');
@@ -3135,7 +3136,10 @@ window.allPharmacistNames = [];
        *   unmarked when logged-in ณรพล views ณัชชพล's filter. OverlayManager wins via
        *   `||` in the render code, so same-row double-marking is harmless. */
       getUsedMap(loggedInName) {
-        const overlays = Array.isArray(pathBOverlays) ? pathBOverlays : [];
+        // v3.44 Step 4b: a DRAFT record must never strike/affect anyone else's row.
+        //   (This was the 103(1)* desync: a private draft leaked into the public view.)
+        const overlays = (Array.isArray(pathBOverlays) ? pathBOverlays : [])
+          .filter(o => o && String(o._visibility || 'public') !== 'draft');
         const map = {};
         const colors = {};
         let idx = 0;
@@ -4587,22 +4591,27 @@ window.allPharmacistNames = [];
         return;
       }
       const mid = getCurrentMonthId();
+      // v3.44 Step 4b: before recording, show Level-1 (current owner + time) + an editable
+      //   "รับจาก/แลกกับ" field so the recorder can name the ACTUAL person they got it from
+      //   (e.g. C), even if the schedule still displays the original owner (A). We keep the
+      //   existing overlay format — only partnerName changes — so the current view still renders.
       if (actionState.step === 'swap' && actionState.shiftKey) {
         const mine = findShiftByKey(actionState.shiftKey);
         if (!mine) return;
-        OverlayManager.addAction(mid, {
-          action: 'swap',
-          shiftKey: actionState.shiftKey,
-          partnerShiftKey: targetKey,
-          partnerName: targetShift.name,
-          originalOwner: mine.name
-        });
+        const myKey = actionState.shiftKey, mineName = mine.name;
+        _lwwTransferConfirm({ kind: 'swap', targetKey: targetKey, targetShift: targetShift, defaultFrom: targetShift.name,
+          onConfirm: function(fromName) {
+            OverlayManager.addAction(mid, { action: 'swap', shiftKey: myKey, partnerShiftKey: targetKey, partnerName: fromName, originalOwner: mineName });
+            closeActionModal(); triggerUpdate();
+          } });
+        return;
       } else if (actionState.step === 'add') {
-        OverlayManager.addAction(mid, {
-          action: 'add',
-          shiftKey: targetKey,
-          partnerName: targetShift.name
-        });
+        _lwwTransferConfirm({ kind: 'add', targetKey: targetKey, targetShift: targetShift, defaultFrom: targetShift.name,
+          onConfirm: function(fromName) {
+            OverlayManager.addAction(mid, { action: 'add', shiftKey: targetKey, partnerName: fromName });
+            closeActionModal(); triggerUpdate();
+          } });
+        return;
       }
       closeActionModal();
       triggerUpdate();
@@ -4628,6 +4637,43 @@ window.allPharmacistNames = [];
       }
       closeActionModal();
       triggerUpdate();
+    }
+
+    // v3.44 Step 4b — transfer confirm dialog (Level-1 + editable "รับจาก/แลกกับ").
+    function _lwwFmtAt2(iso) { try { var d = new Date(iso); return isNaN(d) ? '' : d.toLocaleString('th-TH', { dateStyle: 'short', timeStyle: 'short' }); } catch (e) { return ''; } }
+    function _lwwTransferClose() { var e = document.getElementById('lwwTransferOverlay'); if (e) e.remove(); }
+    function _lwwTransferConfirm(opts) {
+      var names = (window.allPharmacistNames || []).slice();
+      var optionsHtml = names.map(function(n) { return '<option value="' + String(n).replace(/"/g, '&quot;') + '"></option>'; }).join('');
+      var kindLabel = opts.kind === 'swap' ? 'แลกกับ' : 'รับจาก';
+      var curOwner = (opts.targetShift && opts.targetShift.name) || opts.defaultFrom || '';
+      var lastAt = '';
+      try {
+        if (typeof LWW !== 'undefined' && String(opts.targetKey || '').indexOf('_g_') !== 0) {
+          var led = LWW.ledger(opts.targetKey) || [];
+          if (led.length) lastAt = _lwwFmtAt2(led[led.length - 1].at);
+        }
+      } catch (e) {}
+      var lvl1 = 'ช่องนี้ตอนนี้เป็นของ <b>' + curOwner + '</b>' + (lastAt ? ' · ลงเมื่อ ' + lastAt : '');
+      var ov = document.createElement('div');
+      ov.id = 'lwwTransferOverlay';
+      ov.style.cssText = 'position:fixed; inset:0; background:rgba(0,0,0,0.45); z-index:10000; display:flex; align-items:flex-end; justify-content:center;';
+      ov.innerHTML = '<div style="background:var(--surface); width:100%; max-width:460px; border-radius:16px 16px 0 0; padding:18px; font-family:inherit;">' +
+        '<div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px;"><div style="font-weight:700; font-size:15px;">ยืนยันการ' + (opts.kind === 'swap' ? 'แลกเวร' : 'รับเวร') + '</div>' +
+        '<button type="button" onclick="_lwwTransferClose()" style="border:none;background:none;font-size:18px;cursor:pointer;color:var(--sub);">✕</button></div>' +
+        '<div style="display:flex; gap:8px; background:#fff7ed; border-radius:8px; padding:9px 11px; margin-bottom:14px;"><span>ℹ️</span><div style="font-size:12px; color:#9a3412; line-height:1.55;">' + lvl1 + '</div></div>' +
+        '<label style="font-size:12px; color:var(--sub);">' + kindLabel + ' (ถ้าจริง ๆ มาจากคนอื่น แก้ตรงนี้ได้)</label>' +
+        '<input id="lwwFromInput" list="lwwFromList" value="' + String(opts.defaultFrom || '').replace(/"/g, '&quot;') + '" style="width:100%; margin:5px 0 12px; padding:8px; border:1px solid var(--border); border-radius:6px; font-family:inherit; font-size:14px; box-sizing:border-box;" />' +
+        '<datalist id="lwwFromList">' + optionsHtml + '</datalist>' +
+        '<div style="display:flex; gap:8px;"><button type="button" onclick="_lwwTransferClose()" style="flex:1; padding:9px; border:1px solid var(--border); border-radius:6px; background:var(--surface); color:var(--text); font-family:inherit; cursor:pointer;">ยกเลิก</button>' +
+        '<button type="button" id="lwwTransferOk" style="flex:1; padding:9px; border:1px solid #2563eb; border-radius:6px; background:#2563eb; color:#fff; font-family:inherit; cursor:pointer;">ยืนยัน</button></div>' +
+        '</div>';
+      document.body.appendChild(ov);
+      document.getElementById('lwwTransferOk').addEventListener('click', function() {
+        var v = (document.getElementById('lwwFromInput').value || '').trim() || (opts.defaultFrom || '');
+        _lwwTransferClose();
+        if (typeof opts.onConfirm === 'function') opts.onConfirm(v);
+      });
     }
 
     // 🆕 PHASE 1: Auto-select user จาก URL param (?user=NAME)
