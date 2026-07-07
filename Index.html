@@ -4643,8 +4643,6 @@ window.allPharmacistNames = [];
     function _lwwFmtAt2(iso) { try { var d = new Date(iso); return isNaN(d) ? '' : d.toLocaleString('th-TH', { dateStyle: 'short', timeStyle: 'short' }); } catch (e) { return ''; } }
     function _lwwTransferClose() { var e = document.getElementById('lwwTransferOverlay'); if (e) e.remove(); }
     function _lwwTransferConfirm(opts) {
-      var names = (window.allPharmacistNames || []).slice();
-      var optionsHtml = names.map(function(n) { return '<option value="' + String(n).replace(/"/g, '&quot;') + '"></option>'; }).join('');
       var kindLabel = opts.kind === 'swap' ? 'แลกกับ' : 'รับจาก';
       var curOwner = (opts.targetShift && opts.targetShift.name) || opts.defaultFrom || '';
       var lastAt = '';
@@ -4655,6 +4653,7 @@ window.allPharmacistNames = [];
         }
       } catch (e) {}
       var lvl1 = 'ช่องนี้ตอนนี้เป็นของ <b>' + curOwner + '</b>' + (lastAt ? ' · ลงเมื่อ ' + lastAt : '');
+      var initFrom = opts.defaultFrom || '';
       var ov = document.createElement('div');
       ov.id = 'lwwTransferOverlay';
       ov.style.cssText = 'position:fixed; inset:0; background:rgba(0,0,0,0.45); z-index:10000; display:flex; align-items:flex-end; justify-content:center;';
@@ -4662,18 +4661,62 @@ window.allPharmacistNames = [];
         '<div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px;"><div style="font-weight:700; font-size:15px;">ยืนยันการ' + (opts.kind === 'swap' ? 'แลกเวร' : 'รับเวร') + '</div>' +
         '<button type="button" onclick="_lwwTransferClose()" style="border:none;background:none;font-size:18px;cursor:pointer;color:var(--sub);">✕</button></div>' +
         '<div style="display:flex; gap:8px; background:#fff7ed; border-radius:8px; padding:9px 11px; margin-bottom:14px;"><span>ℹ️</span><div style="font-size:12px; color:#9a3412; line-height:1.55;">' + lvl1 + '</div></div>' +
-        '<label style="font-size:12px; color:var(--sub);">' + kindLabel + ' (ถ้าจริง ๆ มาจากคนอื่น แก้ตรงนี้ได้)</label>' +
-        '<input id="lwwFromInput" list="lwwFromList" value="' + String(opts.defaultFrom || '').replace(/"/g, '&quot;') + '" style="width:100%; margin:5px 0 12px; padding:8px; border:1px solid var(--border); border-radius:6px; font-family:inherit; font-size:14px; box-sizing:border-box;" />' +
-        '<datalist id="lwwFromList">' + optionsHtml + '</datalist>' +
+        '<label style="font-size:12px; color:var(--sub);">' + kindLabel + ' (แตะเพื่อเลือก/แก้ชื่อ)</label>' +
+        '<div id="lwwFromField" data-val="' + String(initFrom).replace(/"/g, '&quot;') + '" style="width:100%; margin:5px 0 12px; padding:10px 12px; border:1px solid var(--border); border-radius:6px; font-family:inherit; font-size:15px; cursor:pointer; display:flex; justify-content:space-between; align-items:center; box-sizing:border-box;"><span id="lwwFromVal">' + (initFrom || '— เลือกชื่อ —') + '</span><span style="color:var(--sub);">▾</span></div>' +
         '<div style="display:flex; gap:8px;"><button type="button" onclick="_lwwTransferClose()" style="flex:1; padding:9px; border:1px solid var(--border); border-radius:6px; background:var(--surface); color:var(--text); font-family:inherit; cursor:pointer;">ยกเลิก</button>' +
         '<button type="button" id="lwwTransferOk" style="flex:1; padding:9px; border:1px solid #2563eb; border-radius:6px; background:#2563eb; color:#fff; font-family:inherit; cursor:pointer;">ยืนยัน</button></div>' +
         '</div>';
       document.body.appendChild(ov);
+      document.getElementById('lwwFromField').addEventListener('click', function() {
+        var field = this;
+        _lwwNamePicker(field.getAttribute('data-val'), function(nm) {
+          field.setAttribute('data-val', nm);
+          document.getElementById('lwwFromVal').textContent = nm || '— เลือกชื่อ —';
+        });
+      });
       document.getElementById('lwwTransferOk').addEventListener('click', function() {
-        var v = (document.getElementById('lwwFromInput').value || '').trim() || (opts.defaultFrom || '');
+        var v = (document.getElementById('lwwFromField').getAttribute('data-val') || '').trim() || initFrom;
         _lwwTransferClose();
         if (typeof opts.onConfirm === 'function') opts.onConfirm(v);
       });
+    }
+
+    // v3.44 Step 4b — mobile-friendly center name picker (search + tap), replaces the
+    //   native datalist which renders cramped behind the phone keyboard.
+    function _lwwNamePickerClose() { var e = document.getElementById('lwwNamePickerOverlay'); if (e) e.remove(); }
+    function _lwwNamePicker(current, onPick) {
+      var names = (window.allPharmacistNames || []).slice();
+      var ov = document.createElement('div');
+      ov.id = 'lwwNamePickerOverlay';
+      ov.style.cssText = 'position:fixed; inset:0; background:rgba(0,0,0,0.5); z-index:10002; display:flex; align-items:center; justify-content:center; padding:16px;';
+      ov.innerHTML = '<div style="background:var(--surface); width:100%; max-width:380px; height:70vh; border-radius:14px; padding:14px; font-family:inherit; display:flex; flex-direction:column;">' +
+        '<div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px;"><div style="font-weight:700; font-size:15px;">เลือกชื่อ</div>' +
+        '<button type="button" onclick="_lwwNamePickerClose()" style="border:none;background:none;font-size:18px;cursor:pointer;color:var(--sub);">✕</button></div>' +
+        '<input id="lwwNameSearch" placeholder="พิมพ์ค้นหาชื่อ…" autocomplete="off" style="width:100%; padding:10px; border:1px solid var(--border); border-radius:8px; font-family:inherit; font-size:15px; box-sizing:border-box; margin-bottom:8px;" />' +
+        '<div id="lwwNameList" style="overflow-y:auto; flex:1; -webkit-overflow-scrolling:touch;"></div>' +
+        '</div>';
+      document.body.appendChild(ov);
+      ov.addEventListener('click', function(e) { if (e.target === ov) _lwwNamePickerClose(); });
+      var search = document.getElementById('lwwNameSearch');
+      var list = document.getElementById('lwwNameList');
+      function render() {
+        var q = (search.value || '').trim().toLowerCase();
+        var qt = (search.value || '').trim();
+        var filtered = names.filter(function(n) { return !q || String(n).toLowerCase().indexOf(q) >= 0; });
+        var html = filtered.slice(0, 80).map(function(n) {
+          return '<div class="lww-name-row" data-name="' + String(n).replace(/"/g, '&quot;') + '" style="padding:12px 8px; border-bottom:1px solid var(--border); cursor:pointer; font-size:15px;">' + n + '</div>';
+        }).join('');
+        if (qt && !names.some(function(n) { return String(n).toLowerCase() === q; })) {
+          html += '<div class="lww-name-row" data-name="' + qt.replace(/"/g, '&quot;') + '" style="padding:12px 8px; cursor:pointer; font-size:14px; color:#b45309;">ใช้ชื่อ “' + qt + '” (ไม่มีในระบบ)</div>';
+        }
+        list.innerHTML = html || '<div style="padding:14px; color:var(--sub); font-size:13px;">ไม่พบชื่อ</div>';
+        Array.prototype.forEach.call(list.querySelectorAll('.lww-name-row'), function(row) {
+          row.addEventListener('click', function() { var nm = row.getAttribute('data-name'); _lwwNamePickerClose(); if (typeof onPick === 'function') onPick(nm); });
+        });
+      }
+      search.addEventListener('input', render);
+      render();
+      setTimeout(function() { try { search.focus(); } catch (e) {} }, 60);
     }
 
     // 🆕 PHASE 1: Auto-select user จาก URL param (?user=NAME)
