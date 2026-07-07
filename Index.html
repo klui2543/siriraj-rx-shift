@@ -3067,6 +3067,55 @@ window.allPharmacistNames = [];
           }
         }
         return result;
+      },
+
+      // v3.44 STEP 3 — sweep EVERY month in the selector (migration coverage).
+      //   Fetches each month's data, runs the OLD-vs-LWW compare, then RESTORES the
+      //   live view untouched. One command:  await LWWCompare.runAll()
+      //   ⚠️ A red month may be a real LWW gap OR the logged-in user's local drafts —
+      //   drill in by switching the app to that month and running LWWCompare.run().
+      runAll() {
+        const sel = document.getElementById('mainMonthSelector');
+        if (!sel) { console.warn('[LWWCompare] month selector (#mainMonthSelector) not found'); return; }
+        const months = Array.from(sel.options)
+          .map(o => ({ value: o.value, mid: 'm_' + String(o.text || '').trim().replace(/\s+/g, '_') }))
+          .filter(m => m.value);
+        const fetch1 = (v) => new Promise((res, rej) => {
+          try { google.script.run.withSuccessHandler(res).withFailureHandler(rej).getScheduleData(v); }
+          catch (e) { rej(e); }
+        });
+        const _raw = rawData, _pb = pathBOverlays;    // save live state
+        const summary = [];
+        console.log('%c[LWWCompare.runAll] sweeping ' + months.length + ' months…', 'font-weight:bold');
+        return (async () => {
+          try {
+            for (const m of months) {
+              let res;
+              try { res = await fetch1(m.value); }
+              catch (e) { console.warn('  ✗ fetch failed ' + m.mid, e && e.message);
+                          summary.push({ month: m.mid, result: 'ERR', overlays: '-', diffs: '-', who: '' }); continue; }
+              rawData = (res && res.data) || [];
+              pathBOverlays = (res && Array.isArray(res._pbOverlays)) ? res._pbOverlays : [];
+              if (typeof invalidateGhostCache === 'function') invalidateGhostCache();
+              _shiftKeyIndex = null; _shiftKeyIndexFor = null;
+              const r = this.run(m.mid, { verbose: false });
+              summary.push({ month: m.mid, result: r.ok ? '✅' : '❌', overlays: r.overlays,
+                             diffs: r.mismatches.length, who: r.mismatches.map(x => x.person).join(', ') });
+              console.log('  ' + (r.ok ? '✅' : '❌') + ' ' + m.mid + '  (overlays ' + r.overlays + ', diffs ' + r.mismatches.length + ')');
+            }
+          } finally {
+            rawData = _raw; pathBOverlays = _pb;        // restore live state
+            if (typeof invalidateGhostCache === 'function') invalidateGhostCache();
+            _shiftKeyIndex = null; _shiftKeyIndexFor = null;
+          }
+          const green = summary.filter(s => s.result === '✅').length;
+          const reds  = summary.filter(s => s.result === '❌');
+          const errs  = summary.filter(s => s.result === 'ERR').length;
+          console.log('%c[LWWCompare.runAll] done — ' + green + ' ✅ / ' + reds.length + ' ❌ / ' + errs + ' ERR', 'font-weight:bold');
+          console.table(summary);
+          if (reds.length) console.log('%cdrill in: switch app to a red month → LWWCompare.run(). Reds may be local drafts, not LWW bugs.', 'color:#b45309');
+          return summary;
+        })();
       }
     };
     try { if (typeof window !== 'undefined') window.LWWCompare = LWWCompare; } catch (e) {}
