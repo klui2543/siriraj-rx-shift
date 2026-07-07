@@ -2834,6 +2834,137 @@ window.allPharmacistNames = [];
       }
       return Array.from(seen);
     }
+
+    // ═══════════════════════════════════════════════════════════
+    // v3.44 STEP 1 — LWW ownership resolver (PARALLEL, NOT WIRED)
+    //   "สมุดเซ็นชื่อ": ใครถูกบันทึกล่าสุด = เจ้าของช่องนั้น (Last-Write-Wins).
+    //   อ่าน pathBOverlays (public) + rawData(master) → คืน "ตอนนี้ใครถือ" ต่อ 1 ช่อง.
+    //
+    //   ⚠️ ยังไม่มีใครเรียกใช้ในการ render — เป็นเครื่องคิดตัวที่สองไว้ข้าง ๆ (Step 1).
+    //      Step 2 จะเขียน harness เทียบผลกับ engine เก่า (buildGhostRows) ทุกช่อง.
+    //   NOTE: `at` ตอนนี้ใช้ createdAt (client). Klui เลือกให้ย้ายไป server-stamp
+    //         ตอน publish — ทำใน Step ถัดไป (ยังไม่แตะตรงนี้).
+    //
+    //   slotKey = makeShiftKey ของ "แถว master" (date|pos|origOwner|range) — นิ่งตลอด
+    //   เพราะ master immutable. ทุก record ชี้แถว master เดิม (เลขที่นั่งโรงหนัง).
+    // ═══════════════════════════════════════════════════════════
+    const LWW = {
+      // Walk a `_g_<actionId>` ghost key back to a REAL master slotKey (string).
+      // Mirrors buildGhostRows._resolveToReal but returns the KEY, not the row —
+      // so a chained give/swap collapses onto the original master row it started from.
+      _resolveKey(key, consumerVN, overlays, rawArr) {
+        let k = String(key || ''), consumer = consumerVN || '', hops = 0;
+        const ov = Array.isArray(overlays) ? overlays : [];
+        while (k.indexOf('_g_') === 0 && hops++ < 10) {
+          const parentId = k.substring(3);
+          const parent = ov.find(p => p && p.actionId === parentId);
+          if (!parent) return null;                 // parent draft/missing → chain unresolved
+          const pact = String(parent.action || '');
+          if (pact === 'give' || pact === 'add') {
+            k = String(parent.shiftKey || '');
+            consumer = (pact === 'give') ? String(parent.viewerName || '') : String(parent.partnerName || '');
+          } else if (pact === 'swap') {
+            if (consumer && String(consumer) === String(parent.partnerName || '')) {
+              k = String(parent.shiftKey || '');
+              consumer = String(parent.viewerName || '');
+            } else {
+              k = String(parent.partnerShiftKey || '');
+              consumer = String(parent.partnerName || '');
+            }
+          } else return null;
+        }
+        if (Array.isArray(rawArr) && rawArr.find(s => makeShiftKey(s) === k)) return k;
+        return null;                                 // terminal key not a real master row
+      },
+
+      // Turn each PUBLIC overlay into 1 (give/add) or 2 (swap) ownership records.
+      //   record = { slotKey, newOwner, fromNote, recordedBy, at, action, actionId, pairId? }
+      buildRecords(overlays, rawArr) {
+        const ov = (Array.isArray(overlays) ? overlays : [])
+          .filter(o => o && String(o._visibility || 'public') !== 'draft');
+        const recs = [];
+        ov.forEach(o => {
+          const act = String(o.action || '');
+          const at = o.createdAt || '';
+          const recordedBy = String(o._retroBy || o.viewerName || '');   // login that entered it
+          if (act === 'give') {
+            // shiftKey = giver's row → newOwner = partnerName
+            const slot = this._resolveKey(o.shiftKey, String(o.viewerName || ''), ov, rawArr);
+            if (!slot || !o.partnerName) return;
+            recs.push({ slotKey: slot, newOwner: String(o.partnerName), fromNote: String(o.viewerName || ''),
+                        recordedBy, at, action: 'give', actionId: o.actionId });
+          } else if (act === 'add') {
+            // shiftKey = partner's (giver's) row → newOwner = viewerName
+            const slot = this._resolveKey(o.shiftKey, String(o.partnerName || ''), ov, rawArr);
+            if (!slot || !o.viewerName) return;
+            recs.push({ slotKey: slot, newOwner: String(o.viewerName), fromNote: String(o.partnerName || ''),
+                        recordedBy, at, action: 'add', actionId: o.actionId });
+          } else if (act === 'swap') {
+            // leg1: viewer's row → partner ; leg2: partner's row → viewer (consumer = overlay author)
+            const s1 = this._resolveKey(o.shiftKey, String(o.viewerName || ''), ov, rawArr);
+            const s2 = this._resolveKey(o.partnerShiftKey, String(o.viewerName || ''), ov, rawArr);
+            if (s1 && o.partnerName) recs.push({ slotKey: s1, newOwner: String(o.partnerName), fromNote: String(o.viewerName || ''),
+                        recordedBy, at, action: 'swap', actionId: o.actionId, pairId: o.actionId });
+            if (s2 && o.viewerName)  recs.push({ slotKey: s2, newOwner: String(o.viewerName), fromNote: String(o.partnerName || ''),
+                        recordedBy, at, action: 'swap', actionId: o.actionId, pairId: o.actionId });
+          }
+        });
+        return recs;
+      },
+
+      // LWW tiebreak: later `at` wins; equal `at` → later insertion order wins (stable).
+      _cmpAt(a, b) {
+        const ta = Date.parse(a.at) || 0, tb = Date.parse(b.at) || 0;
+        if (ta !== tb) return ta - tb;
+        return (a._i || 0) - (b._i || 0);
+      },
+
+      // slotKey → the single latest record (the winner). Only slots with ≥1 record.
+      ownershipMap(overlays, rawArr) {
+        const recs = this.buildRecords(overlays, rawArr);
+        const bySlot = {};
+        recs.forEach((r, i) => {
+          r._i = i;
+          const cur = bySlot[r.slotKey];
+          if (!cur || this._cmpAt(r, cur) >= 0) bySlot[r.slotKey] = r;
+        });
+        return bySlot;
+      },
+
+      // "ตอนนี้ใครถือช่องนี้" — latest public record's owner, else master original owner.
+      currentOwner(slotKey, overlays, rawArr) {
+        overlays = overlays || (typeof pathBOverlays !== 'undefined' ? pathBOverlays : []);
+        rawArr   = rawArr   || (typeof rawData !== 'undefined' ? rawData : []);
+        const latest = this.ownershipMap(overlays, rawArr)[slotKey];
+        if (latest) return latest.newOwner;
+        const row = (Array.isArray(rawArr) ? rawArr : []).find(s => makeShiftKey(s) === slotKey);
+        return row ? String(row.name || '') : null;   // null = unknown slot
+      },
+
+      // Full sign-in logbook for one slot, oldest→newest (the "สืบความจริง" ledger).
+      ledger(slotKey, overlays, rawArr) {
+        overlays = overlays || (typeof pathBOverlays !== 'undefined' ? pathBOverlays : []);
+        rawArr   = rawArr   || (typeof rawData !== 'undefined' ? rawData : []);
+        return this.buildRecords(overlays, rawArr)
+          .filter(r => r.slotKey === slotKey)
+          .sort((a, b) => this._cmpAt(a, b));
+      },
+
+      // Convenience for the Step-2 compare harness: every slot that has moved,
+      //   slotKey → currentOwner. (Slots with no record keep their master owner and
+      //   are omitted here — the harness fills those from rawData.)
+      movedOwners(overlays, rawArr) {
+        overlays = overlays || (typeof pathBOverlays !== 'undefined' ? pathBOverlays : []);
+        rawArr   = rawArr   || (typeof rawData !== 'undefined' ? rawData : []);
+        const map = this.ownershipMap(overlays, rawArr);
+        const out = {};
+        Object.keys(map).forEach(k => { out[k] = map[k].newOwner; });
+        return out;
+      }
+    };
+    // Expose for console testing (Step 1). Safe: nothing in render calls LWW yet.
+    try { if (typeof window !== 'undefined') window.LWW = LWW; } catch (e) {}
+
     const PBOverlays = {
       /** shiftKey → {label, actionId, color, _pbSource:true}.
        *  v3.42.3: no longer excludes logged-in user's overlays.
