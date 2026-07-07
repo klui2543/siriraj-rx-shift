@@ -2286,6 +2286,9 @@ window.allPharmacistNames = [];
     function invalidateGhostCache() { _ghostCache = null; _ghostCacheKey = ''; }
 
     function buildGhostRows(rawArr, monthId, viewerName) {
+      // v3.44 Path B: LWW is the ownership brain (fixes chained give/swap). Flag-gated,
+      //   default OFF (legacy engine). Flip with setLwwEngine(true) to test.
+      if (window._lwwEngine) { try { return _lwwBackedGhosts(rawArr, monthId, viewerName); } catch (e) { console.warn('[lww ghosts]', e); return []; } }
       try {
       if (!viewerName) return [];
       // v15: check cache
@@ -2485,6 +2488,104 @@ window.allPharmacistNames = [];
       _ghostCacheKey = cacheKey;
       return ghosts;
       } catch(err) { v10ShowError('buildGhostRows', err); return []; }
+    }
+
+    // ═══════════════════════════════════════════════════════════
+    // v3.44 Path B — LWW-backed engine (flag: window._lwwEngine)
+    //   Replaces the ghost chain resolver with LWW ownership. Same output SHAPE as
+    //   buildGhostRows / _combinedUsedMap so renderTable, counts, exports, calendar
+    //   all keep working — only WHO-holds-what is computed correctly (chains fixed).
+    //   Records = public pathBOverlays + the VIEWER's own local drafts (author preview).
+    // ═══════════════════════════════════════════════════════════
+    window._lwwEngine = window._lwwEngine || false;
+    window.setLwwEngine = function(on) {
+      window._lwwEngine = !!on;
+      if (typeof invalidateGhostCache === 'function') invalidateGhostCache();
+      if (typeof triggerUpdate === 'function') triggerUpdate();
+      console.log('[LWW engine] ' + (on ? 'ON' : 'OFF'));
+    };
+    function _lwwViewerRecords(monthId, viewerName) {
+      var pub = (Array.isArray(pathBOverlays) ? pathBOverlays : []).filter(function(o) { return o && String(o._visibility || 'public') !== 'draft'; });
+      if (!viewerName || typeof OverlayManager === 'undefined') return pub;
+      var out = pub.slice();
+      try {
+        var pubIds = {}; pub.forEach(function(o) { pubIds[o.actionId] = 1; });
+        var acts = OverlayManager.getActions(monthId, viewerName) || [];
+        acts.forEach(function(a) {
+          if (!a || pubIds[a.id]) return;                 // already public → counted once
+          out.push({ actionId: a.id, action: a.action, viewerName: a.viewerName || viewerName,
+                     partnerName: a.partnerName, shiftKey: a.shiftKey, partnerShiftKey: a.partnerShiftKey,
+                     originalOwner: a.originalOwner, createdAt: a.createdAt, _visibility: 'public', _retroBy: a._retroBy });
+        });
+      } catch (e) {}
+      return out;
+    }
+    function _lwwLatestMap(records, rawArr) {
+      var recs = LWW.buildRecords(records, rawArr), map = {};
+      recs.forEach(function(r, i) { r._i = i; var c = map[r.slotKey]; if (!c || LWW._cmpAt(r, c) >= 0) map[r.slotKey] = r; });
+      return { map: map, recs: recs };
+    }
+    function _lwwBackedGhosts(rawArr, monthId, viewerName) {
+      if (!viewerName || typeof LWW === 'undefined') return [];
+      var records = _lwwViewerRecords(monthId, viewerName);
+      var res = _lwwLatestMap(records, rawArr), own = res.map, allRecs = res.recs;
+      var ghosts = [];
+      (rawArr || []).forEach(function(s) {
+        var key = makeShiftKey(s), rec = own[key];
+        if (!rec || rec.newOwner !== viewerName || s.name === viewerName) return;   // only slots X received
+        var sourcePos = s.pos;
+        if (rec.action === 'swap' && rec.actionId) {
+          for (var j = 0; j < allRecs.length; j++) {
+            var m = allRecs[j];
+            if (m.actionId === rec.actionId && m.slotKey !== key && m.newOwner === rec.fromNote) { sourcePos = String(m.slotKey).split('|')[1] || s.pos; break; }
+          }
+        }
+        ghosts.push(Object.assign({}, s, {
+          _ghostKey: '_g_' + rec.actionId, name: viewerName, _ghost: 'received',
+          _ghostType: rec.action === 'swap' ? 'swap' : 'add', _ghostActionId: rec.actionId,
+          _ghostPartnerName: rec.fromNote, _ghostSourcePos: sourcePos
+        }));
+      });
+      _lwwAnnotateConflicts(ghosts, rawArr, viewerName, own);
+      return ghosts;
+    }
+    // Given-away strikes: any master row whose current owner ≠ its origin owner.
+    function _lwwBackedUsedMap(monthId, viewerName) {
+      if (typeof LWW === 'undefined') return {};
+      var records = _lwwViewerRecords(monthId, viewerName);
+      var own = _lwwLatestMap(records, rawData || []).map, map = {};
+      (rawData || []).forEach(function(s) {
+        var key = makeShiftKey(s), rec = own[key];
+        if (rec && rec.newOwner !== s.name) {
+          map[key] = { label: (rec.action === 'swap' ? 'สลับกับ ' : 'ยกให้ ') + rec.newOwner + ' แล้ว', actionId: rec.actionId, _pbSource: true };
+        }
+      });
+      return map;
+    }
+    // Mirror buildGhostRows Pass 2: annotate each ghost with conflict + label.
+    function _lwwAnnotateConflicts(ghosts, rawArr, viewerName, own) {
+      var ownEff = (rawArr || []).filter(function(s) {
+        if (s.name !== viewerName) return false;
+        var rec = own[makeShiftKey(s)];
+        return !(rec && rec.newOwner !== viewerName);       // own & not given away
+      });
+      var all = ownEff.concat(ghosts);
+      ghosts.forEach(function(g) {
+        var worst = 'none', cw = null;
+        for (var i = 0; i < all.length; i++) {
+          var o = all[i]; if (o === g) continue;
+          var ok = o._ghostKey || makeShiftKey(o); if (ok === g._ghostKey) continue;
+          var c = checkShiftConflict(g, o);
+          if (c === 'overlap') { worst = 'overlap'; cw = o; break; }
+          if (c === 'adjacent' && worst === 'none') { worst = 'adjacent'; cw = o; }
+        }
+        g._conflict = worst;
+        var desc = (g._ghostType === 'swap') ? ('แลกกับ ' + g._ghostSourcePos + ' กับ ' + g._ghostPartnerName) : ('รับจาก ' + g._ghostPartnerName);
+        var clinic = isSpecialClinic(g) || (cw && isSpecialClinic(cw));
+        if (worst === 'overlap') { g._ghostLabel = '(' + desc + (clinic ? ' • โปรดตรวจสอบเวลาการทำงานอีกครั้ง ก่อนแลกเปลี่ยนเวร' : ' • เวรชนกับ ' + (cw ? cw.pos : '')) + ')'; g._ghostLabelClass = 'label-overlap'; }
+        else if (worst === 'adjacent') { g._ghostLabel = '(' + desc + (clinic ? ' • โปรดตรวจสอบเวลาการทำงานอีกครั้ง ก่อนแลกเปลี่ยนเวร' : ' • เวรติดกับ ' + (cw ? cw.pos : '')) + ')'; g._ghostLabelClass = 'label-adjacent'; }
+        else { g._ghostLabel = '(' + desc + ')'; g._ghostLabelClass = ''; }
+      });
     }
 
     /** Combined rawData + ghost rows for current viewer */
@@ -2754,6 +2855,8 @@ window.allPharmacistNames = [];
     //           Use at count/filter sites (banner total, export PNG/PDF/ICS, day-picker) to
     //           avoid double-counting given-away shifts.
     function _combinedUsedMap(monthId, viewerName) {
+      // v3.44 Path B: LWW-backed strike map (given-away rows) when the engine flag is on.
+      if (window._lwwEngine) { try { return _lwwBackedUsedMap(monthId, viewerName); } catch (e) { console.warn('[lww usedmap]', e); return {}; } }
       const om = (typeof OverlayManager !== 'undefined') ? OverlayManager.getUsedMap(monthId, viewerName) : {};
       const pb = (typeof PBOverlays !== 'undefined') ? PBOverlays.getUsedMap(_pbGetLoggedInName()) : {};
       return Object.assign({}, pb, om);   // OverlayManager wins on key collision (own > public)
