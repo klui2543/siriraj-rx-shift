@@ -2965,6 +2965,112 @@ window.allPharmacistNames = [];
     // Expose for console testing (Step 1). Safe: nothing in render calls LWW yet.
     try { if (typeof window !== 'undefined') window.LWW = LWW; } catch (e) {}
 
+    // ═══════════════════════════════════════════════════════════
+    // v3.44 STEP 2 — Compare harness: OLD engine vs LWW (ตาข่ายกันตก)
+    //   For every person in the month, compare the set of shifts they hold.
+    //     OLD = _phxB3bComputeEffectiveShifts (the REAL render path: own rows
+    //           not struck + received ghosts) — what the app shows today.
+    //     NEW = LWW: for each master row, owner = LWW override else master name.
+    //   Identity = "date¦pos¦range" (name-agnostic — a ghost is a clone of its
+    //   source row with only `name` swapped, so comparing on the name-part would
+    //   false-mismatch a chained hop; the tuple avoids that).
+    //
+    //   Run in the browser console:  LWWCompare.run()
+    //   Green (ok:true) = both engines agree on who holds every shift → safe to
+    //   switch behind the flag in Step 4. Red = LWW still misses a case → fix it.
+    //
+    //   ⚠️ CAVEAT: feed both the SAME data. LWW reads pathBOverlays (public). The
+    //   OLD path also mixes in the LOGGED-IN user's *local unpublished drafts*
+    //   (via OverlayManager). So for a clean run, test with no pending drafts
+    //   (publish or clear them first), or view as anonymous. A mismatch isolated
+    //   to the logged-in user that traces to a draft is expected, not a bug.
+    // ═══════════════════════════════════════════════════════════
+    const LWWCompare = {
+      _tuple(s) {
+        if (!s) return '';
+        const d = s._origDate || s.date || '';
+        return [d, s.pos || '', s.range || ''].join('¦');
+      },
+      // every name that appears as a master owner or anywhere in the public overlays
+      _people(raw, ov) {
+        const set = new Set();
+        (raw || []).forEach(s => { if (s && s.name) set.add(String(s.name)); });
+        (ov || []).forEach(o => {
+          if (!o) return;
+          if (o.viewerName) set.add(String(o.viewerName));
+          if (o.partnerName) set.add(String(o.partnerName));
+        });
+        return Array.from(set);
+      },
+      run(monthId, opts) {
+        opts = opts || {};
+        const verbose = opts.verbose !== false;
+        const mid = monthId || (typeof getCurrentMonthId === 'function' ? getCurrentMonthId() : null);
+        const raw = (typeof rawData !== 'undefined' && Array.isArray(rawData)) ? rawData : [];
+        const ovAll = (typeof pathBOverlays !== 'undefined' && Array.isArray(pathBOverlays)) ? pathBOverlays : [];
+        const ov = ovAll.filter(o => o && String(o._visibility || 'public') !== 'draft');
+        if (!mid) { console.warn('[LWWCompare] no monthId'); return { ok: false, error: 'no monthId' }; }
+
+        // ---- NEW side: owner per master slot via LWW ----
+        const moved = LWW.movedOwners(ov, raw);          // slotKey → new owner (moved slots only)
+        const newByPerson = {};
+        // duplicate-tuple guard: if two master rows share a tuple, comparison is coarse there
+        const tupleOwners = {};
+        raw.forEach(s => {
+          const k = makeShiftKey(s);
+          const owner = (k in moved) ? moved[k] : String(s.name || '');
+          const t = this._tuple(s);
+          (newByPerson[owner] = newByPerson[owner] || new Set()).add(t);
+          (tupleOwners[t] = tupleOwners[t] || new Set()).add(k);
+        });
+        const dupTuples = Object.keys(tupleOwners).filter(t => tupleOwners[t].size > 1);
+
+        // ---- OLD side: what the app renders per person ----
+        const people = this._people(raw, ov);
+        const oldByPerson = {};
+        people.forEach(X => {
+          const eff = (typeof _phxB3bComputeEffectiveShifts === 'function')
+            ? (_phxB3bComputeEffectiveShifts(X, mid) || []) : [];
+          const set = new Set();
+          eff.forEach(s => set.add(this._tuple(s)));
+          oldByPerson[X] = set;
+        });
+
+        // ---- diff per person ----
+        const everyone = new Set(people.concat(Object.keys(newByPerson)));
+        const mismatches = [];
+        everyone.forEach(X => {
+          const oldS = oldByPerson[X] || new Set();
+          const newS = newByPerson[X] || new Set();
+          const onlyOld = Array.from(oldS).filter(t => !newS.has(t));  // OLD says X holds, LWW doesn't
+          const onlyNew = Array.from(newS).filter(t => !oldS.has(t));  // LWW says X holds, OLD doesn't
+          if (onlyOld.length || onlyNew.length) mismatches.push({ person: X, onlyOld, onlyNew });
+        });
+
+        const result = { ok: mismatches.length === 0, monthId: mid, peopleChecked: everyone.size,
+                         overlays: ov.length, mismatches, dupTuples };
+        if (verbose) {
+          console.log('%c[LWWCompare] ' + mid, 'font-weight:bold');
+          console.log('  people: ' + everyone.size + ' | public overlays: ' + ov.length +
+                      ' | moved slots: ' + Object.keys(moved).length);
+          if (dupTuples.length) console.warn('  ⚠️ ' + dupTuples.length +
+                      ' duplicate date¦pos¦range tuple(s) — comparison is coarse there:', dupTuples);
+          if (result.ok) {
+            console.log('%c  ✅ MATCH — OLD engine and LWW agree on every holder', 'color:green;font-weight:bold');
+          } else {
+            console.log('%c  ❌ ' + mismatches.length + ' person(s) differ', 'color:#dc2626;font-weight:bold');
+            mismatches.forEach(m => {
+              console.log('   • ' + m.person +
+                (m.onlyOld.length ? '\n       OLD-only (app shows, LWW drops): ' + m.onlyOld.join(' , ') : '') +
+                (m.onlyNew.length ? '\n       LWW-only (LWW adds, app hides): ' + m.onlyNew.join(' , ') : ''));
+            });
+          }
+        }
+        return result;
+      }
+    };
+    try { if (typeof window !== 'undefined') window.LWWCompare = LWWCompare; } catch (e) {}
+
     const PBOverlays = {
       /** shiftKey → {label, actionId, color, _pbSource:true}.
        *  v3.42.3: no longer excludes logged-in user's overlays.
