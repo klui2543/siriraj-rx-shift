@@ -65,44 +65,65 @@ function phxPushActions(rawName, pwHash, actionsArg, actingAs) {
     if (actions.length === 0) return { success: true, added: 0, skipped: 0 };
  
     const sh = _phxGetSheet(_B3_TAB);
- 
-    // Existing actionIds for target user
-    const existingIds = new Set();
+
+    // v3.44 UPSERT — snapshot existing rows for the target user: actionId → { row, payload }.
+    //   Old behaviour skipped any actionId already on the server, so a draft→public flip
+    //   (or any edit) could never propagate. Now we overwrite the stored payload in place.
+    const existing = {};   // id → { row: absoluteSheetRow, payload: storedJson }
     if (sh.getLastRow() >= 2) {
-      const idData = sh.getRange(2, 1, sh.getLastRow() - 1, 2).getValues();
-      for (let i = 0; i < idData.length; i++) {
-        if (String(idData[i][1]).trim() === targetName) {
-          existingIds.add(String(idData[i][0]).trim());
+      const all = sh.getRange(2, 1, sh.getLastRow() - 1, _B3_COL_COUNT).getValues();
+      for (let i = 0; i < all.length; i++) {
+        if (String(all[i][1]).trim() === targetName) {
+          existing[String(all[i][0]).trim()] = { row: i + 2, payload: String(all[i][4]) };
         }
       }
     }
- 
-    const rows = [];
-    let skipped = 0;
+
+    const rows = [];        // new actions → append at the bottom
+    let updated = 0;        // existing actions whose payload changed → overwritten in place
+    let unchanged = 0;      // existing actions with identical payload → left untouched (no sheet write)
+    let skipped = 0;        // malformed actions
     const now = new Date();
     for (let i = 0; i < actions.length; i++) {
       const a = actions[i];
       if (!a || typeof a !== 'object' || !a.id) { skipped++; continue; }
-      if (existingIds.has(String(a.id).trim())) { skipped++; continue; }
-      rows.push([
-        String(a.id).trim(),
-        targetName,                    // 🆕 ใช้ target ไม่ใช่ auth.name
-        String(a.monthId || ''),
-        String(a.type || ''),
-        JSON.stringify(a),
-        now
-      ]);
+      const id = String(a.id).trim();
+      const payloadStr = JSON.stringify(a);
+      const ex = existing[id];
+      if (ex) {
+        // Only rewrite when the payload actually differs — keeps steady-state refreshes
+        // (which re-push every unchanged action) from hammering the sheet.
+        if (ex.payload === payloadStr) { unchanged++; continue; }
+        // Overwrite cols 3-5 (monthId, type, payload); leave actionId/name/createdAt intact.
+        sh.getRange(ex.row, 3, 1, 3).setValues([[
+          String(a.monthId || ''),
+          String(a.type || ''),
+          payloadStr
+        ]]);
+        updated++;
+      } else {
+        rows.push([
+          id,
+          targetName,                    // 🆕 ใช้ target ไม่ใช่ auth.name
+          String(a.monthId || ''),
+          String(a.type || ''),
+          payloadStr,
+          now
+        ]);
+      }
     }
- 
+
     if (rows.length > 0) {
       sh.getRange(sh.getLastRow() + 1, 1, rows.length, _B3_COL_COUNT).setValues(rows);
     }
- 
+
     _phxTouchLastSeen(auth.row.rowIndex);
- 
+
     return {
       success: true,
       added: rows.length,
+      updated: updated,
+      unchanged: unchanged,
       skipped: skipped,
       actedAs: targetName !== auth.name ? targetName : undefined
     };
@@ -343,13 +364,29 @@ function testB3RoundTrip() {
   Logger.log('    found ' + testActions1.length + ' test actions (expect 3)');
   if (testActions1.length !== 3) passed = false;
  
-  // 3. Push again (dedup test)
-  Logger.log('\n[3] PUSH ซ้ำ (test dedup)...');
+  // 3. Push again, identical (dedup test — v3.44: now "unchanged", not "skipped")
+  Logger.log('\n[3] PUSH ซ้ำ (test dedup / no-op)...');
   r = phxPushActions(TEST_NAME, pwHash, fakeActions);
   Logger.log('    ' + JSON.stringify(r));
-  if (r.added !== 0 || r.skipped !== 3) {
-    Logger.log('    ⚠️ expected added=0, skipped=3 (dedup not working)'); passed = false;
+  if (r.added !== 0 || r.unchanged !== 3) {
+    Logger.log('    ⚠️ expected added=0, unchanged=3 (dedup not working)'); passed = false;
   }
+
+  // 3b. Push again with a CHANGED payload (v3.44 upsert test — the draft→public flip)
+  Logger.log('\n[3b] PUSH ทับ (test upsert — พลิก _visibility)...');
+  const flipped = fakeActions.map(function(a) { return Object.assign({}, a, { _visibility: 'public' }); });
+  r = phxPushActions(TEST_NAME, pwHash, flipped);
+  Logger.log('    ' + JSON.stringify(r));
+  if (r.added !== 0 || r.updated !== 3) {
+    Logger.log('    ⚠️ expected added=0, updated=3 (upsert not working)'); passed = false;
+  }
+  // verify the new payload actually landed
+  r = phxPullAll(TEST_NAME, pwHash);
+  const flippedBack = (r.actions || []).filter(function(a) {
+    return String(a.id).indexOf('test_act_') === 0 && a._visibility === 'public';
+  });
+  Logger.log('    public after upsert: ' + flippedBack.length + ' (expect 3)');
+  if (flippedBack.length !== 3) passed = false;
  
   // 4. Remove
   Logger.log('\n[4] REMOVE test_act_002...');
