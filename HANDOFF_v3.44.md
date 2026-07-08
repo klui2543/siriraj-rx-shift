@@ -1,8 +1,36 @@
 # HANDOFF v3.44 — LWW engine DONE + correct · blocker is SYNC
 
-**วันที่:** 7 กรกฎาคม 2569
+**วันที่:** 8 กรกฎาคม 2569 (อัปเดต — เดิม 7 ก.ค.)
 **Worktree:** LOCAL `clever-zhukovsky-390ab9` · branch `work/v3.44-lww`
-**สถานะ:** 🟢 LWW (Path B) เขียนเสร็จ + พิสูจน์แล้วว่า **render ถูกต้อง** · 🔴 บล็อกเดียว = **publish/sync ไม่ทำงาน** (คนละเรื่องกับ LWW)
+**สถานะ:** 🟢 LWW เสร็จ · 🟢 **SYNC fix (option ข) เทสผ่าน** (server round-trip + client 4 เคส) · 🟢 live-update overlay + ปุ่มรีเฟรช เพิ่มแล้ว · commit local แล้ว — **ยัง NOT PUSHED**
+
+---
+
+## 🆕 อัปเดต 8 ก.ค. — Sync fix + live-update overlay + ปุ่มรีเฟรช (commit local, ยังไม่ push)
+
+**สรุปรอบนี้:** แก้ให้ publish ไปถึง server จริง (blocker เดิม) + ทำให้ overlay ของคนอื่นเด้งขึ้นเองไม่ต้องรีเฟรช + เพิ่มปุ่มรีเฟรชมือ. ทุกอย่าง flag/rollback ได้ · deploy = paste `Index.html` + `Phase_Z_B3_Sync.js` คู่กัน
+
+### 1. SYNC fix (option ข) — ✅ เทสผ่านแล้ว
+**Diagnosis เดิมผิดนิดหน่อย:** overlay **ขึ้น server จริง** (login-sync auto-push ตอน addAction) แต่เป็น **draft** — การพลิก draft→public ไปไม่ถึง server เพราะ (ก) `publishAction`/`unpublishAction` ไม่ถูก hook เข้า login-sync (มีแค่ add/remove) (ข) server `phxPushActions` **skip id ซ้ำ** (ไม่ upsert) → รีเฟรช `phxCloudPullAll` ดึง draft ทับ → ย้อนเป็น draft
+- **`Phase_Z_B3_Sync.js`** `phxPushActions` skip→**UPSERT** (เขียนทับ cols 3-5 เมื่อ payload เปลี่ยนจริง; เหมือนเดิม=`unchanged` ไม่เขียน sheet). return เพิ่ม `updated`/`unchanged`. `testB3RoundTrip` + step [3b] พิสูจน์ upsert
+- **`Index.html`** flag `window._syncPublish` + `setSyncPublish(on)` (localStorage `sync_publish`, ~L2510 ข้าง `setLwwEngine`) · wrap `publishAction`/`unpublishAction` ใน `_phxWrapOverlayForSync` (~L11660) → `_phxScheduleSync()` เมื่อ flag เปิด
+- **เทสแล้ว:** server `testB3RoundTrip` เขียวรวม [3b] `updated=3` · client Klui เทสครบ 4 เคส (รับตรง/อ้อม + แลกตรง/อ้อม) ✅
+- **default OFF** · flip 1 บรรทัด (`=== '1'`→`!== '0'`) = เปิดทุกคน · rollback `setSyncPublish(false)`. ⚠️ **deploy 2 ไฟล์คู่กัน** ไม่งั้น flip ไม่ถึง server
+
+### 2. Live-update overlay — ✅ (บั๊ก "คนอื่นแก้แล้วไม่เห็นจนรีเฟรช")
+**Root cause:** `getDataSignature` ([Index.html ~L5034](Index.html)) ดูแค่ **master schedule ไม่ดู overlays** → poll 30 วิ ข้าม overlay-only changes; Firebase ก็ **ไม่ขน overlay** (ขนแค่ `schedules/<key>`) → published overlay ไม่โผล่จน manual refresh
+- Fix: `_pbOverlaySignature(pb)` (fingerprint รวม `_visibility` → จับ draft→public ที่ count เท่าเดิม) + poll เช็ก overlay แยกจาก master → `_pbRefreshInPlace(overlays)` (adopt `pathBOverlays` + retro-mirror + `triggerUpdate`). sync `_lastPbSignature` ที่ `fetchPathBOverlays` + `handleDataReceived`
+- ผล: overlay ของคนอื่นเด้งเอง **≤30 วิ** (เดิม 1-2 นาที + ต้องรีเฟรช)
+
+### 3. ปุ่มรีเฟรช (soft refresh) — ✅
+`phxManualRefresh()` + ปุ่ม `#phxRefreshBtn` (ไอคอน `#phxRefreshIcon`) ในแถว **`#lwwViewToggle`** ("มุมมอง:" toggle, ชิดขวา `margin-left:auto`). ดึง `getScheduleData` 1 รอบ → master เปลี่ยน `handleDataReceived` / เหมือนเดิม `_pbRefreshInPlace`. หมุนไอคอน (`.phx-spinning`) + toast `_p2bShowToast('อัปเดตแล้ว')`. **หมายเหตุ:** อยู่ **หน้าตารางเท่านั้น** (ปฏิทินยังไม่มี — Klui รับทราบ)
+
+### 4. Fix เล็ก
+- **ยาม id เพี้ยน:** publish ([Index.html:3803/3833](Index.html)) เรียก `fetchPathBOverlays` ด้วย selector value (numeric id) แทน label id → stale-guard ไม่เตือนผิด/ไม่ตกไป cache
+- **ชื่อเจ้าของแลกอ้อม:** `_lwwBackedGhosts` เก็บ `_ghostOrigOwner`=s.name (master); `_lwwAnnotateConflicts` เติม `— เวรเดิมของ X` เมื่อ origOwner ≠ partner ≠ viewer (แลก**ตรง**ไม่ขึ้น เพราะ origOwner=partner). ใช้กับ "รับ" ด้วย
+
+### 🔥 Firebase "ดับ" = ไม่ได้ดับ
+console จริง: **3/100 conn, <1% load, 0 errors**. log `[Bcast] 🔥 burst started (poll)` = ฟีเจอร์ broadcast-burst (poll เจอ master เปลี่ยน → เช็กประกาศ 60s×5min) **ไม่ใช่ error** (ไฟ 🔥 คือชื่อโหมด). อาการจริงที่ Klui เจอ = live-update overlay ไม่มา → **แก้ในข้อ 2 แล้ว**. ไม่ต้องไปยุ่ง Firebase reconnect (มันช่วย overlay ไม่ได้อยู่แล้ว)
 
 ---
 
