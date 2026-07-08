@@ -172,6 +172,9 @@
     }
     .tab-btn.active { color: var(--accent); border-bottom-color: var(--accent); }
     body.dark-theme .tab-btn.active { color: #93c5fd; border-bottom-color: #3b82f6; }
+    /* v3.44: manual soft-refresh button lives in the "มุมมอง" toggle row — spin icon while loading */
+    @keyframes phxSpin { to { transform: rotate(360deg); } }
+    .phx-spinning { animation: phxSpin 0.7s linear infinite; }
 
     /* ===== CONTENT AREA ===== */
     .content-area { padding: 12px 14px 16px; }
@@ -1820,6 +1823,10 @@
               <button type="button" id="lwwBtnLegacy" onclick="setOrigView(false)" style="padding:4px 10px; border-radius:6px; border:1px solid #2563eb; background:#2563eb; color:#fff; font-family:inherit; font-size:12px; cursor:pointer;">หลังแลก</button>
               <button type="button" id="lwwBtnOrig" onclick="setOrigView(true)" style="padding:4px 10px; border-radius:6px; border:1px solid var(--border); background:var(--surface); color:var(--text); font-family:inherit; font-size:12px; cursor:pointer;">ต้นฉบับ (ตามอัพโหลด)</button>
               <span id="lwwViewNote" style="font-size:10px; color:var(--sub);"></span>
+              <button id="phxRefreshBtn" onclick="phxManualRefresh()" title="รีเฟรชข้อมูลล่าสุด" aria-label="รีเฟรช" style="margin-left:auto; display:inline-flex; align-items:center; gap:4px; padding:4px 10px; border-radius:6px; border:1px solid var(--border); background:var(--surface); color:var(--text); font-family:inherit; font-size:12px; cursor:pointer;">
+                <svg id="phxRefreshIcon" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></svg>
+                รีเฟรช
+              </button>
             </div>
             <div id="tableContainer">
               <table>
@@ -2506,6 +2513,19 @@ window.allPharmacistNames = [];
       if (typeof triggerUpdate === 'function') triggerUpdate();
       console.log('[LWW engine] ' + (on ? 'ON (persisted)' : 'OFF'));
     };
+
+    // v3.44 — Publish→server sync (flag: window._syncPublish)
+    //   Fixes: กดเผยแพร่แล้ว draft→public แต่ server ไม่รู้ (publishAction ไม่ต่อสาย sync +
+    //   phxPushActions เดิม skip id ซ้ำ). เปิด flag → publish/unpublish วิ่งผ่าน login-based
+    //   push (debounced) และ server (upsert) เขียนทับ payload → คนอื่นเห็น/รีเฟรชไม่ย้อน draft.
+    //   ⚠️ ต้อง deploy Phase_Z_B3_Sync.js (upsert) คู่กันด้วย ไม่งั้น flip ยังไปไม่ถึง server.
+    //   default OFF → เทสด้วย setSyncPublish(true) ก่อน แล้วค่อยแก้ default เป็น ON ให้ทุกคน.
+    window._syncPublish = (function() { try { return localStorage.getItem('sync_publish') === '1'; } catch (e) { return false; } })();
+    window.setSyncPublish = function(on) {
+      window._syncPublish = !!on;
+      try { localStorage.setItem('sync_publish', on ? '1' : '0'); } catch (e) {}
+      console.log('[sync publish] ' + (on ? 'ON (persisted)' : 'OFF'));
+    };
     function _lwwViewerRecords(monthId, viewerName) {
       var pub = (Array.isArray(pathBOverlays) ? pathBOverlays : []).filter(function(o) { return o && String(o._visibility || 'public') !== 'draft'; });
       if (!viewerName || typeof OverlayManager === 'undefined') return pub;
@@ -2545,7 +2565,8 @@ window.allPharmacistNames = [];
         ghosts.push(Object.assign({}, s, {
           _ghostKey: '_g_' + rec.actionId, name: viewerName, _ghost: 'received',
           _ghostType: rec.action === 'swap' ? 'swap' : 'add', _ghostActionId: rec.actionId,
-          _ghostPartnerName: rec.fromNote, _ghostSourcePos: sourcePos
+          _ghostPartnerName: rec.fromNote, _ghostSourcePos: sourcePos,
+          _ghostOrigOwner: s.name   // v3.44: master (true) owner of this duty — for the indirect-transfer label
         }));
       });
       _lwwAnnotateConflicts(ghosts, rawArr, viewerName, own);
@@ -2583,6 +2604,12 @@ window.allPharmacistNames = [];
         }
         g._conflict = worst;
         var desc = (g._ghostType === 'swap') ? ('แลกกับ ' + g._ghostSourcePos + ' กับ ' + g._ghostPartnerName) : ('รับจาก ' + g._ghostPartnerName);
+        // v3.44: indirect transfer — show the duty's REAL original owner when it isn't the person we dealt with.
+        //   Direct swap/receive: origOwner === partner → nothing added. Round-trip back to self → skipped too.
+        var _lwwNorm = function(n){ return String(n || '').replace(/^\s*(ภก\.|ภญ\.)\s*/i, '').trim(); };
+        if (g._ghostOrigOwner && _lwwNorm(g._ghostOrigOwner) !== _lwwNorm(g._ghostPartnerName) && _lwwNorm(g._ghostOrigOwner) !== _lwwNorm(viewerName)) {
+          desc += ' — เวรเดิมของ ' + g._ghostOrigOwner;
+        }
         var clinic = isSpecialClinic(g) || (cw && isSpecialClinic(cw));
         if (worst === 'overlap') { g._ghostLabel = '(' + desc + (clinic ? ' • โปรดตรวจสอบเวลาการทำงานอีกครั้ง ก่อนแลกเปลี่ยนเวร' : ' • เวรชนกับ ' + (cw ? cw.pos : '')) + ')'; g._ghostLabelClass = 'label-overlap'; }
         else if (worst === 'adjacent') { g._ghostLabel = '(' + desc + (clinic ? ' • โปรดตรวจสอบเวลาการทำงานอีกครั้ง ก่อนแลกเปลี่ยนเวร' : ' • เวรติดกับ ' + (cw ? cw.pos : '')) + ')'; g._ghostLabelClass = 'label-adjacent'; }
@@ -3787,7 +3814,14 @@ window.allPharmacistNames = [];
       // v3.43: keep the retro preview mirror in step with the new visibility, then reconcile
       //   with the server so published rows arrive via the normal path on the next fetch.
       if (typeof _applyRetroMirror === 'function') _applyRetroMirror();
-      if (typeof fetchPathBOverlays === 'function') fetchPathBOverlays(mid);
+      if (typeof fetchPathBOverlays === 'function') {
+        // v3.44: refetch with the SELECTOR's month id (numeric MONTH_LIST id), not the label-id `mid`.
+        //   The stale-response guard compares against the selector value; passing `mid` (label form)
+        //   never matched → it falsely tripped "cache-only" on every publish. getScheduleData resolves
+        //   the label internally either way, so the selector value is the correct thing to pass.
+        var _pbSel = document.getElementById('mainMonthSelector');
+        fetchPathBOverlays((_pbSel && _pbSel.value) || mid);
+      }
       // Rebuild the enclosing timeline panel so state (button + steps + dashed marks) updates
       const panel = btn.closest('.tl-inline-content');
       const row = btn.closest('.tl-inline-row');
@@ -3817,7 +3851,14 @@ window.allPharmacistNames = [];
         _p2bShowToast('เผยแพร่แล้ว' + (ids.length > 1 ? ' (' + ids.length + ' ขั้น)' : ''), 'ok');
       }
       if (typeof triggerUpdate === 'function') triggerUpdate();
-      if (typeof fetchPathBOverlays === 'function') fetchPathBOverlays(mid);
+      if (typeof fetchPathBOverlays === 'function') {
+        // v3.44: refetch with the SELECTOR's month id (numeric MONTH_LIST id), not the label-id `mid`.
+        //   The stale-response guard compares against the selector value; passing `mid` (label form)
+        //   never matched → it falsely tripped "cache-only" on every publish. getScheduleData resolves
+        //   the label internally either way, so the selector value is the correct thing to pass.
+        var _pbSel = document.getElementById('mainMonthSelector');
+        fetchPathBOverlays((_pbSel && _pbSel.value) || mid);
+      }
     }, true);
 
     // ============================================
@@ -5010,6 +5051,52 @@ window.allPharmacistNames = [];
       return d.length + '|' + (d[0] && d[0].name || '') + '|' + (d[d.length-1] && d[d.length-1].name || '') + '|' + (res.audit && res.audit.verifiedAt || '');
     }
 
+    // v3.44: getDataSignature watches only the MASTER schedule. Overlays (others' swap/publish)
+    //   change without touching the master, so the poll never noticed them → colleagues' updates
+    //   stayed invisible until a manual refresh. Track overlays with their OWN fingerprint —
+    //   include _visibility so a draft→public flip is caught even when the count is unchanged.
+    var _lastPbSignature = '';
+    function _pbOverlaySignature(pb) {
+      if (!Array.isArray(pb)) return '';
+      return pb.length + ':' + pb.map(function(o) {
+        return (o && o.actionId || '') + '~' + (o && o._visibility || 'public');
+      }).sort().join(',');
+    }
+    // v3.44: adopt fresh overlays + re-render in place (shared by the poll and manual refresh).
+    function _pbRefreshInPlace(overlays) {
+      _lastPbSignature = _pbOverlaySignature(overlays);
+      pathBOverlays = Array.isArray(overlays) ? overlays : [];
+      if (typeof _applyRetroMirror === 'function') _applyRetroMirror();
+      else if (typeof invalidateGhostCache === 'function') invalidateGhostCache();
+      if (typeof _invalidateDraftLookup === 'function') _invalidateDraftLookup();
+      _shiftKeyIndex = null; _shiftKeyIndexFor = null;
+      if (typeof triggerUpdate === 'function') triggerUpdate();
+    }
+
+    // v3.44: manual SOFT refresh — re-fetch master + overlays without a full page reload.
+    //   Master changed → full adopt (handleDataReceived); master same → refresh overlays in place.
+    //   Spins the icon while loading + toast on done. One round-trip (getScheduleData carries both).
+    function phxManualRefresh() {
+      var sel = document.getElementById('mainMonthSelector');
+      if (!sel || !sel.value) return;
+      var icon = document.getElementById('phxRefreshIcon');
+      if (icon) icon.classList.add('phx-spinning');
+      google.script.run
+        .withSuccessHandler(function(res) {
+          if (icon) icon.classList.remove('phx-spinning');
+          if (!res || !res.data) { if (typeof _p2bShowToast === 'function') _p2bShowToast('ไม่พบข้อมูล', 'warn'); return; }
+          var sig = getDataSignature(res);
+          if (sig !== lastDataSignature) handleDataReceived(res, 'poll');
+          else _pbRefreshInPlace(res._pbOverlays);
+          if (typeof _p2bShowToast === 'function') _p2bShowToast('อัปเดตแล้ว', 'ok');
+        })
+        .withFailureHandler(function(err) {
+          if (icon) icon.classList.remove('phx-spinning');
+          if (typeof _p2bShowToast === 'function') _p2bShowToast('รีเฟรชไม่สำเร็จ', 'warn');
+        })
+        .getScheduleData(sel.value);
+    }
+
     function startFirebasePolling() {
       if (firebasePollTimer) clearInterval(firebasePollTimer);
       var selectEl = document.getElementById('mainMonthSelector');
@@ -5026,6 +5113,14 @@ window.allPharmacistNames = [];
             if (newSig && newSig !== lastDataSignature) {
               console.log('✨ Poll พบข้อมูลใหม่!', newSig);
               handleDataReceived(res, 'poll');
+              return;   // handleDataReceived already adopts _pbOverlays + re-renders
+            }
+            // v3.44: master unchanged, but overlays may have changed (others published/swapped).
+            //   Refresh just the ghosts/strikes — no full reload, no toast/burst.
+            var pbSig = _pbOverlaySignature(res._pbOverlays);
+            if (pbSig !== _lastPbSignature) {
+              _pbRefreshInPlace(res._pbOverlays);
+              console.log('🔄 Poll: overlays เปลี่ยน → รีเฟรชผีอัตโนมัติ');
             }
           })
           .withFailureHandler(function(err) {
@@ -5125,7 +5220,7 @@ window.allPharmacistNames = [];
       rawData = res.data || [];
       // v3.41: if response includes global overlays (GAS path), adopt them.
       //        Firebase path won't have _pbOverlays — fetchPathBOverlays fills it separately.
-      if (Array.isArray(res._pbOverlays)) pathBOverlays = res._pbOverlays;
+      if (Array.isArray(res._pbOverlays)) { pathBOverlays = res._pbOverlays; _lastPbSignature = _pbOverlaySignature(res._pbOverlays); }
       if (typeof _applyRetroMirror === 'function') _applyRetroMirror();   // v3.43: keep local retro drafts visible
       currentSheetUrl = res.sheetUrl || "";
       window.currentAuditInfo = res.audit || null;
@@ -5303,6 +5398,7 @@ window.allPharmacistNames = [];
             return;
           }
           pathBOverlays = overlays;
+          _lastPbSignature = _pbOverlaySignature(overlays);   // v3.44: sync poll's overlay fingerprint
           console.log('🎯 Path B: loaded ' + overlays.length + ' global overlays (rawData preserved)');
           // v3.43: re-apply this device's local retro-draft mirror on top of the fresh server rows,
           //   so an in-progress offline chain keeps previewing after a refresh (also invalidates caches).
@@ -11630,6 +11726,29 @@ table.exp-tbl .tm{margin-left:3px;opacity:0.75;}
             .phxRemoveAction(u.name, u.hash, actionId);
         }
         return result;
+      };
+      // v3.44: publish/unpublish flip _visibility → propagate to server (login-based, debounced).
+      //   publishAction/unpublishAction weren't hooked, so draft→public never reached the server.
+      //   Reuse _phxScheduleSync (the same debounced phxCloudPushAll addAction uses) so bulk
+      //   publish coalesces into one push — needs the Phase_Z_B3 upsert to overwrite the row.
+      //   Gated by window._syncPublish for safe rollout (setSyncPublish()).
+      const _origPublish = OverlayManager.publishAction.bind(OverlayManager);
+      OverlayManager.publishAction = function(monthId, actionId) {
+        const act = _origPublish(monthId, actionId);
+        if (act && window._syncPublish && phxAuthIsLoggedIn()) {
+          phxShowSyncBanner('syncing', 'กำลัง sync...');
+          _phxScheduleSync();
+        }
+        return act;
+      };
+      const _origUnpublish = OverlayManager.unpublishAction.bind(OverlayManager);
+      OverlayManager.unpublishAction = function(monthId, actionId) {
+        const act = _origUnpublish(monthId, actionId);
+        if (act && window._syncPublish && phxAuthIsLoggedIn()) {
+          phxShowSyncBanner('syncing', 'กำลัง sync...');
+          _phxScheduleSync();
+        }
+        return act;
       };
     })();
 
