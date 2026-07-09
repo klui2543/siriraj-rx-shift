@@ -1047,6 +1047,20 @@
     }
     .pick-ta-input:focus { border-color: var(--accent); }
     .pick-ta .multi-list { top: 38px; }
+    /* v3.44: nickname manager modal */
+    .nk-sec-title { font-size: 12px; font-weight: 700; color: var(--text); margin-bottom: 6px; }
+    .nk-hint { font-weight: 600; color: var(--muted); font-size: 11px; }
+    .nk-input { flex: 1; min-width: 0; padding: 8px 10px; font-size: 13px; border-radius: 8px; border: 1px solid var(--border); background: var(--bg); color: var(--text); font-family: 'Kanit', sans-serif; outline: none; }
+    .nk-input:focus { border-color: var(--accent); }
+    .nk-save-btn { border: none; background: var(--accent); color: #fff; font-weight: 700; font-size: 12px; border-radius: 8px; padding: 0 16px; cursor: pointer; font-family: 'Kanit', sans-serif; }
+    .nk-note { font-size: 10.5px; color: var(--muted); margin-top: 6px; line-height: 1.4; }
+    .nk-msg { font-size: 11px; font-weight: 600; margin-top: 5px; min-height: 14px; }
+    .nk-friend-list { display: flex; flex-direction: column; gap: 6px; max-height: 260px; overflow-y: auto; }
+    .nk-friend-row { display: flex; align-items: center; gap: 8px; }
+    .nk-friend-name { flex: 1; min-width: 0; font-size: 12px; color: var(--text); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .nk-friend-input { flex: 0 0 118px; padding: 6px 8px; font-size: 12px; border-radius: 7px; border: 1px solid var(--border); background: var(--bg); color: var(--text); font-family: 'Kanit', sans-serif; outline: none; }
+    .nk-friend-input:focus { border-color: var(--accent); }
+    .nk-empty { font-size: 11px; color: var(--muted); text-align: center; padding: 12px; }
     .pick-search-box {
       display: flex; align-items: center; gap: 6px; padding: 0 10px; height: 36px;
       background: var(--bg); border: 1px solid var(--border); border-radius: 8px;
@@ -1633,6 +1647,10 @@
             <svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.5"><polyline points="6 9 12 15 18 9"/></svg>
           </button>
           <div id="phxUserMenu" class="phx-user-menu hidden">
+            <button onclick="nkOpenModal()" class="phx-menu-item">
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M20.59 13.41l-7.17 7.17a2 2 0 01-2.83 0L2 12V2h10l8.59 8.59a2 2 0 010 2.82z"/><line x1="7" y1="7" x2="7.01" y2="7"/></svg>
+              ตั้งชื่อเล่น
+            </button>
             <button onclick="phxOpenChangePwModal()" class="phx-menu-item">
               <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><circle cx="9" cy="14" r="5"/><path d="M13 14l7-7"/><path d="M17 5l3 3"/></svg>
               เปลี่ยนรหัสผ่าน
@@ -2045,6 +2063,17 @@
   <!-- ✏️ Action Modal v6 -->
   <div id="actionModal" class="act-modal-overlay" style="display:none;" onclick="if(event.target===this)closeActionModal()">
     <div class="act-modal-box" id="actionModalBox"></div>
+  </div>
+
+  <!-- 🏷️ v3.44: Nickname manager (public self-nickname + private aliases) -->
+  <div id="nkModal" class="act-modal-overlay" style="display:none;" onclick="if(event.target===this)nkCloseModal()">
+    <div class="act-modal-box" style="max-width:460px;">
+      <div class="act-modal-header">
+        <h3>🏷️ ชื่อเล่น</h3>
+        <button class="act-modal-close" onclick="nkCloseModal()">✕</button>
+      </div>
+      <div class="act-modal-body" id="nkModalBody"></div>
+    </div>
   </div>
 
   <!-- v3.43: Retro chain builder — records offline swap sequences after the fact -->
@@ -5580,6 +5609,101 @@ window.allPharmacistNames = [];
       p.then(function () { if (cb) cb(null); }).catch(function (e) { if (cb) cb(e); });
     }
     try { if (fbDb) _nkSubscribe(); } catch (e) { console.warn('nk subscribe init failed', e); }
+
+    // ---- Nickname manager modal (v3.44) ----
+    function _nkErrText(err) {
+      var m = (err && err.message) ? String(err.message) : String(err || '');
+      if (/permission/i.test(m)) return 'บันทึกไม่ได้ — สิทธิ์ฐานข้อมูลยังไม่เปิด (ต้องตั้งกฎ RTDB สำหรับ nicknames)';
+      return 'บันทึกไม่ได้: ' + m;
+    }
+    function nkOpenModal() {
+      var um = document.getElementById('phxUserMenu'); if (um) um.classList.add('hidden');
+      var m = document.getElementById('nkModal'); if (!m) return;
+      nkRenderModal();
+      m.style.display = 'flex';
+    }
+    function nkCloseModal() {
+      var m = document.getElementById('nkModal'); if (m) m.style.display = 'none';
+    }
+    function nkRenderModal() {
+      var body = document.getElementById('nkModalBody'); if (!body) return;
+      var me = _nkMyName();
+      if (!me) {
+        body.innerHTML = '<div class="nk-empty">กรุณาเข้าสู่ระบบก่อน จึงจะตั้งชื่อเล่นได้</div>' +
+          '<button class="nk-save-btn" style="width:100%;padding:9px 0;" onclick="nkCloseModal();phxOpenLoginModal(\'login\')">เข้าสู่ระบบ</button>';
+        return;
+      }
+      var myPub = (window._nkPublic && window._nkPublic[me]) || '';
+      var h = '';
+      h += '<div class="nk-sec-title">ชื่อเล่นของฉัน <span class="nk-hint">(ทุกคนเห็น)</span></div>';
+      h += '<div style="display:flex;gap:7px;">';
+      h += '<input id="nkMyInput" class="nk-input" maxlength="40" placeholder="เช่น โต้ง" value="' + myPub.replace(/"/g, '&quot;') + '">';
+      h += '<button class="nk-save-btn" onclick="nkSaveMine()">บันทึก</button>';
+      h += '</div>';
+      h += '<div id="nkMyMsg" class="nk-msg"></div>';
+      h += '<div class="nk-note">ชื่อของคุณจะแสดงเป็นชื่อเล่นนี้ให้ทุกคนเห็น (เว้นแต่เขาตั้งชื่อเล่นส่วนตัวให้คุณเอง)</div>';
+      h += '<div class="nk-sec-title" style="margin-top:16px;">ตั้งชื่อเล่นให้เพื่อน <span class="nk-hint">(เห็นแค่คุณ)</span></div>';
+      h += '<div class="pick-search-box" style="margin-bottom:8px;">';
+      h += '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" style="color:var(--muted)"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>';
+      h += '<input id="nkFriendSearch" type="text" autocomplete="off" placeholder="ค้นหาชื่อเพื่อน..." oninput="nkRenderFriendList()">';
+      h += '</div>';
+      h += '<div id="nkFriendList" class="nk-friend-list"></div>';
+      body.innerHTML = h;
+      nkRenderFriendList();
+    }
+    function nkSaveMine() {
+      var inp = document.getElementById('nkMyInput');
+      var msg = document.getElementById('nkMyMsg');
+      if (!inp) return;
+      if (msg) { msg.style.color = 'var(--muted)'; msg.textContent = 'กำลังบันทึก...'; }
+      nkSetPublic(inp.value, function (err) {
+        if (!msg) return;
+        if (err) { msg.style.color = '#dc2626'; msg.textContent = _nkErrText(err); }
+        else { msg.style.color = '#16a34a'; msg.textContent = '✓ บันทึกแล้ว'; }
+      });
+    }
+    function nkRenderFriendList() {
+      var wrap = document.getElementById('nkFriendList'); if (!wrap) return;
+      var me = _nkMyName();
+      var qEl = document.getElementById('nkFriendSearch');
+      var q = qEl ? qEl.value.trim().toLowerCase() : '';
+      var all = (window.allPharmacistNames || []).filter(function (n) { return n && n !== me; });
+      var priv = window._nkPrivate || {};
+      var list;
+      if (q) {
+        list = all.filter(function (n) {
+          var pub = (window._nkPublic && window._nkPublic[n]) || '';
+          return n.toLowerCase().indexOf(q) >= 0 || (pub && pub.toLowerCase().indexOf(q) >= 0);
+        }).slice(0, 40);
+      } else {
+        list = Object.keys(priv).filter(function (n) { return n !== me; }).sort();
+      }
+      if (list.length === 0) {
+        wrap.innerHTML = '<div class="nk-empty">' + (q ? 'ไม่พบชื่อ' : 'พิมพ์ค้นหาชื่อเพื่อน เพื่อตั้งชื่อเล่นส่วนตัว') + '</div>';
+        return;
+      }
+      var h = '';
+      list.forEach(function (n) {
+        var pub = (window._nkPublic && window._nkPublic[n]) || '';
+        var mine = priv[n] || '';
+        var sub = pub ? ' · ' + pub : '';
+        h += '<div class="nk-friend-row">';
+        h += '<div class="nk-friend-name" title="' + n.replace(/"/g, '&quot;') + '">' + n + '<span style="color:var(--muted);">' + sub + '</span></div>';
+        h += '<input class="nk-friend-input" maxlength="40" placeholder="ชื่อเล่น" value="' + mine.replace(/"/g, '&quot;') + '" data-nk-target="' + encodeURIComponent(n) + '" onchange="nkSavePrivateFromInput(this)">';
+        h += '</div>';
+      });
+      wrap.innerHTML = h;
+    }
+    function nkSavePrivateFromInput(inp) {
+      if (!inp) return;
+      var target = decodeURIComponent(inp.getAttribute('data-nk-target') || '');
+      inp.style.borderColor = 'var(--border)';
+      inp.title = '';
+      nkSetPrivate(target, inp.value, function (err) {
+        inp.style.borderColor = err ? '#dc2626' : '#16a34a';
+        if (err) inp.title = _nkErrText(err);
+      });
+    }
 
     // ==========================================
     // 🌟 UI HELPERS
