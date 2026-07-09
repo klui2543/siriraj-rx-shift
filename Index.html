@@ -3862,7 +3862,7 @@ window.allPharmacistNames = [];
       // v3.10: anyone can toggle edit mode (login is for cloud sync, not edit permission)
       // v3.13: pencil + save moved to FAB (bottom-right) — banner stays clean
       notice.innerHTML =
-        '<b>' + target + '</b> ปฏิบัติงานเดือนนี้: ' +
+        '<b>' + displayName(target) + '</b> ปฏิบัติงานเดือนนี้: ' +
         '<span style="font-size:18px;font-weight:800;margin:0 4px;">' + total + '</span> เวร ' +
         ovlTag +
         '<button onclick="toggleSettingsPopup(event)" style="position:absolute;right:8px;top:50%;transform:translateY(-50%);background:none;border:1px solid transparent;border-radius:8px;cursor:pointer;padding:4px;color:var(--accent);opacity:0.7;" title="ตั้งค่า">' +
@@ -6537,7 +6537,7 @@ window.allPharmacistNames = [];
         //   strike (_isDraftLocal / shift-draft above) so the author can still spot unpublished rows.
         const _pubInline = '';
         const _nameBase = i.isNew ? 'text-orange-600 font-bold leading-none' : 'text-blue-900 font-bold leading-none';
-        const nameDisplay = `<span class="col-name-wrap"><span class="ncw-left"></span><span class="ncw-center"><span class="${_nameBase} ${_strike}">${i.isNew?'⚠️ ':''}${i.name}</span>${_pencil}${_pubInline}</span><span class="ncw-right">${_suffix}</span></span>`;
+        const nameDisplay = `<span class="col-name-wrap"><span class="ncw-left"></span><span class="ncw-center"><span class="${_nameBase} ${_strike}">${i.isNew?'⚠️ ':''}${displayName(i.name)}</span>${_pencil}${_pubInline}</span><span class="ncw-right">${_suffix}</span></span>`;
         let _ghostCls = '';
         if (_isGhost) {
           if (i._conflict === 'overlap') _ghostCls = 'shift-ghost-overlap';
@@ -6660,7 +6660,7 @@ window.allPharmacistNames = [];
         var nameCls = i.isNew ? 'text-orange-600 font-bold leading-none' : 'text-blue-900 font-bold leading-none';
         return '<tr class="bg-white hover:bg-gray-50 border-b border-gray-100 transition-all" style="font-size: var(--table-font-size);">' +
           '<td class="px-0.5 py-1.5 font-semibold text-gray-600 align-middle text-center whitespace-nowrap">' + i.date + '</td>' +
-          '<td class="px-1 py-1.5 align-middle col-name leading-tight"><span class="' + nameCls + '">' + (i.isNew ? '⚠️ ' : '') + i.name + '</span></td>' +
+          '<td class="px-1 py-1.5 align-middle col-name leading-tight"><span class="' + nameCls + '">' + (i.isNew ? '⚠️ ' : '') + displayName(i.name) + '</span></td>' +
           '<td class="px-0.5 py-1.5 pl-5 text-center font-bold text-gray-800 align-middle whitespace-nowrap">' + i.pos + '</td>' +
           '<td class="px-0.5 py-1.5 text-center align-middle whitespace-nowrap"><div class="inline-flex items-center justify-center ' + badge + ' px-1.5 py-1 rounded font-bold shadow-2xs whitespace-nowrap text-center box-border leading-none">' + disp + '</div></td>' +
           '</tr>';
