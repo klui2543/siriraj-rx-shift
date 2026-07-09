@@ -71,7 +71,11 @@ function phxGetAllActiveOverlaysForMonth(monthId) {
         _retroAt: payload._retroAt || null,
         // v3.43: retro override — the recorder pinned this hop's receiver as the current holder
         //        (earlier chain unknown). Kept so every viewer resolves the same current holder.
-        _retroFinal: payload._retroFinal || false
+        _retroFinal: payload._retroFinal || false,
+        // v3.44: admin override audit — pass through so every viewer sees the ⚖️ badge (who/when/why)
+        _overrideBy: payload._overrideBy || null,
+        _overrideAt: payload._overrideAt || null,
+        _overrideReason: payload._overrideReason || null
       });
     });
     

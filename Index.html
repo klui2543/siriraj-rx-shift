@@ -695,6 +695,19 @@
     body.dark-theme .pb-vb-publish:hover { background: #1e40af; }
     body.dark-theme .pb-vb-unpublish { background: #334155; color: #cbd5e1; border-color: #475569; }
     body.dark-theme .pb-vb-unpublish:hover { background: #475569; }
+    /* v3.44: neutral outlined variant — the "แก้ผู้ให้/แก้ผู้รับ" edit button in the publish modal */
+    .pb-vb-edit { background: var(--surface); color: var(--text); border-color: var(--border); }
+    .pb-vb-edit:hover { background: var(--bg); }
+    /* v3.44: inline ✎ next to a name in the timeline history — quick edit of รับจาก/ยกให้ */
+    .tl-edit-recipient { cursor: pointer; margin-left: 6px; padding: 1px 5px; border-radius: 4px; color: #2563eb; font-size: 13px; }
+    .tl-edit-recipient:hover { background: rgba(37,99,235,0.12); }
+    body.dark-theme .tl-edit-recipient { color: #93c5fd; }
+    /* v3.44: inline ✕ on the latest draft hop in the timeline — peel it off (revert one step) */
+    .tl-remove-hop { cursor: pointer; margin-left: 4px; padding: 1px 5px; border-radius: 4px; color: #dc2626; font-size: 13px; }
+    .tl-remove-hop:hover { background: rgba(220,38,38,0.12); }
+    body.dark-theme .tl-remove-hop { color: #fca5a5; }
+    /* v3.44: ⚖️ admin-override audit badge — hover shows who/when/why */
+    .tl-override-badge { cursor: help; margin-right: 3px; font-size: 12px; }
     /* v3.43: Retro badge on chain steps */
     .tl-retro-badge {
       display: inline-block;
@@ -2029,6 +2042,11 @@
     <div class="act-modal-box" id="retroModalBox"></div>
   </div>
 
+  <!-- v3.44: Publish center — single place to publish drafts / unpublish, and edit "รับจาก" -->
+  <div id="publishModal" class="act-modal-overlay" style="display:none;" onclick="if(event.target===this)closePublishModal()">
+    <div class="act-modal-box" id="publishModalBox" style="max-width:640px;"></div>
+  </div>
+
   <script>
     
     // ==========================================
@@ -2580,7 +2598,15 @@ window.allPharmacistNames = [];
       (rawData || []).forEach(function(s) {
         var key = makeShiftKey(s), rec = own[key];
         if (rec && rec.newOwner !== s.name) {
-          map[key] = { label: (rec.action === 'swap' ? 'สลับกับ ' : 'ยกให้ ') + rec.newOwner + ' แล้ว', actionId: rec.actionId, _pbSource: true };
+          // v3.44: swap-pair color on the struck (given-away) row. Use the SAME getSwapColor source
+          //   as the received ghost's dot (line ~6091) so the shift you gave and the shift you got
+          //   back share ONE color — you can see which pair was swapped. (LWW path was missing this.)
+          var _c = null;
+          if (rec.action === 'swap' && rec.actionId) {
+            _c = (typeof OverlayManager !== 'undefined' && OverlayManager.getSwapColor ? OverlayManager.getSwapColor(monthId, viewerName, rec.actionId) : null)
+               || (typeof PBOverlays !== 'undefined' && PBOverlays.getSwapColor ? PBOverlays.getSwapColor(rec.actionId) : null);
+          }
+          map[key] = { label: (rec.action === 'swap' ? 'สลับกับ ' : 'ยกให้ ') + rec.newOwner + ' แล้ว', actionId: rec.actionId, color: _c, _pbSource: true };
         }
       });
       return map;
@@ -2788,6 +2814,22 @@ window.allPharmacistNames = [];
         if (typeof SYNC !== 'undefined' && SYNC.enabled) SYNC.removeAction(actionId);
         return act;
       },
+      // v3.44: patch fields of an existing action (e.g. edit "รับจาก" partnerName).
+      //   Pure LOCAL mutation. For a PUBLIC action, the caller (_pbEditRecipient) additionally
+      //   mirrors the change into pathBOverlays and schedules the server upsert so the correction
+      //   propagates to everyone; drafts stay local so no sync is needed.
+      updateAction(monthId, actionId, patch) {
+        this.load();
+        const bucket = this._data[monthId];
+        if (!bucket || !bucket.actions) return null;
+        const act = bucket.actions.find(a => a.id === actionId);
+        if (!act) return null;
+        Object.assign(act, patch || {});
+        this.save();
+        if (typeof invalidateGhostCache === 'function') invalidateGhostCache();
+        if (typeof _invalidateDraftLookup === 'function') _invalidateDraftLookup();
+        return act;
+      },
       clearMonth(monthId, viewerName) {
         // v14: only clear actions of the viewer (don't nuke others' on same device)
         this.load();
@@ -2973,6 +3015,338 @@ window.allPharmacistNames = [];
         acts.forEach(c => { if (c && c.shiftKey === '_g_' + id) stack.push(c.id); });
       }
       return Array.from(seen);
+    }
+
+    // ══════════════════════════════════════════════════════════════
+    // v3.44 — Publish center (the single "🌐 เผยแพร่" FAB modal).
+    //   Lists the logged-in user's own overlay actions for the CURRENT month:
+    //     • ร่าง (draft)        → [แก้ไขผู้รับ] (add/give only) + [เผยแพร่]
+    //     • เผยแพร่แล้ว (public) → [ยกเลิกเผยแพร่]
+    //   Plus one [เผยแพร่ทั้งหมด]. Replaces the old inline-row + timeline publish buttons.
+    //   Publishing a row publishes its WHOLE connected chain (_collectConnectedChain) so
+    //   a child never goes public while its parent is still a draft.
+    // ══════════════════════════════════════════════════════════════
+    function _pbEsc(s) {
+      return String(s == null ? '' : s).replace(/[&<>"']/g, function(c) {
+        return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c];
+      });
+    }
+    function _pbFmtShift(shiftKey, viewerName, recs) {
+      var sk = String(shiftKey || '');
+      // A chained action stores shiftKey = '_g_<parentActionId>' (the shift was itself received
+      //   via another overlay — e.g. B swaps A's shift, which B got from someone). Walk it back to
+      //   the real master slot so the modal shows a readable date·pos·range, not the raw _g_ key.
+      if (sk.indexOf('_g_') === 0 && typeof LWW !== 'undefined' && LWW._resolveKey) {
+        try {
+          var ov = recs || (Array.isArray(pathBOverlays) ? pathBOverlays : []);
+          var real = LWW._resolveKey(sk, viewerName || '', ov, (typeof rawData !== 'undefined' ? rawData : []));
+          if (real) sk = real;
+        } catch (e) {}
+      }
+      var p = sk.split('|');   // date|pos|name|range
+      if (p.length < 4) return _pbEsc('เวรที่รับต่อมา (เชน)');   // still unresolved → friendly fallback
+      return _pbEsc(p[0] + ' · ' + p[1] + ' · ' + p[3]);
+    }
+    function openPublishModal() {
+      var bound = (typeof _pbGetLoggedInName === 'function') ? _pbGetLoggedInName() : null;
+      if (!bound) { if (typeof _p2bShowToast === 'function') _p2bShowToast('ต้อง login ก่อนเผยแพร่', 'warn'); return; }
+      renderPublishModal();
+      var m = document.getElementById('publishModal');
+      if (m) m.style.display = 'flex';
+    }
+    function closePublishModal() {
+      var m = document.getElementById('publishModal');
+      if (m) m.style.display = 'none';
+    }
+    // Reconcile after a visibility flip: keep the retro preview mirror in step, refetch the
+    //   public overlays with the SELECTOR's month id (v3.44 stale-guard fix — NOT the label
+    //   mid), then repaint the table/calendar.
+    function _pbReconcile(mid) {
+      if (typeof _applyRetroMirror === 'function') _applyRetroMirror();
+      if (typeof fetchPathBOverlays === 'function') {
+        var sel = document.getElementById('mainMonthSelector');
+        fetchPathBOverlays((sel && sel.value) || mid);
+      }
+      if (typeof triggerUpdate === 'function') triggerUpdate();
+    }
+    function _pbPopupPublish(mid, id) {
+      var ids = _collectConnectedChain(mid, id);
+      ids.forEach(function(x) { OverlayManager.publishAction(mid, x); });
+      _pbReconcile(mid);
+      if (typeof _p2bShowToast === 'function') _p2bShowToast('เผยแพร่แล้ว' + (ids.length > 1 ? ' (' + ids.length + ' ขั้น)' : ''), 'ok');
+      renderPublishModal();
+    }
+    function _pbPopupUnpublish(mid, id) {
+      var ids = _collectConnectedChain(mid, id);
+      ids.forEach(function(x) { OverlayManager.unpublishAction(mid, x); });
+      _pbReconcile(mid);
+      if (typeof _p2bShowToast === 'function') _p2bShowToast('เอากลับเป็นส่วนตัวแล้ว' + (ids.length > 1 ? ' (' + ids.length + ' ขั้น)' : ''), 'ok');
+      renderPublishModal();
+    }
+    function _pbPublishAllDrafts(mid) {
+      var viewer = (typeof _pbGetLoggedInName === 'function') ? _pbGetLoggedInName() : null;
+      if (!mid || !viewer) return;
+      var acts = OverlayManager.getActions(mid, viewer) || [];
+      var seen = {};
+      acts.filter(function(a) { return a._visibility === 'draft'; }).forEach(function(a) {
+        _collectConnectedChain(mid, a.id).forEach(function(x) {
+          if (seen[x]) return; seen[x] = 1;
+          OverlayManager.publishAction(mid, x);
+        });
+      });
+      var n = Object.keys(seen).length;
+      if (!n) return;
+      _pbReconcile(mid);
+      if (typeof _p2bShowToast === 'function') _p2bShowToast('เผยแพร่ทั้งหมดแล้ว (' + n + ' รายการ)', 'ok');
+      renderPublishModal();
+    }
+    function _pbEditRecipient(mid, id) {
+      var viewer = (typeof _pbGetLoggedInName === 'function') ? _pbGetLoggedInName() : null;
+      var acts = (mid && viewer) ? (OverlayManager.getActions(mid, viewer) || []) : [];
+      var a = acts.find(function(x) { return x.id === id; });
+      if (!a) return;
+      var wasPublic = (a._visibility !== 'draft');
+      // v3.44: published records are final — only an Admin may override the name.
+      if (wasPublic && !(typeof phxAuthIsAdmin === 'function' && phxAuthIsAdmin())) {
+        if (typeof _p2bShowToast === 'function') _p2bShowToast('เผยแพร่แล้ว — แก้ได้เฉพาะแอดมิน', 'warn');
+        return;
+      }
+      _lwwNamePicker(a.partnerName || '', function(nm) {
+        if (!nm || nm === a.partnerName) return;   // no-op if unchanged
+        // Editing a DRAFT = quiet local fix. Editing a PUBLISHED record = an Admin OVERRIDE →
+        //   force a reason and stamp who/when/why for the audit trail.
+        function _apply(reason) {
+          var patch = { partnerName: nm };
+          if (wasPublic) {
+            var au = (typeof phxAuthGetUser === 'function') ? phxAuthGetUser() : null;
+            patch._overrideBy = au ? au.name : '';
+            patch._overrideAt = new Date().toISOString();
+            patch._overrideReason = reason;
+          }
+          OverlayManager.updateAction(mid, id, patch);
+          if (wasPublic) {
+            // The render reads a public action's name from pathBOverlays (server copy), NOT local —
+            //   mirror the change (+ audit) for an immediate repaint, then push the upsert (debounced).
+            //   No immediate refetch: the ~1.5s debounced write would be clobbered by a stale pull.
+            if (typeof pathBOverlays !== 'undefined' && Array.isArray(pathBOverlays)) {
+              pathBOverlays.forEach(function(o) {
+                if (o && String(o.actionId) === String(id)) {
+                  o.partnerName = nm; o._overrideBy = patch._overrideBy; o._overrideAt = patch._overrideAt; o._overrideReason = reason;
+                }
+              });
+            }
+            if (typeof invalidateGhostCache === 'function') invalidateGhostCache();
+            if (window._syncPublish && typeof _phxScheduleSync === 'function') _phxScheduleSync();
+          }
+          if (typeof triggerUpdate === 'function') triggerUpdate();
+          renderPublishModal();
+        }
+        if (wasPublic) _pbAskReason('เวรของ ' + (a.viewerName || viewer), _apply);
+        else _apply(null);
+      });
+    }
+    // v3.44: mandatory-reason modal for an Admin override. Calls onOk(reason) only with a non-empty
+    //   reason; the OK button refuses to close while the box is blank.
+    function _pbAskReason(subtitle, onOk) {
+      var ov = document.createElement('div');
+      ov.id = 'pbReasonOverlay';
+      ov.style.cssText = 'position:fixed; inset:0; background:rgba(0,0,0,0.55); z-index:10004; display:flex; align-items:center; justify-content:center; padding:16px;';
+      ov.innerHTML = '<div style="background:var(--surface); width:100%; max-width:420px; border-radius:14px; padding:16px; font-family:inherit;">' +
+        '<div style="font-weight:700; font-size:15px;">⚖️ เหตุผลในการแก้ (override)</div>' +
+        '<div style="font-size:12px; color:var(--sub); margin:2px 0 10px;">' + _pbEsc(subtitle || '') + '</div>' +
+        '<textarea id="pbReasonInput" rows="3" placeholder="เช่น แก้ให้ตรงกับที่ตกลงจริง / เลือกชื่อผิด" style="width:100%; padding:10px; border:1px solid var(--border); border-radius:8px; font-family:inherit; font-size:14px; box-sizing:border-box; resize:vertical;"></textarea>' +
+        '<div id="pbReasonErr" style="color:#dc2626; font-size:12px; min-height:15px; margin:4px 2px;"></div>' +
+        '<div style="display:flex; gap:8px;">' +
+        '<button type="button" id="pbReasonCancel" style="flex:1; padding:9px; border:1px solid var(--border); border-radius:6px; background:var(--surface); color:var(--text); font-family:inherit; cursor:pointer;">ยกเลิก</button>' +
+        '<button type="button" id="pbReasonOk" style="flex:1; padding:9px; border:1px solid #dc2626; border-radius:6px; background:#dc2626; color:#fff; font-family:inherit; cursor:pointer;">ยืนยัน override</button>' +
+        '</div></div>';
+      document.body.appendChild(ov);
+      function close() { var e = document.getElementById('pbReasonOverlay'); if (e) e.remove(); }
+      ov.addEventListener('click', function(e) { if (e.target === ov) close(); });
+      document.getElementById('pbReasonCancel').addEventListener('click', close);
+      document.getElementById('pbReasonOk').addEventListener('click', function() {
+        var v = (document.getElementById('pbReasonInput').value || '').trim();
+        if (!v) { document.getElementById('pbReasonErr').textContent = 'ต้องใส่เหตุผลก่อนจึงจะ override ได้'; return; }
+        close();
+        if (typeof onOk === 'function') onOk(v);
+      });
+      setTimeout(function() { try { document.getElementById('pbReasonInput').focus(); } catch (e) {} }, 60);
+    }
+    function _pbOverrideFail(msg) {
+      if (typeof phxHideSyncBanner === 'function') phxHideSyncBanner(0);
+      if (typeof _p2bShowToast === 'function') _p2bShowToast('override ล้มเหลว: ' + (msg || 'error'), 'warn');
+    }
+    // v3.44: Admin overrides ANOTHER user's record. The record lives on the server under its owner,
+    //   not in the admin's local OverlayManager — so PULL the owner's actions (admin-gated actingAs),
+    //   patch the one by id (+ audit), then PUSH it back AS the owner (upsert). No backend change
+    //   beyond the _override* pass-through; phxPullAll/phxPushActions already accept actingAs.
+    function _pbAdminOverride(mid, actionId, ownerViewer, currentName) {
+      if (!(typeof phxAuthIsAdmin === 'function' && phxAuthIsAdmin())) {
+        if (typeof _p2bShowToast === 'function') _p2bShowToast('เฉพาะแอดมิน', 'warn'); return;
+      }
+      var admin = (typeof phxAuthGetUser === 'function') ? phxAuthGetUser() : null;
+      if (!admin) { if (typeof _p2bShowToast === 'function') _p2bShowToast('ต้อง login', 'warn'); return; }
+      _lwwNamePicker(currentName || '', function(nm) {
+        if (!nm || nm === currentName) return;
+        _pbAskReason('เวรของ ' + ownerViewer + ' — แก้โดยแอดมิน', function(reason) {
+          if (typeof phxShowSyncBanner === 'function') phxShowSyncBanner('syncing', 'กำลังบันทึก override...');
+          google.script.run
+            .withSuccessHandler(function(res) {
+              if (!res || !res.success) return _pbOverrideFail(res && res.error);
+              var target = (res.actions || []).find(function(x) { return String(x.id) === String(actionId); });
+              if (!target) return _pbOverrideFail('ไม่พบรายการบน server');
+              target.partnerName = nm;
+              target._overrideBy = admin.name;
+              target._overrideAt = new Date().toISOString();
+              target._overrideReason = reason;
+              google.script.run
+                .withSuccessHandler(function(r2) {
+                  if (!r2 || !r2.success) return _pbOverrideFail(r2 && r2.error);
+                  if (typeof phxHideSyncBanner === 'function') phxHideSyncBanner(0);
+                  if (typeof _p2bShowToast === 'function') _p2bShowToast('override สำเร็จ', 'ok');
+                  if (typeof pathBOverlays !== 'undefined' && Array.isArray(pathBOverlays)) {
+                    pathBOverlays.forEach(function(o) {
+                      if (o && String(o.actionId) === String(actionId)) {
+                        o.partnerName = nm; o._overrideBy = admin.name; o._overrideAt = target._overrideAt; o._overrideReason = reason;
+                      }
+                    });
+                  }
+                  if (typeof invalidateGhostCache === 'function') invalidateGhostCache();
+                  if (typeof triggerUpdate === 'function') triggerUpdate();
+                  var sel = document.getElementById('mainMonthSelector');
+                  if (typeof fetchPathBOverlays === 'function') fetchPathBOverlays((sel && sel.value) || mid);
+                })
+                .withFailureHandler(function(err) { _pbOverrideFail(err && err.message); })
+                .phxPushActions(admin.name, admin.hash, JSON.stringify([target]), ownerViewer);
+            })
+            .withFailureHandler(function(err) { _pbOverrideFail(err && err.message); })
+            .phxPullAll(admin.name, admin.hash, ownerViewer);
+        });
+      });
+    }
+    // v3.44: inline ✎ in the timeline history → edit the "รับจาก/ยกให้" name in place.
+    //   Capture-phase + stopPropagation so the click doesn't also toggle the chevron. After the
+    //   edit, _pbEditRecipient runs triggerUpdate → the table (and any open timeline) repaint.
+    document.addEventListener('click', function(e) {
+      var btn = (e.target && e.target.closest) ? e.target.closest('[data-tl-edit]') : null;
+      if (!btn) return;
+      e.stopPropagation();
+      var mid = btn.getAttribute('data-tl-mid');
+      var id = btn.getAttribute('data-tl-edit');
+      if (mid && id && typeof _pbEditRecipient === 'function') _pbEditRecipient(mid, id);
+    }, true);
+    // v3.44: ✕ on the latest draft hop → remove just that action (reverts the chain one step).
+    //   removeAction of a draft is local-only (its sync wrapper skips the server for non-public).
+    document.addEventListener('click', function(e) {
+      var btn = (e.target && e.target.closest) ? e.target.closest('[data-tl-remove]') : null;
+      if (!btn) return;
+      e.stopPropagation();
+      var mid = btn.getAttribute('data-tl-mid');
+      var id = btn.getAttribute('data-tl-remove');
+      if (!mid || !id || typeof OverlayManager === 'undefined') return;
+      if (!confirm('เอาขั้นล่าสุดนี้ออก? จะกลับไปสถานะก่อนหน้า')) return;
+      OverlayManager.removeAction(mid, id);
+      if (typeof triggerUpdate === 'function') triggerUpdate();
+      if (typeof _p2bShowToast === 'function') _p2bShowToast('เอาขั้นล่าสุดออกแล้ว', 'ok');
+    }, true);
+    // v3.44: Admin ✎ on ANOTHER user's timeline hop → override the counterpart (B) as that owner.
+    document.addEventListener('click', function(e) {
+      var btn = (e.target && e.target.closest) ? e.target.closest('[data-tl-pbedit]') : null;
+      if (!btn) return;
+      e.stopPropagation();
+      var mid = btn.getAttribute('data-tl-mid');
+      var actionId = btn.getAttribute('data-tl-pbedit');
+      var owner = btn.getAttribute('data-tl-owner');
+      var cur = btn.getAttribute('data-tl-cur');
+      if (mid && actionId && owner && typeof _pbAdminOverride === 'function') _pbAdminOverride(mid, actionId, owner, cur);
+    }, true);
+    // Collapse the user's actions into connected chains — return one representative per chain
+    //   (the TAIL = latest hop, the one no other hop points at via '_g_<id>') plus the hop count.
+    //   Lets the publish modal show ONE row per chain instead of one per hop.
+    function _pbChainReps(mid, actions) {
+      var byId = {}; (actions || []).forEach(function(a) { if (a && a.id) byId[a.id] = a; });
+      var seen = {}, reps = [];
+      (actions || []).forEach(function(a) {
+        if (!a || !a.id || seen[a.id]) return;
+        var ids = (typeof _collectConnectedChain === 'function') ? _collectConnectedChain(mid, a.id) : [a.id];
+        var members = ids.map(function(id) { return byId[id]; }).filter(Boolean);
+        if (!members.length) { seen[a.id] = 1; return; }
+        members.forEach(function(m) { seen[m.id] = 1; });
+        var tails = members.filter(function(m) {
+          return !members.some(function(o) { return String(o.shiftKey || '') === '_g_' + m.id; });
+        });
+        tails.sort(function(x, y) { return String(x.createdAt || '').localeCompare(String(y.createdAt || '')); });
+        reps.push({ rep: tails[tails.length - 1] || members[members.length - 1], size: members.length });
+      });
+      return reps;
+    }
+    function renderPublishModal() {
+      var box = document.getElementById('publishModalBox');
+      if (!box) return;
+      var mid = (typeof getCurrentMonthId === 'function') ? getCurrentMonthId() : '';
+      var viewer = (typeof _pbGetLoggedInName === 'function') ? _pbGetLoggedInName() : null;
+      var acts = (mid && viewer) ? (OverlayManager.getActions(mid, viewer) || []) : [];
+      // Records (public + own local) for resolving chained '_g_' shiftKeys to a readable shift.
+      var recs = (typeof _lwwViewerRecords === 'function' && mid && viewer)
+        ? _lwwViewerRecords(mid, viewer)
+        : (Array.isArray(pathBOverlays) ? pathBOverlays : []);
+      // One row per CONNECTED CHAIN (its latest/tail hop). Publishing a chain publishes ALL its
+      //   hops together (a child can't be public while its parent is a draft) — so showing every
+      //   hop as its own row, and having them publish together, confused; collapse to one.
+      var reps = _pbChainReps(mid, acts);
+      var draftReps = reps.filter(function(r) { return r.rep._visibility === 'draft'; });
+      var pubReps = reps.filter(function(r) { return r.rep._visibility !== 'draft'; });
+
+      var html = '<div class="act-modal-header"><h3>🌐 เผยแพร่เวร</h3>' +
+                 '<button class="act-modal-close" onclick="closePublishModal()">✕</button></div>';
+
+      function typeText(a) {
+        var act = String(a.action || '');
+        return act === 'swap' ? 'แลกเวร' : (act === 'give' ? 'ยกเวร' : 'รับเวร');
+      }
+      function relText(a) {
+        var act = String(a.action || ''), who = _pbEsc(a.partnerName || '?');
+        if (act === 'swap') return 'แลกกับ ' + who;
+        if (act === 'give') return 'ยกให้ ' + who;
+        return 'รับจาก ' + who;
+      }
+      // Context-aware label: add → edit the GIVER (ผู้ให้ = B); give → edit the RECEIVER (ผู้รับ);
+      //   swap → edit the swap partner (คู่แลก).
+      function editLabel(a) {
+        var act = String(a.action || '');
+        return act === 'give' ? 'แก้ผู้รับ' : (act === 'swap' ? 'แก้คู่แลก' : 'แก้ผู้ให้');
+      }
+      function rowHtml(a, size, isDraft) {
+        var chainHint = size > 1 ? ' <span style="color:var(--sub); font-weight:400;">· เชน ' + size + ' ขั้น</span>' : '';
+        var h = '<div style="display:flex; align-items:center; gap:10px; padding:11px 0; border-bottom:1px solid var(--border);">';
+        h += '<div style="flex:1; min-width:0;">' +
+             '<div style="font-weight:600; font-size:13px;">' + typeText(a) + ' · ' + _pbFmtShift(a.shiftKey, a.viewerName || viewer, recs) + chainHint + '</div>' +
+             '<div style="font-size:12px; color:var(--sub); margin-top:1px;">' + relText(a) + '</div></div>';
+        h += '<div style="display:flex; gap:6px; flex-shrink:0;">';
+        // v3.44: the publish modal is publish-only. Editing the name (B) moved to the timeline ✎
+        //   (chevron history) so the model has ONE edit surface with the draft/Admin rules.
+        if (isDraft) h += '<button type="button" class="pb-visibility-btn pb-vb-publish" onclick="_pbPopupPublish(\'' + mid + '\',\'' + a.id + '\')">เผยแพร่</button>';
+        else h += '<button type="button" class="pb-visibility-btn pb-vb-unpublish" onclick="_pbPopupUnpublish(\'' + mid + '\',\'' + a.id + '\')">ยกเลิกเผยแพร่</button>';
+        h += '</div></div>';
+        return h;
+      }
+
+      var body = '';
+      if (!draftReps.length && !pubReps.length) {
+        body += '<div style="padding:22px 4px; text-align:center; color:var(--sub); font-size:13px;">ยังไม่มีรายการแก้เวรในเดือนนี้</div>';
+      } else {
+        if (draftReps.length) {
+          body += '<div style="font-size:12px; font-weight:700; color:var(--sub); margin:12px 0 2px;">ร่าง — เห็นแค่คุณ (' + draftReps.length + ')</div>';
+          draftReps.forEach(function(r) { body += rowHtml(r.rep, r.size, true); });
+          body += '<button type="button" class="act-btn act-btn-primary" style="width:100%; margin-top:12px;" onclick="_pbPublishAllDrafts(\'' + mid + '\')">🌐 เผยแพร่ทั้งหมด (' + draftReps.length + ')</button>';
+        }
+        if (pubReps.length) {
+          body += '<div style="font-size:12px; font-weight:700; color:var(--sub); margin:' + (draftReps.length ? '18px' : '12px') + ' 0 2px;">เผยแพร่แล้ว — ทุกคนเห็น (' + pubReps.length + ')</div>';
+          pubReps.forEach(function(r) { body += rowHtml(r.rep, r.size, false); });
+        }
+      }
+      html += '<div style="padding: 4px 16px 16px;">' + body + '</div>';
+      box.innerHTML = html;
     }
 
     // ═══════════════════════════════════════════════════════════
@@ -3594,20 +3968,28 @@ window.allPharmacistNames = [];
           let kind = '', desc = '';
           if (act.action === 'add') {
             const t = findShiftByKey(act.shiftKey);
+            // A = the shift's ORIGIN owner from the master table (locked). B = the direct
+            //   counterpart who handed it over (act.partnerName, editable). Show "(A)" only when
+            //   there's a middle-man (A ≠ B), e.g. "รับ O11 (พรผกา) จาก สมโชค".
+            const _A = t ? t.name : '';
+            const _B = act.partnerName;
+            const _orig = (_A && _A !== _B) ? ' (<b>' + _A + '</b>)' : '';
             kind = 'add';
-            desc = 'รับ <b>' + (t ? t.pos : '') + '</b> จาก <b>' + act.partnerName + '</b>';
+            desc = 'รับ <b>' + (t ? t.pos : '') + '</b>' + _orig + ' จาก <b>' + _B + '</b>';
           } else if (act.action === 'swap') {
-            // For first action (real shift): show source pos
-            // For chained (ghost source): omit source — implied by previous step
+            // "แลก <myShift> กับ <gotShift> (<A = originOwner>) จาก <B = counterpart>"
             let srcStr = '';
             if (act.shiftKey && act.shiftKey.indexOf('_g_') !== 0) {
               const sx = findShiftByKey(act.shiftKey);
-              if (sx) srcStr = '<b>' + sx.pos + '</b><span class="tl-arrow">↔</span>';
+              if (sx) srcStr = '<b>' + sx.pos + '</b> กับ ';
             }
             const tx = findShiftByKey(act.partnerShiftKey);
             const tgtStr = tx ? '<b>' + tx.pos + '</b>' : '';
+            const _A = tx ? tx.name : '';
+            const _B = act.partnerName;
+            const _orig = (_A && _A !== _B) ? ' (<b>' + _A + '</b>)' : '';
             kind = 'swap';
-            desc = 'แลก ' + srcStr + tgtStr + ' กับ <b>' + act.partnerName + '</b>';
+            desc = 'แลก ' + srcStr + tgtStr + _orig + ' จาก <b>' + _B + '</b>';
           } else if (act.action === 'give') {
             let srcStr = '';
             if (act.shiftKey && act.shiftKey.indexOf('_g_') !== 0) {
@@ -3616,6 +3998,20 @@ window.allPharmacistNames = [];
             }
             kind = 'give';
             desc = (srcStr ? 'ยก ' + srcStr : 'ยก') + 'ให้ <b>' + act.partnerName + '</b>';
+          }
+          // v3.44: inline ✎ right after the name → edit the counterpart (B) in place. Shown on a
+          //   DRAFT (to its author) or on any record when the viewer is Admin (published = final,
+          //   Admin override). Reuses _pbEditRecipient. NOTE: only B (the direct counterpart) is
+          //   editable — the origin owner A is locked from the master table.
+          if ((act.action === 'add' || act.action === 'give' || act.action === 'swap') &&
+              (act._visibility === 'draft' || (typeof phxAuthIsAdmin === 'function' && phxAuthIsAdmin()))) {
+            desc += ' <span class="tl-edit-recipient" data-tl-edit="' + act.id + '" data-tl-mid="' + monthId + '" title="แก้ชื่อ" role="button" aria-label="แก้ชื่อ">✎</span>';
+          }
+          // v3.44: ✕ to peel off the LATEST hop (DRAFT only) → reverts the chain to the previous
+          //   state (e.g. remove the swap-with-กฤตยา → back to just รับ-O9-จาก-พรผกา). Only the tail
+          //   (idx === last) is removable — deleting a middle hop would orphan its children.
+          if (idx === chain.length - 1 && act._visibility === 'draft') {
+            desc += ' <span class="tl-remove-hop" data-tl-remove="' + act.id + '" data-tl-mid="' + monthId + '" title="เอาขั้นล่าสุดนี้ออก (กลับไปขั้นก่อนหน้า)" role="button" aria-label="เอาขั้นล่าสุดออก">✕</span>';
           }
           const tsStr = act.createdAt ? new Date(act.createdAt).toLocaleString('th-TH', {dateStyle:'short', timeStyle:'short'}) : '';
           if (tsStr) desc += ' <span class="tl-inline-ts">· ' + tsStr + '</span>';
@@ -3626,6 +4022,12 @@ window.allPharmacistNames = [];
               : '';
             const _title = 'บันทึกย้อนหลังโดย ' + act._retroBy + (_retroAtStr ? ' · ' + _retroAtStr : '');
             desc = '<span class="tl-retro-badge" title="' + _title + '">🔄</span>' + desc;
+          }
+          // v3.44: admin-override audit badge on own records too (admin edited a published hop)
+          if (act._overrideReason) {
+            const _ovAt = act._overrideAt ? new Date(act._overrideAt).toLocaleString('th-TH', {dateStyle:'short', timeStyle:'short'}) : '';
+            const _ovTitle = 'แก้โดยแอดมิน ' + (act._overrideBy || '') + (_ovAt ? ' · ' + _ovAt : '') + ' — เหตุผล: ' + act._overrideReason;
+            desc = '<span class="tl-override-badge" title="' + _pbEsc(_ovTitle) + '">⚖️</span>' + desc;
           }
           html += '<div class="tl-inline-step tl-' + kind + '">';
           html += '<div class="tl-inline-num">' + (idx + 1) + '</div>';
@@ -3646,36 +4048,8 @@ window.allPharmacistNames = [];
         const _pinnedSrc = chain.some(a => a && a._retroFinal);
         html += '<div class="tl-inline-end active">ปัจจุบันเวรนี้อยู่กับ: <b>' + (_curHolder || '?') + '</b>' +
                 (_pinnedSrc ? ' <span title="ปักหมุดจากการบันทึกย้อนหลัง (ข้ามช่วงที่ไม่ทราบ)">🔒</span>' : '') + '</div>';
-        // v3.43: Publish/Unpublish controls — only when the logged-in user authored these actions.
-        //   The chain is in local OverlayManager (this branch), so we already know they own it,
-        //   BUT edit only makes sense when they're logged in (drafts can only leave via SYNC).
-        try {
-          const _bound = _pbGetLoggedInName();
-          if (_bound && String(viewer) === String(_bound)) {
-            const _draftIds = [];
-            const _publicIds = [];
-            chain.forEach(a => {
-              if (a._visibility === 'draft') _draftIds.push(a.id);
-              else _publicIds.push(a.id);
-            });
-            if (_draftIds.length > 0 || _publicIds.length > 0) {
-              html += '<div class="tl-inline-actions">';
-              if (_draftIds.length > 0) {
-                html += '<button type="button" class="pb-visibility-btn pb-vb-publish" ' +
-                        'data-pb-publish="' + _draftIds.join(',') + '" ' +
-                        'data-pb-mid="' + monthId + '">🌐 เผยแพร่' +
-                        (_draftIds.length > 1 ? ' (' + _draftIds.length + ' ขั้น)' : '') + '</button>';
-              }
-              if (_publicIds.length > 0) {
-                html += '<button type="button" class="pb-visibility-btn pb-vb-unpublish" ' +
-                        'data-pb-unpublish="' + _publicIds.join(',') + '" ' +
-                        'data-pb-mid="' + monthId + '">🔒 เอากลับเป็นส่วนตัว' +
-                        (_publicIds.length > 1 ? ' (' + _publicIds.length + ' ขั้น)' : '') + '</button>';
-              }
-              html += '</div>';
-            }
-          }
-        } catch (_e) { /* button is optional */ }
+        // v3.44: publish/unpublish moved OUT of the timeline into the single "🌐 เผยแพร่"
+        //   FAB modal (openPublishModal). The timeline is now read-only history.
         return html;
       } catch(err) {
         v10ShowError('buildTimelineHTML', err);
@@ -3737,6 +4111,17 @@ window.allPharmacistNames = [];
               : '';
             const _title = 'บันทึกย้อนหลังโดย ' + ov._retroBy + (_retroAtStr ? ' · ' + _retroAtStr : '');
             desc = '<span class="tl-retro-badge" title="' + _title + '">🔄</span>' + desc;
+          }
+          // v3.44: admin-override audit badge — who/when/why (from the _override* pass-through)
+          if (ov._overrideReason) {
+            var _ovAtStr = ov._overrideAt ? new Date(ov._overrideAt).toLocaleString('th-TH', {dateStyle:'short', timeStyle:'short'}) : '';
+            var _ovTitle = 'แก้โดยแอดมิน ' + (ov._overrideBy || '') + (_ovAtStr ? ' · ' + _ovAtStr : '') + ' — เหตุผล: ' + ov._overrideReason;
+            desc = '<span class="tl-override-badge" title="' + _pbEsc(_ovTitle) + '">⚖️</span>' + desc;
+          }
+          // v3.44: Admin ✎ to OVERRIDE another user's hop (add/give/swap). Carries the owner +
+          //   current name so _pbAdminOverride can pull→patch→push AS that owner.
+          if ((act === 'add' || act === 'give' || act === 'swap') && (typeof phxAuthIsAdmin === 'function' && phxAuthIsAdmin())) {
+            desc += ' <span class="tl-edit-recipient" data-tl-pbedit="' + _pbEsc(ov.actionId) + '" data-tl-owner="' + _pbEsc(ov.viewerName || '') + '" data-tl-cur="' + _pbEsc(ov.partnerName || '') + '" data-tl-mid="' + _pbEsc(getCurrentMonthId()) + '" title="override (แอดมิน)" role="button" aria-label="override">✎</span>';
           }
           html += '<div class="tl-inline-step tl-' + kind + '">';
           html += '<div class="tl-inline-num">' + (idx + 1) + '</div>';
@@ -4836,7 +5221,7 @@ window.allPharmacistNames = [];
       ov.id = 'lwwNamePickerOverlay';
       ov.style.cssText = 'position:fixed; inset:0; background:rgba(0,0,0,0.5); z-index:10002; display:flex; align-items:center; justify-content:center; padding:16px;';
       ov.innerHTML = '<div style="background:var(--surface); width:100%; max-width:380px; height:70vh; border-radius:14px; padding:14px; font-family:inherit; display:flex; flex-direction:column;">' +
-        '<div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px;"><div style="font-weight:700; font-size:15px;">เลือกชื่อ</div>' +
+        '<div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px;"><div style="font-weight:700; font-size:15px;">ระบุชื่อผู้สัมปทานเวร</div>' +
         '<button type="button" onclick="_lwwNamePickerClose()" style="border:none;background:none;font-size:18px;cursor:pointer;color:var(--sub);">✕</button></div>' +
         '<input id="lwwNameSearch" placeholder="พิมพ์ค้นหาชื่อ…" autocomplete="off" style="width:100%; padding:10px; border:1px solid var(--border); border-radius:8px; font-family:inherit; font-size:15px; box-sizing:border-box; margin-bottom:8px;" />' +
         '<div id="lwwNameList" style="overflow-y:auto; flex:1; -webkit-overflow-scrolling:touch;"></div>' +
@@ -4852,10 +5237,10 @@ window.allPharmacistNames = [];
         var html = filtered.slice(0, 80).map(function(n) {
           return '<div class="lww-name-row" data-name="' + String(n).replace(/"/g, '&quot;') + '" style="padding:12px 8px; border-bottom:1px solid var(--border); cursor:pointer; font-size:15px;">' + n + '</div>';
         }).join('');
-        if (qt && !names.some(function(n) { return String(n).toLowerCase() === q; })) {
-          html += '<div class="lww-name-row" data-name="' + qt.replace(/"/g, '&quot;') + '" style="padding:12px 8px; cursor:pointer; font-size:14px; color:#b45309;">ใช้ชื่อ “' + qt + '” (ไม่มีในระบบ)</div>';
-        }
-        list.innerHTML = html || '<div style="padding:14px; color:var(--sub); font-size:13px;">ไม่พบชื่อ</div>';
+        // v3.44: known-names only — no free-text. The picked name MUST exist in the People
+        //   master list or the current month's schedule. Forces everyone to be registered
+        //   (the app already requires login), so "รับจาก" always points at a real account.
+        list.innerHTML = html || '<div style="padding:14px; color:var(--sub); font-size:13px;">ไม่พบชื่อในระบบ — เลือกได้เฉพาะชื่อที่ลงทะเบียนไว้ หรืออยู่ในตารางเวรเดือนนี้</div>';
         Array.prototype.forEach.call(list.querySelectorAll('.lww-name-row'), function(row) {
           row.addEventListener('click', function() { var nm = row.getAttribute('data-name'); _lwwNamePickerClose(); if (typeof onPick === 'function') onPick(nm); });
         });
@@ -5054,12 +5439,13 @@ window.allPharmacistNames = [];
     // v3.44: getDataSignature watches only the MASTER schedule. Overlays (others' swap/publish)
     //   change without touching the master, so the poll never noticed them → colleagues' updates
     //   stayed invisible until a manual refresh. Track overlays with their OWN fingerprint —
-    //   include _visibility so a draft→public flip is caught even when the count is unchanged.
+    //   include _visibility so a draft→public flip is caught even when the count is unchanged,
+    //   and partnerName so an edited "รับจาก" (edit-published) propagates live to everyone.
     var _lastPbSignature = '';
     function _pbOverlaySignature(pb) {
       if (!Array.isArray(pb)) return '';
       return pb.length + ':' + pb.map(function(o) {
-        return (o && o.actionId || '') + '~' + (o && o._visibility || 'public');
+        return (o && o.actionId || '') + '~' + (o && o._visibility || 'public') + '~' + (o && o.partnerName || '');
       }).sort().join(',');
     }
     // v3.44: adopt fresh overlays + re-render in place (shared by the poll and manual refresh).
@@ -5726,13 +6112,10 @@ window.allPharmacistNames = [];
         const _strikeActionId = _used ? _used.actionId : (_isGhost ? i._ghostActionId : null);
         const _isDraftLocal = _strikeActionId ? _isActionDraft(_strikeActionId) : false;
         const _strike = _used ? (_isDraftLocal ? 'shift-line-through-draft' : 'shift-line-through') : '';
-        // v3.43: inline publish — sits beside the pencil, shown once per own draft action.
-        //   _isDraftLocal is true only on the author's device, so it already implies "my draft".
-        let _pubInline = '';
-        if (editModeActive && _isDraftLocal && _strikeActionId && !_draftBtnShown.has(_strikeActionId)) {
-          _draftBtnShown.add(_strikeActionId);
-          _pubInline = '<span class="inline-publish" data-pb-publish-row="' + _strikeActionId + '" data-pb-mid="' + _mid + '" title="เผยแพร่ให้ทุกคนเห็น (ตอนนี้ยังเป็นส่วนตัว)">🌐 เผยแพร่</span>';
-        }
+        // v3.44: inline publish button removed — publishing is centralized in the single
+        //   "🌐 เผยแพร่" FAB modal (openPublishModal). Draft rows still render with the dashed
+        //   strike (_isDraftLocal / shift-draft above) so the author can still spot unpublished rows.
+        const _pubInline = '';
         const _nameBase = i.isNew ? 'text-orange-600 font-bold leading-none' : 'text-blue-900 font-bold leading-none';
         const nameDisplay = `<span class="col-name-wrap"><span class="ncw-left"></span><span class="ncw-center"><span class="${_nameBase} ${_strike}">${i.isNew?'⚠️ ':''}${i.name}</span>${_pencil}${_pubInline}</span><span class="ncw-right">${_suffix}</span></span>`;
         let _ghostCls = '';
@@ -11870,10 +12253,10 @@ table.exp-tbl .tm{margin-left:3px;opacity:0.75;}
           const u = (typeof phxAuthGetUser === 'function') ? phxAuthGetUser() : null;
           const willSync = !!(u && u.name === target);
           if (floppyBtn) floppyBtn.style.display = willSync ? 'none' : 'flex';
-          // v3.43: retro chain button — only useful when logged in (draft/publish needs identity)
-          const retroBtn = document.getElementById('phxFabRetro');
+          // v3.44: publish button — only useful when logged in (draft/publish needs identity)
+          const publishBtn = document.getElementById('phxFabPublish');
           const bound = (typeof _pbGetLoggedInName === 'function') ? _pbGetLoggedInName() : null;
-          if (retroBtn) retroBtn.style.display = bound ? 'flex' : 'none';
+          if (publishBtn) publishBtn.style.display = bound ? 'flex' : 'none';
         } else {
           // Edit mode off — show just pencil
           fab.style.display = 'flex';
@@ -13028,9 +13411,9 @@ table.exp-tbl .tm{margin-left:3px;opacity:0.75;}
     <button id="phxFabFloppy" class="phx-fab-action phx-fab-floppy" onclick="phxSaveAndConfirm()" style="display:none;" title="บันทึก local">
       <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 21H5a2 2 0 01-2-2V5a2 2 0 012-2h11l5 5v11a2 2 0 01-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg>
     </button>
-    <!-- v3.43: retroactive multi-hop chain (offline swaps that already happened) -->
-    <button id="phxFabRetro" class="phx-fab-action" onclick="openRetroModal()" style="display:none;" title="บันทึกย้อนหลัง">
-      <span style="font-size:16px; line-height:1;">📝</span>
+    <!-- v3.44: publish center — open the "🌐 เผยแพร่" modal (replaces the old offline-chain button) -->
+    <button id="phxFabPublish" class="phx-fab-action" onclick="openPublishModal()" style="display:none;" title="เผยแพร่เวร">
+      <span style="font-size:16px; line-height:1;">🌐</span>
     </button>
     <button class="phx-fab-done" onclick="toggleEditMode()" title="ออกจากโหมดแก้ไข">
       <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
