@@ -5410,13 +5410,12 @@ window.allPharmacistNames = [];
       var radar = document.getElementById('connRadar');
       if (!radar) return;
       // v3.44: #connRadar is hardcoded display:none in the markup ("hidden for clean UI") — force it
-      //   visible so the Firebase light actually shows (Klui wants it on whenever Firebase is up).
+      //   visible so the Firebase light shows. Klui wants just a small DOT (like auditBadge), not a
+      //   "Firebase" pill: green = connected, grey = offline.
       radar.style.display = 'inline-flex'; radar.style.alignItems = 'center';
-      if (window._fbConnected) {
-        radar.innerHTML = '<div class="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-green-50 border border-green-200 text-[10px] font-bold text-green-700 shadow-sm"><span class="w-1.5 h-1.5 rounded-full bg-green-500"></span>Firebase</div>';
-      } else {
-        radar.innerHTML = '<div class="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-gray-100 border border-gray-300 text-[10px] font-bold text-gray-500 shadow-sm"><span class="w-1.5 h-1.5 rounded-full bg-gray-400"></span>ออฟไลน์</div>';
-      }
+      var _c = window._fbConnected ? '#16a34a' : '#9ca3af';
+      radar.title = window._fbConnected ? 'Firebase เชื่อมต่ออยู่' : 'Firebase ออฟไลน์';
+      radar.innerHTML = '<span style="display:inline-block;width:10px;height:10px;border-radius:50%;background:' + _c + ';box-shadow:0 0 0 3px ' + _c + '22;"></span>';
     }
     try {
       if (fbDb) {
@@ -5679,13 +5678,14 @@ window.allPharmacistNames = [];
         '<div style="background:var(--surface,#fff); width:100%; max-width:400px; border-radius:16px; padding:18px; box-shadow:0 10px 40px rgba(0,0,0,0.25); font-family:inherit;">' +
           '<div style="font-size:15px; font-weight:800; color:var(--text,#111827); display:flex; align-items:center; gap:6px; margin-bottom:10px;">' + (n.icon || '📢') + '<span>' + _phxNoticeEsc(n.title || 'แจ้งเตือน') + '</span></div>' +
           '<div style="font-size:12.5px; color:var(--sub,#374151); line-height:1.6;">' + (n.html || '') + '</div>' +
-          '<label style="display:flex; align-items:center; gap:7px; font-size:12px; color:var(--sub,#374151); margin:14px 0; cursor:pointer; user-select:none;"><input type="checkbox" id="phxNoticeOptout" style="width:15px;height:15px;"> ไม่ต้องแสดงข้อความนี้อีก</label>' +
-          '<button id="phxNoticeOk" style="width:100%; background:var(--accent,#2563eb); color:#fff; border:0; border-radius:10px; padding:10px; font-size:13px; font-weight:700; cursor:pointer;">รับทราบ</button>' +
+          (n.hideOptOut ? '' : '<label style="display:flex; align-items:center; gap:7px; font-size:12px; color:var(--sub,#374151); margin:14px 0; cursor:pointer; user-select:none;"><input type="checkbox" id="phxNoticeOptout" style="width:15px;height:15px;"> ไม่ต้องแสดงข้อความนี้อีก</label>') +
+          '<button id="phxNoticeOk" style="width:100%; margin-top:12px; background:var(--accent,#2563eb); color:#fff; border:0; border-radius:10px; padding:10px; font-size:13px; font-weight:700; cursor:pointer;">รับทราบ</button>' +
         '</div>';
       document.body.appendChild(ov);
       function _close() {
         const cb = document.getElementById('phxNoticeOptout');
         if (cb && cb.checked) _phxNoticeDismiss(n.id);
+        if (typeof n.onAck === 'function') { try { n.onAck(); } catch(e){} }        // e.g. mark announcement read
         ov.remove(); _phxNoticeOpen = false; _phxCurrentNoticeId = null;
         _phxNoticeDrain();                                                          // show next queued
       }
@@ -12821,31 +12821,30 @@ table.exp-tbl .tm{margin-left:3px;opacity:0.75;}
         }, msUntilExpire + 1000);  // +1s buffer
       }
 
-      // Show newest first
-      const b = unread[0];
-      const multiBadge = unread.length > 1
-        ? '<span class="phx-bcast-banner-multi">+' + (unread.length - 1) + ' อื่นๆ</span>'
-        : '';
-      const escapedTitle = String(b.title || '').replace(/[<>&]/g, function(c) {
-        return { '<': '&lt;', '>': '&gt;', '&': '&amp;' }[c];
+      // v3.44: announcements now surface as dismissible POPUPS (Klui) instead of an inline banner.
+      //   Phase J "unusual sheet" notices (e.g. เปลี่ยนเวลาวันหยุดพิเศษ) are broadcasts too, so they
+      //   ride the same path = Source 2 for free. Ack (รับทราบ) marks the broadcast read via the
+      //   existing phxBcastDismiss (server-synced when logged in) — no "ไม่ต้องแสดงอีก" tick, since
+      //   read-tracking + the 10-min window already handle "don't show again". The queue + id-dedup
+      //   mean re-renders (visibilitychange / 60s poll) never double-open the same one.
+      host.innerHTML = '';
+      const _bcastEsc = function(s){ return String(s || '').replace(/[<>&]/g, function(c){ return { '<': '&lt;', '>': '&gt;', '&': '&amp;' }[c]; }); };
+      unread.forEach(function(b) {
+        const createdDate = (function() {
+          try { const d = new Date(b.createdAt); return d.getDate() + '/' + (d.getMonth() + 1) + '/' + (d.getFullYear() + 543); }
+          catch(e) { return ''; }
+        })();
+        _phxNoticeEnqueue({
+          id: 'bcast_' + b.id,
+          icon: '📢',
+          title: _bcastEsc(b.title || 'ประกาศ'),
+          html: '<p style="margin:0 0 8px;">' + _bcastEsc(b.body || '') + '</p>' +
+                '<p style="margin:0; font-size:11px; color:var(--muted,#6b7280);">โดย ' + _bcastEsc(b.createdBy || '-') + ' • ' + createdDate + '</p>',
+          hideOptOut: true,
+          onAck: function(){ try { phxBcastDismiss(b.id); } catch(e){} }
+        });
       });
-      const escapedBody = String(b.body || '').replace(/[<>&]/g, function(c) {
-        return { '<': '&lt;', '>': '&gt;', '&': '&amp;' }[c];
-      });
-      const createdDate = (function() {
-        try {
-          const d = new Date(b.createdAt);
-          return d.getDate() + '/' + (d.getMonth() + 1) + '/' + (d.getFullYear() + 543);
-        } catch(e) { return ''; }
-      })();
-      host.innerHTML =
-        '<div class="phx-bcast-banner" data-bcast-id="' + b.id + '">' +
-          '<button class="phx-bcast-banner-close" onclick="phxBcastDismiss(\'' + b.id + '\')" title="รับทราบ">✕</button>' +
-          '<div class="phx-bcast-banner-title">📢 ' + escapedTitle + multiBadge + '</div>' +
-          '<div class="phx-bcast-banner-body">' + escapedBody + '</div>' +
-          '<div class="phx-bcast-banner-meta">โดย ' + (b.createdBy || '-') + ' • ' + createdDate + '</div>' +
-        '</div>';
-      // Cache full list for chained display
+      // Cache full list for the auto-hide re-check
       window._phxBcastList = unread;
     }
 
