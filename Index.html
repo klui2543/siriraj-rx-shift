@@ -5409,6 +5409,9 @@ window.allPharmacistNames = [];
     function _renderConnRadar() {
       var radar = document.getElementById('connRadar');
       if (!radar) return;
+      // v3.44: #connRadar is hardcoded display:none in the markup ("hidden for clean UI") — force it
+      //   visible so the Firebase light actually shows (Klui wants it on whenever Firebase is up).
+      radar.style.display = 'inline-flex'; radar.style.alignItems = 'center';
       if (window._fbConnected) {
         radar.innerHTML = '<div class="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-green-50 border border-green-200 text-[10px] font-bold text-green-700 shadow-sm"><span class="w-1.5 h-1.5 rounded-full bg-green-500"></span>Firebase</div>';
       } else {
