@@ -5506,6 +5506,82 @@ window.allPharmacistNames = [];
     } catch (e) { console.warn('Firebase .info/connected listener failed:', e); }
 
     // ==========================================
+    // 🏷️ NICKNAMES (v3.44) — public (self-set, everyone sees) + private (my aliases, only I see)
+    //   RTDB:  nicknames/public/{encName}            = "โต้ง"        (a person's own public nickname)
+    //          nicknames/private/{encMe}/{encTarget} = "หมอโต้ง"     (my private alias for someone)
+    //   Display precedence: my private alias > their public nickname > real name.
+    //   ⚠️ DISPLAY-ONLY — never mutate stored/identity names (makeShiftKey, partnerName, comparisons).
+    // ==========================================
+    window._nkPublic = {};   // { realName: publicNickname }
+    window._nkPrivate = {};  // { realName: myAliasForThem }
+    function _nkKey(name) { return encodeURIComponent(name || '').replace(/\./g, '%2E'); }
+    function _nkUnkey(key) { try { return decodeURIComponent(key); } catch (e) { return key; } }
+    function _nkMyName() {
+      try { var u = (typeof phxAuthGetUser === 'function') ? phxAuthGetUser() : null; return (u && u.name) ? u.name : ''; }
+      catch (e) { return ''; }
+    }
+    // Resolve a real name to what THIS viewer should see. DISPLAY ONLY.
+    function displayName(name) {
+      if (!name) return name;
+      var mine = window._nkPrivate && window._nkPrivate[name];
+      if (mine) return mine;
+      var pub = window._nkPublic && window._nkPublic[name];
+      if (pub) return pub;
+      return name;
+    }
+    var _nkPubRef = null, _nkPrivRef = null;
+    function _nkMapFromSnap(snap) {
+      var v = (snap && snap.val()) || {}; var map = {};
+      Object.keys(v).forEach(function (k) { if (v[k]) map[_nkUnkey(k)] = String(v[k]); });
+      return map;
+    }
+    function _nkRepaint() { if (typeof triggerUpdate === 'function') { try { triggerUpdate(); } catch (e) {} } }
+    function _nkSubscribe() {
+      if (!fbDb) return;
+      try {
+        if (!_nkPubRef) {
+          _nkPubRef = fbDb.ref('nicknames/public');
+          _nkPubRef.on('value', function (snap) { window._nkPublic = _nkMapFromSnap(snap); _nkRepaint(); });
+        }
+      } catch (e) { console.warn('nk public sub failed', e); }
+      _nkSubscribePrivate();
+    }
+    // (re)subscribe to MY private aliases — call on login / logout (viewer identity changed)
+    function _nkSubscribePrivate() {
+      if (!fbDb) return;
+      try {
+        if (_nkPrivRef) { _nkPrivRef.off(); _nkPrivRef = null; }
+        window._nkPrivate = {};
+        var me = _nkMyName();
+        if (!me) { _nkRepaint(); return; }
+        _nkPrivRef = fbDb.ref('nicknames/private/' + _nkKey(me));
+        _nkPrivRef.on('value', function (snap) { window._nkPrivate = _nkMapFromSnap(snap); _nkRepaint(); });
+      } catch (e) { console.warn('nk private sub failed', e); }
+    }
+    // Write my OWN public nickname (empty = clear). cb(err|null).
+    function nkSetPublic(nickname, cb) {
+      var me = _nkMyName();
+      if (!fbDb) { if (cb) cb(new Error('ไม่ได้เชื่อมต่อฐานข้อมูล')); return; }
+      if (!me) { if (cb) cb(new Error('ต้องเข้าสู่ระบบก่อน')); return; }
+      var ref = fbDb.ref('nicknames/public/' + _nkKey(me));
+      var val = (nickname || '').trim();
+      var p = val ? ref.set(val) : ref.remove();
+      p.then(function () { if (cb) cb(null); }).catch(function (e) { if (cb) cb(e); });
+    }
+    // Write a PRIVATE alias I give to someone else (empty = clear). cb(err|null).
+    function nkSetPrivate(targetName, nickname, cb) {
+      var me = _nkMyName();
+      if (!fbDb) { if (cb) cb(new Error('ไม่ได้เชื่อมต่อฐานข้อมูล')); return; }
+      if (!me) { if (cb) cb(new Error('ต้องเข้าสู่ระบบก่อน')); return; }
+      if (!targetName) { if (cb) cb(new Error('ไม่พบชื่อ')); return; }
+      var ref = fbDb.ref('nicknames/private/' + _nkKey(me) + '/' + _nkKey(targetName));
+      var val = (nickname || '').trim();
+      var p = val ? ref.set(val) : ref.remove();
+      p.then(function () { if (cb) cb(null); }).catch(function (e) { if (cb) cb(e); });
+    }
+    try { if (fbDb) _nkSubscribe(); } catch (e) { console.warn('nk subscribe init failed', e); }
+
+    // ==========================================
     // 🌟 UI HELPERS
     // ==========================================
     
@@ -10582,6 +10658,7 @@ table.exp-tbl .tm{margin-left:3px;opacity:0.75;}
         localStorage.setItem(PHX_LS_HASH, hash);
         localStorage.setItem(PHX_LS_ROLE, role || 'user');
       } catch(e) {}
+      try { if (typeof _nkSubscribePrivate === 'function') _nkSubscribePrivate(); } catch(e) {}
       // v3.5: bridge to P2B (old name-binding system) — login = bind as that person
       try {
         if (typeof P2B !== 'undefined' && P2B) {
@@ -10627,6 +10704,7 @@ table.exp-tbl .tm{margin-left:3px;opacity:0.75;}
         localStorage.removeItem(PHX_LS_HASH);
         localStorage.removeItem(PHX_LS_ROLE);
       } catch(e) {}
+      try { if (typeof _nkSubscribePrivate === 'function') _nkSubscribePrivate(); } catch(e) {}
       // Feature 2 (B4b): clear reminder cache on logout
       if (typeof _phxClearCachedReminderSettings === 'function') _phxClearCachedReminderSettings();
       // v3.5: clear P2B too
