@@ -2608,7 +2608,7 @@ window.allPharmacistNames = [];
             _c = (typeof OverlayManager !== 'undefined' && OverlayManager.getSwapColor ? OverlayManager.getSwapColor(monthId, viewerName, rec.actionId) : null)
                || (typeof PBOverlays !== 'undefined' && PBOverlays.getSwapColor ? PBOverlays.getSwapColor(rec.actionId) : null);
           }
-          map[key] = { label: (rec.action === 'swap' ? 'สลับกับ ' : 'ยกให้ ') + rec.newOwner + ' แล้ว', actionId: rec.actionId, color: _c, _pbSource: true };
+          map[key] = { label: (rec.action === 'swap' ? 'สลับกับ ' : 'ยกให้ ') + rec.newOwner + ' แล้ว', actionId: rec.actionId, color: _c, _pbSource: true, newOwner: rec.newOwner };
         }
       });
       return map;
@@ -2863,14 +2863,14 @@ window.allPharmacistNames = [];
         actions.forEach(a => {
           if (a.action === 'swap') {
             const c = swapColors[a.id];
-            map[a.shiftKey] = { label: 'สลับกับ ' + a.partnerName + ' แล้ว', actionId: a.id, color: c };
+            map[a.shiftKey] = { label: 'สลับกับ ' + a.partnerName + ' แล้ว', actionId: a.id, color: c, newOwner: a.partnerName };
             if (a.partnerShiftKey) {
-              map[a.partnerShiftKey] = { label: 'สลับกับ ' + a.originalOwner + ' แล้ว', actionId: a.id, color: c };
+              map[a.partnerShiftKey] = { label: 'สลับกับ ' + a.originalOwner + ' แล้ว', actionId: a.id, color: c, newOwner: a.originalOwner };
             }
           } else if (a.action === 'give') {
-            map[a.shiftKey] = { label: 'ยกให้ ' + a.partnerName + ' แล้ว', actionId: a.id };
+            map[a.shiftKey] = { label: 'ยกให้ ' + a.partnerName + ' แล้ว', actionId: a.id, newOwner: a.partnerName };
           } else if (a.action === 'add') {
-            map[a.shiftKey] = { label: 'รับมาแล้ว', actionId: a.id };
+            map[a.shiftKey] = { label: 'รับมาแล้ว', actionId: a.id, newOwner: viewerName };
           }
         });
         return map;
@@ -2933,6 +2933,13 @@ window.allPharmacistNames = [];
       const om = (typeof OverlayManager !== 'undefined') ? OverlayManager.getUsedMap(monthId, viewerName) : {};
       const pb = (typeof PBOverlays !== 'undefined') ? PBOverlays.getUsedMap(_pbGetLoggedInName()) : {};
       return Object.assign({}, pb, om);   // OverlayManager wins on key collision (own > public)
+    }
+    // v3.44: current holder of a master slot after gives/swaps. Reads the same used-map the
+    //   table strikes with (newOwner field), so the picker/confirm agree with what everyone sees.
+    //   No transfer on this slot → the master owner still holds it.
+    function _pbHolderOf(s, usedMap) {
+      const u = usedMap && usedMap[makeShiftKey(s)];
+      return (u && u.newOwner) ? u.newOwner : (s && s.name || '');
     }
     // v3.43: Lookup helper for Draft/Publish visual state.
     //   actionId → true if the local OverlayManager action is draft. Public and unknown → false.
@@ -3661,13 +3668,13 @@ window.allPharmacistNames = [];
             // v3.42.9: tag side ('actor' vs 'partner') so timeline endpoint can pick
             //          the right person after a swap — actor's row goes to partner,
             //          partner's row goes to actor
-            if (o.shiftKey)        map[o.shiftKey]        = { label: 'สลับกับ ' + o.partnerName + ' แล้ว', actionId: o.actionId, color: c, _pbSource: true, _pbSide: 'actor'   };
-            if (o.partnerShiftKey) map[o.partnerShiftKey] = { label: 'สลับกับ ' + o.viewerName  + ' แล้ว', actionId: o.actionId, color: c, _pbSource: true, _pbSide: 'partner' };
+            if (o.shiftKey)        map[o.shiftKey]        = { label: 'สลับกับ ' + o.partnerName + ' แล้ว', actionId: o.actionId, color: c, _pbSource: true, _pbSide: 'actor',   newOwner: o.partnerName };
+            if (o.partnerShiftKey) map[o.partnerShiftKey] = { label: 'สลับกับ ' + o.viewerName  + ' แล้ว', actionId: o.actionId, color: c, _pbSource: true, _pbSide: 'partner', newOwner: o.viewerName  };
           } else if (act === 'give') {
-            if (o.shiftKey) map[o.shiftKey] = { label: 'ยกให้ ' + o.partnerName + ' แล้ว', actionId: o.actionId, _pbSource: true };
+            if (o.shiftKey) map[o.shiftKey] = { label: 'ยกให้ ' + o.partnerName + ' แล้ว', actionId: o.actionId, _pbSource: true, newOwner: o.partnerName };
           } else if (act === 'add') {
             // 'add' shiftKey = "date|pos|partnerName|range" → labels partner's original row
-            if (o.shiftKey) map[o.shiftKey] = { label: 'ยกให้ ' + o.viewerName + ' แล้ว', actionId: o.actionId, _pbSource: true };
+            if (o.shiftKey) map[o.shiftKey] = { label: 'ยกให้ ' + o.viewerName + ' แล้ว', actionId: o.actionId, _pbSource: true, newOwner: o.viewerName };
           }
         });
         return map;
@@ -4912,15 +4919,19 @@ window.allPharmacistNames = [];
     function renderShiftPickerShell() {
       const myShift = actionState.shiftKey ? findShiftByKey(actionState.shiftKey) : null;
       const myName = myShift ? myShift.name : getCurrentUser();
+      // v3.44: group by CURRENT holder (after gives/swaps), not the master owner — a shift ณรพล
+      //   handed to อสมาภรณ์ now lists under อสมาภรณ์, so you receive it from who actually holds it.
+      const _pkUsed = _combinedUsedMap(getCurrentMonthId(), getCurrentUser());
       const persons = [];
       const seen = {};
       (rawData||[]).forEach(s => {
-        if (s.name !== myName && !seen[s.name]) { seen[s.name] = 1; persons.push(s.name); }
+        const h = _pbHolderOf(s, _pkUsed);
+        if (h !== myName && !seen[h]) { seen[h] = 1; persons.push(h); }
       });
       persons.sort();
       // Unique dates (sorted by timestamp)
       const dateMap = {};
-      (rawData||[]).forEach(s => { if (s.name !== myName && !dateMap[s.date]) dateMap[s.date] = s.timestamp || 0; });
+      (rawData||[]).forEach(s => { if (_pbHolderOf(s, _pkUsed) !== myName && !dateMap[s.date]) dateMap[s.date] = s.timestamp || 0; });
       const dates = Object.keys(dateMap).sort((a, b) => dateMap[a] - dateMap[b]);
 
       let html = '<div class="pick-filters">';
@@ -4970,7 +4981,7 @@ window.allPharmacistNames = [];
       if (!listEl) return;
       const s = actionState.step;
       const mid = getCurrentMonthId();
-      const usedMap = OverlayManager.getUsedMap(mid);
+      const usedMap = _combinedUsedMap(mid, getCurrentUser());
       let html = '';
 
       if (s === 'give') {
@@ -5008,9 +5019,14 @@ window.allPharmacistNames = [];
             viewerEffective = viewerEffective.filter(r => makeShiftKey(r) !== myK && r._ghostKey !== myShift._ghostKey);
           }
         }
-        let list = (rawData || []).filter(s2 => s2.name !== myName);
+        // v3.44: tag each master row with its CURRENT holder (after gives/swaps) and group/filter
+        //   by that, not the master owner. Keep `name` untouched so makeShiftKey (identity) stays the
+        //   same → data-pick-key + confirmPickShift still resolve the original slot.
+        let list = (rawData || [])
+          .map(s2 => Object.assign({}, s2, { _holder: _pbHolderOf(s2, usedMap), _origName: s2.name }))
+          .filter(x => x._holder !== myName);
         if (actionState.pickerPerson) {
-          list = list.filter(s2 => s2.name === actionState.pickerPerson);
+          list = list.filter(x => x._holder === actionState.pickerPerson);
         }
         if (actionState.pickerDate) {
           list = list.filter(s2 => s2.date === actionState.pickerDate);
@@ -5033,7 +5049,9 @@ window.allPharmacistNames = [];
           const attrs = disabled ? ' disabled' : ' data-pick-key="' + enc + '"';
           let h = '<button class="pick-result"' + attrs + '>';
           h += '<div style="min-width:0; flex:1;">';
-          h += '<div class="pick-result-name">' + s2.name + '</div>';
+          h += '<div class="pick-result-name">' + (s2._holder || s2.name) + '</div>';
+          if (s2._origName && s2._holder && s2._origName !== s2._holder)
+            h += '<div style="font-size:11px;color:var(--muted);">เดิมของ ' + s2._origName + '</div>';
           h += '<div class="pick-meta-cols">';
           h += '<span class="pick-meta-date">' + s2.date + '</span>';
           h += '<span class="pick-meta-pos">' + s2.pos + '</span>';
@@ -5060,7 +5078,9 @@ window.allPharmacistNames = [];
         list.forEach(s2 => {
           const key = makeShiftKey(s2);
           const used = usedMap[key];
-          const disabled = !!used;
+          // v3.44: a transferred shift is still receivable — from its CURRENT holder (chain support).
+          //   The list already shows it under that holder, so let the viewer pick it.
+          const disabled = false;
           let conflictPreview = '';
           let conflictStatus = 'none';
           if (!disabled && viewerEffective.length > 0) {
@@ -5124,6 +5144,9 @@ window.allPharmacistNames = [];
         return;
       }
       const mid = getCurrentMonthId();
+      // v3.44: default "รับจาก/แลกกับ" = the shift's CURRENT holder (after gives/swaps), not the
+      //   master owner — so a re-transferred shift records the real chain. Still editable in the dialog.
+      const _curHolder = _pbHolderOf(targetShift, _combinedUsedMap(mid, getCurrentUser()));
       // v3.44 Step 4b: before recording, show Level-1 (current owner + time) + an editable
       //   "รับจาก/แลกกับ" field so the recorder can name the ACTUAL person they got it from
       //   (e.g. C), even if the schedule still displays the original owner (A). We keep the
@@ -5132,14 +5155,14 @@ window.allPharmacistNames = [];
         const mine = findShiftByKey(actionState.shiftKey);
         if (!mine) return;
         const myKey = actionState.shiftKey, mineName = mine.name;
-        _lwwTransferConfirm({ kind: 'swap', targetKey: targetKey, targetShift: targetShift, defaultFrom: targetShift.name,
+        _lwwTransferConfirm({ kind: 'swap', targetKey: targetKey, targetShift: targetShift, defaultFrom: _curHolder,
           onConfirm: function(fromName) {
             OverlayManager.addAction(mid, { action: 'swap', shiftKey: myKey, partnerShiftKey: targetKey, partnerName: fromName, originalOwner: mineName });
             closeActionModal(); triggerUpdate();
           } });
         return;
       } else if (actionState.step === 'add') {
-        _lwwTransferConfirm({ kind: 'add', targetKey: targetKey, targetShift: targetShift, defaultFrom: targetShift.name,
+        _lwwTransferConfirm({ kind: 'add', targetKey: targetKey, targetShift: targetShift, defaultFrom: _curHolder,
           onConfirm: function(fromName) {
             OverlayManager.addAction(mid, { action: 'add', shiftKey: targetKey, partnerName: fromName });
             closeActionModal(); triggerUpdate();
@@ -5177,7 +5200,7 @@ window.allPharmacistNames = [];
     function _lwwTransferClose() { var e = document.getElementById('lwwTransferOverlay'); if (e) e.remove(); }
     function _lwwTransferConfirm(opts) {
       var kindLabel = opts.kind === 'swap' ? 'แลกกับ' : 'รับจาก';
-      var curOwner = (opts.targetShift && opts.targetShift.name) || opts.defaultFrom || '';
+      var curOwner = opts.defaultFrom || (opts.targetShift && opts.targetShift.name) || '';
       var lastAt = '';
       try {
         if (typeof LWW !== 'undefined' && String(opts.targetKey || '').indexOf('_g_') !== 0) {
