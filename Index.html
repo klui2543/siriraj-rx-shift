@@ -4173,6 +4173,27 @@ window.allPharmacistNames = [];
       }
     }
 
+    // v3.44: preserve expanded timeline panels across a re-render. A background refresh
+    //   (poll / firebase / GAS fallback) rebuilds the whole table HTML via renderTable, which
+    //   would collapse every open ▼ history the user is reading. Snapshot the open toggle-ids
+    //   before the rebuild, re-open them after (with fresh data). Missing id (row gone) → no-op.
+    function _captureExpandedTimelines() {
+      const ids = [];
+      document.querySelectorAll('.tl-chevron.expanded[data-tl-toggle]').forEach(function(c) {
+        ids.push(c.getAttribute('data-tl-toggle'));
+      });
+      return ids;
+    }
+    function _restoreExpandedTimelines(ids) {
+      if (!ids || !ids.length) return;
+      ids.forEach(function(id) {
+        const chev = document.querySelector('.tl-chevron[data-tl-toggle="' + id + '"]');
+        if (chev && !chev.classList.contains('expanded')) {
+          toggleTimelineInline(id, chev, chev.getAttribute('data-tl-pbside') || null);
+        }
+      });
+    }
+
     // Wire chevron clicks
     document.addEventListener('click', function(e) {
       const chev = e.target.closest('[data-tl-toggle]');
@@ -6024,8 +6045,11 @@ window.allPharmacistNames = [];
 
       // v3.44 Step 4a: "ต้นฉบับ" view swaps ONLY the table-body render to raw master.
       //   Legacy path (banner, calendar, pos dropdown) is untouched — pure additive toggle.
+      // v3.44: keep open ▼ timelines from collapsing when a background refresh rebuilds the table.
+      const _openTL = _captureExpandedTimelines();
       if (window._origView) renderOriginalTable(_origBuildRows(filters));
       else renderTable(fData);
+      _restoreExpandedTimelines(_openTL);
 
       const targetPerson = filters.multiNames.length === 1 ? filters.multiNames[0]
         : ([...new Set(fData.map(i => i.name))].length === 1 ? fData[0].name : null);
