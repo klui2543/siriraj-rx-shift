@@ -5407,12 +5407,13 @@ window.allPharmacistNames = [];
     //   grey "ออฟไลน์" only on a real disconnect.
     window._fbConnected = false;
     function _renderConnRadar() {
-      var radar = document.getElementById('connRadar');
+      // v3.44: the Firebase status dot lives INSIDE the month chip (Klui: one dot only) — it reuses
+      //   the old #auditBadge slot; the 3-color data-quality dot is retired there (data quality now
+      //   surfaces via the CATASTROPHIC popup). #connRadar (after the chip) stays hidden = no dup dot.
+      var radar = document.getElementById('auditBadge');
       if (!radar) return;
-      // v3.44: #connRadar is hardcoded display:none in the markup ("hidden for clean UI") — force it
-      //   visible so the Firebase light shows. Klui wants just a small DOT (like auditBadge), not a
-      //   "Firebase" pill: green = connected, grey = offline.
-      radar.style.display = 'inline-flex'; radar.style.alignItems = 'center';
+      radar.style.display = 'inline-flex'; radar.style.alignItems = 'center'; radar.style.cursor = 'default';
+      radar.onclick = null;
       var _c = window._fbConnected ? '#16a34a' : '#9ca3af';
       radar.title = window._fbConnected ? 'Firebase เชื่อมต่ออยู่' : 'Firebase ออฟไลน์';
       radar.innerHTML = '<span style="display:inline-block;width:10px;height:10px;border-radius:50%;background:' + _c + ';box-shadow:0 0 0 3px ' + _c + '22;"></span>';
@@ -5786,30 +5787,11 @@ window.allPharmacistNames = [];
           allDates.map(d => `<option value="${d}">${d}</option>`).join('');
       }
 
-      const auditBadge = document.getElementById('auditBadge');
-      if (auditBadge) {
-        if (window.currentAuditInfo || (window.clientOverlaps && window.clientOverlaps.length > 0)) {
-          const ok = window.currentAuditInfo && window.currentAuditInfo.passed && window.clientOverlaps.length === 0;
-          const color = ok ? '#16a34a' : (window.clientOverlaps.length > 0 ? '#dc2626' : '#d97706');
-          auditBadge.innerHTML = `<span style="display:inline-block;width:10px;height:10px;border-radius:50%;background:${color};box-shadow:0 0 0 3px ${color}22;"></span>`;
-          auditBadge.style.display = 'inline-block';
-        } else {
-          auditBadge.style.display = 'none';
-        }
-      }
-
-      const auditParent = auditBadge ? auditBadge.parentNode : null;
-      if (auditParent) {
-        let radar = document.getElementById('connRadar');
-        if (!radar) {
-          radar = document.createElement('div');
-          radar.id = 'connRadar';
-          auditParent.insertBefore(radar, auditParent.children[1]);
-        }
-        // v3.44: content = TRUE connection state (see _renderConnRadar + .info/connected listener),
-        //   not the load source. Stays solid green while Firebase is connected.
-        _renderConnRadar();
-      }
+      // v3.44: the month-chip badge shows Firebase connection (green/grey dot). The old 3-color
+      //   data-quality dot is retired here (Klui: one dot only) — data quality now surfaces via the
+      //   CATASTROPHIC popup (_phxNoticeCheckDataQuality). currentAuditInfo/clientOverlaps are still
+      //   set above, so the popup + openAuditModal keep working.
+      _renderConnRadar();
 
       isDataLoadedInSession = true;
       lastDataSignature = getDataSignature(res);
