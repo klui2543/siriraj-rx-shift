@@ -1038,6 +1038,15 @@
       border: 1px solid var(--border); background: var(--bg); color: var(--text);
       font-family: 'Kanit', sans-serif;
     }
+    /* v3.44: type-to-filter popups for the swap picker's person + date */
+    .pick-ta { position: relative; flex: 1; min-width: 0; }
+    .pick-ta-input {
+      width: 100%; padding: 7px 8px; font-size: 12px; border-radius: 7px;
+      border: 1px solid var(--border); background: var(--bg); color: var(--text);
+      font-family: 'Kanit', sans-serif; outline: none;
+    }
+    .pick-ta-input:focus { border-color: var(--accent); }
+    .pick-ta .multi-list { top: 38px; }
     .pick-search-box {
       display: flex; align-items: center; gap: 6px; padding: 0 10px; height: 36px;
       background: var(--bg); border: 1px solid var(--border); border-radius: 8px;
@@ -4956,21 +4965,21 @@ window.allPharmacistNames = [];
       (rawData||[]).forEach(s => { if (_pbHolderOf(s, _pkUsed) !== myName && !dateMap[s.date]) dateMap[s.date] = s.timestamp || 0; });
       const dates = Object.keys(dateMap).sort((a, b) => dateMap[a] - dateMap[b]);
 
+      // v3.44: person + date are type-to-filter popups (like the main search), not <select>s
+      actionState._pkPersons = persons;
+      actionState._pkDates = dates;
+      const _pkPV = (actionState.pickerPerson || '').replace(/"/g, '&quot;');
+      const _pkDV = (actionState.pickerDate || '').replace(/"/g, '&quot;');
       let html = '<div class="pick-filters">';
-      html += '<select id="pickerPersonSelect" onchange="actionState.pickerPerson=this.value;updatePickerListContent()">';
-      html += '<option value="">ทุกคน</option>';
-      persons.forEach(p => {
-        const safeP = p.replace(/"/g, '&quot;');
-        html += '<option value="' + safeP + '"' + (actionState.pickerPerson===p?' selected':'') + '>' + p + '</option>';
-      });
-      html += '</select>';
-      html += '<select id="pickerDateSelect" onchange="actionState.pickerDate=this.value;updatePickerListContent()">';
-      html += '<option value="">ทุกวัน</option>';
-      dates.forEach(d => {
-        const safeD = d.replace(/"/g, '&quot;');
-        html += '<option value="' + safeD + '"' + (actionState.pickerDate===d?' selected':'') + '>' + d + '</option>';
-      });
-      html += '</select></div>';
+      html += '<div class="pick-ta">';
+      html += '<input id="pickerPersonInput" class="pick-ta-input" type="text" autocomplete="off" placeholder="ทุกคน" value="' + _pkPV + '" oninput="_pkTAFilter(\'person\')" onfocus="_pkTAOpen(\'person\')" onblur="_pkTABlur(\'person\')">';
+      html += '<div id="pickerPersonPop" class="multi-list hidden"></div>';
+      html += '</div>';
+      html += '<div class="pick-ta">';
+      html += '<input id="pickerDateInput" class="pick-ta-input" type="text" autocomplete="off" placeholder="ทุกวัน" value="' + _pkDV + '" oninput="_pkTAFilter(\'date\')" onfocus="_pkTAOpen(\'date\')" onblur="_pkTABlur(\'date\')">';
+      html += '<div id="pickerDatePop" class="multi-list hidden"></div>';
+      html += '</div>';
+      html += '</div>';
       html += '<div class="pick-search-box">';
       html += '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" style="color:var(--muted)"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>';
       html += '<input id="pickerSearchInput" type="text" placeholder="ค้นหารหัสตำแหน่ง..." value="' + (actionState.pickerQuery||'').replace(/"/g,'&quot;') + '" oninput="actionState.pickerQuery=this.value;updatePickerListContent()">';
@@ -4988,6 +4997,71 @@ window.allPharmacistNames = [];
       html += '<div class="pick-count" id="pickerCountLbl"></div>';
       html += '<div class="pick-list" id="pickerListContent"></div>';
       return html;
+    }
+
+    // v3.44: typeahead popups for the swap picker's person + date filters (type → popup → tap)
+    function _pkTACfg(kind) {
+      if (kind === 'person') return {
+        inputId: 'pickerPersonInput', popId: 'pickerPersonPop',
+        list: actionState._pkPersons || [], cur: actionState.pickerPerson || '', allLabel: 'ทุกคน',
+        set: function (v) { actionState.pickerPerson = v; }
+      };
+      return {
+        inputId: 'pickerDateInput', popId: 'pickerDatePop',
+        list: actionState._pkDates || [], cur: actionState.pickerDate || '', allLabel: 'ทุกวัน',
+        set: function (v) { actionState.pickerDate = v; }
+      };
+    }
+    function _pkTARender(kind) {
+      const cfg = _pkTACfg(kind);
+      const inp = document.getElementById(cfg.inputId);
+      const pop = document.getElementById(cfg.popId);
+      if (!inp || !pop) return;
+      const q = (inp.value || '').trim().toLowerCase();
+      const typing = q && q !== (cfg.cur || '').toLowerCase();
+      let items = cfg.list.slice();
+      if (typing) items = items.filter(x => x.toLowerCase().indexOf(q) >= 0);
+      let html = '<div class="multi-item' + (!cfg.cur ? ' selected' : '') +
+        '" onmousedown="_pkTAPick(\'' + kind + '\',\'\')">' + cfg.allLabel + '</div>';
+      items.forEach(function (x) {
+        html += '<div class="multi-item' + (x === cfg.cur ? ' selected' : '') +
+          '" onmousedown="_pkTAPick(\'' + kind + '\',\'' + encodeURIComponent(x) + '\')">' + x + '</div>';
+      });
+      if (items.length === 0) html += '<div style="padding:8px 10px;font-size:11px;color:var(--muted);">ไม่พบ</div>';
+      pop.innerHTML = html;
+      pop.classList.remove('hidden');
+    }
+    function _pkTAOpen(kind) {
+      _pkTAHide(kind === 'person' ? 'date' : 'person');
+      _pkTARender(kind);
+    }
+    function _pkTAFilter(kind) {
+      const cfg = _pkTACfg(kind);
+      const inp = document.getElementById(cfg.inputId);
+      if (inp && inp.value.trim() === '' && cfg.cur) { cfg.set(''); updatePickerListContent(); }
+      _pkTARender(kind);
+    }
+    function _pkTAPick(kind, encVal) {
+      const cfg = _pkTACfg(kind);
+      const val = encVal ? decodeURIComponent(encVal) : '';
+      cfg.set(val);
+      const inp = document.getElementById(cfg.inputId);
+      if (inp) inp.value = val;
+      _pkTAHide(kind);
+      updatePickerListContent();
+    }
+    function _pkTAHide(kind) {
+      const pop = document.getElementById(_pkTACfg(kind).popId);
+      if (pop) pop.classList.add('hidden');
+    }
+    function _pkTABlur(kind) {
+      // if the user typed but didn't pick, restore the committed value, then close
+      setTimeout(function () {
+        const cfg = _pkTACfg(kind);
+        const inp = document.getElementById(cfg.inputId);
+        if (inp && inp.value !== cfg.cur) inp.value = cfg.cur || '';
+        _pkTAHide(kind);
+      }, 150);
     }
 
     function renderUndoStep() {
