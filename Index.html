@@ -2537,8 +2537,10 @@ window.allPharmacistNames = [];
     //   phxPushActions เดิม skip id ซ้ำ). เปิด flag → publish/unpublish วิ่งผ่าน login-based
     //   push (debounced) และ server (upsert) เขียนทับ payload → คนอื่นเห็น/รีเฟรชไม่ย้อน draft.
     //   ⚠️ ต้อง deploy Phase_Z_B3_Sync.js (upsert) คู่กันด้วย ไม่งั้น flip ยังไปไม่ถึง server.
-    //   default OFF → เทสด้วย setSyncPublish(true) ก่อน แล้วค่อยแก้ default เป็น ON ให้ทุกคน.
-    window._syncPublish = (function() { try { return localStorage.getItem('sync_publish') === '1'; } catch (e) { return false; } })();
+    //   v3.44 ROLLOUT (2026-07-09): default flipped OFF→ON for all users — publish→server sync
+    //     now on out-of-the-box (fixes "overlay ไม่อัปเดตสด เกือบทุกครั้ง" = publishes never reached
+    //     the shared board). Opt out per-browser with setSyncPublish(false) → persists as '0'.
+    window._syncPublish = (function() { try { return localStorage.getItem('sync_publish') !== '0'; } catch (e) { return true; } })();
     window.setSyncPublish = function(on) {
       window._syncPublish = !!on;
       try { localStorage.setItem('sync_publish', on ? '1' : '0'); } catch (e) {}
