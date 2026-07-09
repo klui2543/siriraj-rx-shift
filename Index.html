@@ -5698,14 +5698,25 @@ window.allPharmacistNames = [];
     function _phxNoticeCheckDataQuality() {
       try {
         const info = window.currentAuditInfo;
-        if (!info || info.severity !== 'CATASTROPHIC') return;
+        const overlaps = (window.clientOverlaps && window.clientOverlaps.length) || 0;
+        const sev = info && info.severity;
+        // v3.44: warn on MINOR + เวรชน too (Klui), not only CATASTROPHIC — this replaces the retired
+        //   3-color audit dot. Red for CATASTROPHIC; ⚠️ for MINOR / overlaps.
+        const isCat = (sev === 'CATASTROPHIC');
+        if (!isCat && sev !== 'MINOR' && overlaps === 0) return;
         const mid = (typeof getCurrentMonthId === 'function') ? getCurrentMonthId() : '';
-        const reason = info.issues || info.reason || 'พบความผิดพลาดของข้อมูลจำนวนมาก';
+        let parts = [];
+        if (info && info.issues) parts.push(String(info.issues));
+        if (overlaps > 0) parts.push('พบเวรที่เวลาทับซ้อนกัน ' + overlaps + ' จุด');
+        const reason = parts.join(' · ') || 'พบจุดที่ควรตรวจสอบ';
+        const lead = isCat
+          ? 'ระบบตรวจพบว่าข้อมูลที่แปลงจากไฟล์ต้นฉบับมีจุดผิดพลาดจำนวนมาก โปรดตรวจสอบกับไฟล์ Excel ต้นฉบับก่อนยึดถือ'
+          : 'ระบบตรวจพบจุดที่อาจไม่ตรงกับไฟล์ต้นฉบับ หรือมีเวรที่เวลาทับซ้อนกัน โปรดตรวจสอบเพิ่มเติม';
         _phxNoticeEnqueue({
-          id: 'dq_' + mid + '_' + _phxHashStr(reason),
-          icon: '🔴',
-          title: 'ข้อมูลตารางเดือนนี้อาจคลาดเคลื่อนมาก',
-          html: '<p style="margin:0 0 8px;">ระบบตรวจพบว่าข้อมูลที่แปลงจากไฟล์ต้นฉบับมีจุดผิดพลาดจำนวนมาก โปรดตรวจสอบกับไฟล์ Excel ต้นฉบับก่อนยึดถือ</p>' +
+          id: 'dq_' + mid + '_' + _phxHashStr((sev || '') + '|' + overlaps + '|' + reason),
+          icon: isCat ? '🔴' : '⚠️',
+          title: isCat ? 'ข้อมูลตารางเดือนนี้อาจคลาดเคลื่อนมาก' : 'ข้อมูลตารางเดือนนี้มีจุดที่ควรตรวจสอบ',
+          html: '<p style="margin:0 0 8px;">' + lead + '</p>' +
                 '<p style="margin:0; font-size:11px; color:var(--muted,#6b7280); background:var(--bg,#f9fafb); border:1px solid var(--border,#e5e7eb); border-radius:8px; padding:6px 8px; word-break:break-word;">' + _phxNoticeEsc(reason) + '</p>'
         });
       } catch (e) { console.warn('notice(dq) failed:', e && e.message); }
@@ -5751,13 +5762,15 @@ window.allPharmacistNames = [];
       if (typeof _applyRetroMirror === 'function') _applyRetroMirror();   // v3.43: keep local retro drafts visible
       currentSheetUrl = res.sheetUrl || "";
       window.currentAuditInfo = res.audit || null;
-      if (typeof _phxNoticeCheckDataQuality === 'function') _phxNoticeCheckDataQuality();   // v3.44: auto data-quality popup (CATASTROPHIC only)
-      
+
       if (typeof detectClientOverlaps === 'function') {
         window.clientOverlaps = detectClientOverlaps(rawData);
       } else {
         window.clientOverlaps = [];
       }
+      // v3.44: data-quality popup — must run AFTER clientOverlaps is set (it checks MINOR/CATASTROPHIC
+      //   audit + เวรชน overlaps). Fires on load; per-issue id + "ไม่ต้องแสดงอีก" tick keep it non-naggy.
+      if (typeof _phxNoticeCheckDataQuality === 'function') _phxNoticeCheckDataQuality();
 
       // v24: merge schedule names with People sheet names (manual additions)
       const _scheduleNames = [...new Set(rawData.map(i => i.name).filter(Boolean))];
