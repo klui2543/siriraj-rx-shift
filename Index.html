@@ -5643,6 +5643,73 @@ window.allPharmacistNames = [];
     // ==========================================
     // 🌟 DATA HANDLERS
     // ==========================================
+    // ============================================================
+    // v3.44: Dismissible notice popups — shown to ALL users (login + anon; no auth gate).
+    //   Each notice has a STABLE id; the "ไม่ต้องแสดงอีก" tick persists THAT id in localStorage,
+    //   so opting out of one popup never hides another. Sources enqueue notices:
+    //     (1) data-quality audit (severity CATASTROPHIC), (2) special schedule markers (future).
+    //   Queue = show one at a time; a dismissed or already-queued id is skipped.
+    // ============================================================
+    const PHX_NOTICE_LS = 'phx_notice_dismissed_v1';
+    let _phxNoticeQueue = [], _phxNoticeOpen = false, _phxCurrentNoticeId = null;
+    function _phxNoticeEsc(s) { return String(s == null ? '' : s).replace(/[&<>"]/g, function(c){ return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]; }); }
+    function _phxHashStr(s) { let h = 5381; s = String(s || ''); for (let i = 0; i < s.length; i++) h = ((h << 5) + h + s.charCodeAt(i)) | 0; return (h >>> 0).toString(36); }
+    function _phxNoticeDismissedSet() { try { return new Set(JSON.parse(localStorage.getItem(PHX_NOTICE_LS) || '[]')); } catch (e) { return new Set(); } }
+    function _phxNoticeDismiss(id) { try { const s = _phxNoticeDismissedSet(); s.add(id); localStorage.setItem(PHX_NOTICE_LS, JSON.stringify(Array.from(s))); } catch (e) {} }
+    function _phxNoticeEnqueue(n) {
+      if (!n || !n.id) return;
+      if (_phxNoticeDismissedSet().has(n.id)) return;                              // user opted out of THIS notice
+      if (_phxCurrentNoticeId === n.id) return;                                    // already on screen
+      if (_phxNoticeQueue.some(function(x){ return x.id === n.id; })) return;      // already queued
+      _phxNoticeQueue.push(n);
+      _phxNoticeDrain();
+    }
+    function _phxNoticeDrain() {
+      if (_phxNoticeOpen || !_phxNoticeQueue.length) return;
+      _phxNoticeRender(_phxNoticeQueue.shift());
+    }
+    function _phxNoticeRender(n) {
+      _phxNoticeOpen = true; _phxCurrentNoticeId = n.id;
+      const ov = document.createElement('div');
+      ov.style.cssText = 'position:fixed; inset:0; background:rgba(0,0,0,0.5); z-index:10050; display:flex; align-items:center; justify-content:center; padding:16px;';
+      ov.innerHTML =
+        '<div style="background:var(--surface,#fff); width:100%; max-width:400px; border-radius:16px; padding:18px; box-shadow:0 10px 40px rgba(0,0,0,0.25); font-family:inherit;">' +
+          '<div style="font-size:15px; font-weight:800; color:var(--text,#111827); display:flex; align-items:center; gap:6px; margin-bottom:10px;">' + (n.icon || '📢') + '<span>' + _phxNoticeEsc(n.title || 'แจ้งเตือน') + '</span></div>' +
+          '<div style="font-size:12.5px; color:var(--sub,#374151); line-height:1.6;">' + (n.html || '') + '</div>' +
+          '<label style="display:flex; align-items:center; gap:7px; font-size:12px; color:var(--sub,#374151); margin:14px 0; cursor:pointer; user-select:none;"><input type="checkbox" id="phxNoticeOptout" style="width:15px;height:15px;"> ไม่ต้องแสดงข้อความนี้อีก</label>' +
+          '<button id="phxNoticeOk" style="width:100%; background:var(--accent,#2563eb); color:#fff; border:0; border-radius:10px; padding:10px; font-size:13px; font-weight:700; cursor:pointer;">รับทราบ</button>' +
+        '</div>';
+      document.body.appendChild(ov);
+      function _close() {
+        const cb = document.getElementById('phxNoticeOptout');
+        if (cb && cb.checked) _phxNoticeDismiss(n.id);
+        ov.remove(); _phxNoticeOpen = false; _phxCurrentNoticeId = null;
+        _phxNoticeDrain();                                                          // show next queued
+      }
+      ov.querySelector('#phxNoticeOk').addEventListener('click', _close);
+      ov.addEventListener('click', function(e){ if (e.target === ov) _close(); });
+    }
+    // Source 1 — data quality: enqueue a popup only when the audit is CATASTROPHIC. id embeds a hash
+    //   of the reason so a DIFFERENT problem re-shows even if an earlier one was "ไม่ต้องแสดงอีก"-ed.
+    function _phxNoticeCheckDataQuality() {
+      try {
+        const info = window.currentAuditInfo;
+        if (!info || info.severity !== 'CATASTROPHIC') return;
+        const mid = (typeof getCurrentMonthId === 'function') ? getCurrentMonthId() : '';
+        const reason = info.issues || info.reason || 'พบความผิดพลาดของข้อมูลจำนวนมาก';
+        _phxNoticeEnqueue({
+          id: 'dq_' + mid + '_' + _phxHashStr(reason),
+          icon: '🔴',
+          title: 'ข้อมูลตารางเดือนนี้อาจคลาดเคลื่อนมาก',
+          html: '<p style="margin:0 0 8px;">ระบบตรวจพบว่าข้อมูลที่แปลงจากไฟล์ต้นฉบับมีจุดผิดพลาดจำนวนมาก โปรดตรวจสอบกับไฟล์ Excel ต้นฉบับก่อนยึดถือ</p>' +
+                '<p style="margin:0; font-size:11px; color:var(--muted,#6b7280); background:var(--bg,#f9fafb); border:1px solid var(--border,#e5e7eb); border-radius:8px; padding:6px 8px; word-break:break-word;">' + _phxNoticeEsc(reason) + '</p>'
+        });
+      } catch (e) { console.warn('notice(dq) failed:', e && e.message); }
+    }
+
+    // ==========================================
+    // 🌟 DATA HANDLERS (cont.)
+    // ==========================================
     function handleDataReceived(res, source) {
       v12log('handleDataReceived source=' + source);
       console.log('🎯 handleDataReceived | source:', source, '| isDataLoadedInSession:', isDataLoadedInSession);
@@ -5680,6 +5747,7 @@ window.allPharmacistNames = [];
       if (typeof _applyRetroMirror === 'function') _applyRetroMirror();   // v3.43: keep local retro drafts visible
       currentSheetUrl = res.sheetUrl || "";
       window.currentAuditInfo = res.audit || null;
+      if (typeof _phxNoticeCheckDataQuality === 'function') _phxNoticeCheckDataQuality();   // v3.44: auto data-quality popup (CATASTROPHIC only)
       
       if (typeof detectClientOverlaps === 'function') {
         window.clientOverlaps = detectClientOverlaps(rawData);
