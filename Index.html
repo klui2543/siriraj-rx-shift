@@ -5048,13 +5048,16 @@ window.allPharmacistNames = [];
       if (!inp || !pop) return;
       const q = (inp.value || '').trim().toLowerCase();
       const typing = q && q !== (cfg.cur || '').toLowerCase();
+      const _pkDisp = function (x) { return kind === 'person' ? displayName(x) : x; };
       let items = cfg.list.slice();
-      if (typing) items = items.filter(x => x.toLowerCase().indexOf(q) >= 0);
+      if (typing) items = items.filter(x => x.toLowerCase().indexOf(q) >= 0 || _pkDisp(x).toLowerCase().indexOf(q) >= 0);
       let html = '<div class="multi-item' + (!cfg.cur ? ' selected' : '') +
         '" onmousedown="_pkTAPick(\'' + kind + '\',\'\')">' + cfg.allLabel + '</div>';
       items.forEach(function (x) {
+        const _lbl = _pkDisp(x);
+        const _extra = (kind === 'person' && _lbl !== x) ? ' <span style="color:var(--muted);font-size:11px;">· ' + x + '</span>' : '';
         html += '<div class="multi-item' + (x === cfg.cur ? ' selected' : '') +
-          '" onmousedown="_pkTAPick(\'' + kind + '\',\'' + encodeURIComponent(x) + '\')">' + x + '</div>';
+          '" onmousedown="_pkTAPick(\'' + kind + '\',\'' + encodeURIComponent(x) + '\')">' + _lbl + _extra + '</div>';
       });
       if (items.length === 0) html += '<div style="padding:8px 10px;font-size:11px;color:var(--muted);">ไม่พบ</div>';
       pop.innerHTML = html;
@@ -5128,7 +5131,9 @@ window.allPharmacistNames = [];
         } else {
           list.forEach(n => {
             const enc = encodeURIComponent(n);
-            html += '<button class="pick-name-row" data-pick-name="' + enc + '">' + n + '</button>';
+            const _dn = displayName(n);
+            const _ex = (_dn !== n) ? ' <span style="color:var(--muted);font-size:11px;">· ' + n + '</span>' : '';
+            html += '<button class="pick-name-row" data-pick-name="' + enc + '">' + _dn + _ex + '</button>';
           });
         }
       } else {
@@ -5177,9 +5182,9 @@ window.allPharmacistNames = [];
           const attrs = disabled ? ' disabled' : ' data-pick-key="' + enc + '"';
           let h = '<button class="pick-result"' + attrs + '>';
           h += '<div style="min-width:0; flex:1;">';
-          h += '<div class="pick-result-name">' + (s2._holder || s2.name) + '</div>';
+          h += '<div class="pick-result-name">' + displayName(s2._holder || s2.name) + '</div>';
           if (s2._origName && s2._holder && s2._origName !== s2._holder)
-            h += '<div style="font-size:11px;color:var(--muted);">เดิมของ ' + s2._origName + '</div>';
+            h += '<div style="font-size:11px;color:var(--muted);">เดิมของ ' + displayName(s2._origName) + '</div>';
           h += '<div class="pick-meta-cols">';
           h += '<span class="pick-meta-date">' + s2.date + '</span>';
           h += '<span class="pick-meta-pos">' + s2.pos + '</span>';
