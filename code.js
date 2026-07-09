@@ -296,8 +296,10 @@ function uploadLocalFile(base64Data, filename, token) {
   guardCheck_(token);
   let blobData = Utilities.newBlob(Utilities.base64Decode(base64Data), MimeType.MICROSOFT_EXCEL, filename);
   let newFile = DriveApp.getFolderById(INPUT_FOLDER_ID).createFile(blobData);
-  let conv = Drive.Files.copy({ name: "Public_" + filename, mimeType: MimeType.GOOGLE_SHEETS }, newFile.getId());
-  DriveApp.getFileById(conv.id).setSharing(DriveApp.Access.ANYONE_WITH_LINK, DriveApp.Permission.VIEW);
+  // v3.44: transient Excel→Sheet conversion — read by hydrate + Phase I/J below, then trashed in the
+  //   finally. NO LONGER shared publicly (the public sheet was almost unused). A re-enable toggle may
+  //   return in a later session (after the bottom-nav work).
+  let conv = Drive.Files.copy({ name: "_convert_tmp_" + filename, mimeType: MimeType.GOOGLE_SHEETS }, newFile.getId());
 
   try {
     // 🚀 ลำดับ 1: ดึงข้อมูลทั้งหมดด้วย FastFetch
@@ -324,7 +326,7 @@ function uploadLocalFile(base64Data, filename, token) {
 
     // ⚠️ Minor หรือ ✅ Passed → PUBLISH
     logStatisticsToSheet_("Manual (" + filename + ")", result.label, result.diagnostics);
-    const sheetUrl = "https://docs.google.com/spreadsheets/d/" + conv.id;
+    const sheetUrl = "";   // v3.44: no public sheet is kept → client hides the "ดูชีต" link when empty
     const payload = {
       data: result.data,
       sheets: result.diagnostics.sheetsProcessed,
@@ -457,7 +459,10 @@ function uploadLocalFile(base64Data, filename, token) {
     return saved;
 
   } finally {
-    newFile.setTrashed(true);
+    // v3.44: drop BOTH transient files so no public/orphan sheet piles up in Drive (covers the
+    //   CATASTROPHIC-throw path too). conv was the old "Public_" sheet.
+    try { DriveApp.getFileById(conv.id).setTrashed(true); } catch(e) {}
+    try { newFile.setTrashed(true); } catch(e) {}
   }
 }
 
