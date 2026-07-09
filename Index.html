@@ -5064,6 +5064,9 @@ window.allPharmacistNames = [];
       }, 150);
     }
 
+    // v3.44: normalize a code for search — drop separators so "I10" matches "I-10", "NM518" matches "NM5-18"
+    function _normCode(s) { return (s || '').toLowerCase().replace(/[\s\-\/._]/g, ''); }
+
     function renderUndoStep() {
       const info = actionState.usedInfo || { label: '' };
       return '<div class="undo-info-box">การแก้ไขปัจจุบัน: ' + info.label + '</div>' +
@@ -5128,10 +5131,10 @@ window.allPharmacistNames = [];
           list = list.filter(s2 => s2.date === actionState.pickerDate);
         }
         if (actionState.pickerQuery) {
-          const q = actionState.pickerQuery.toLowerCase();
+          const q = _normCode(actionState.pickerQuery);
           list = list.filter(s2 =>
-            (s2.pos||'').toLowerCase().includes(q)
-            || (s2.shift||'').toLowerCase().includes(q)
+            _normCode(s2.pos).includes(q)
+            || _normCode(s2.shift).includes(q)
           );
         }
         list.sort((a,b) => {
