@@ -1048,6 +1048,11 @@
     .pick-ta-input:focus { border-color: var(--accent); }
     .pick-ta .multi-list { top: 38px; }
     .adv-card .pick-ta-input { background: var(--surface); }  /* filter fields = white like the old selects */
+    /* v3.44: per-field × clear button (shown only when the field has a value) */
+    .pick-ta-input { padding-right: 24px; }
+    .pick-ta-clear { position: absolute; right: 5px; top: 50%; transform: translateY(-50%); display: none; cursor: pointer; color: var(--muted); font-size: 15px; line-height: 1; padding: 2px 5px; border-radius: 4px; z-index: 3; }
+    .pick-ta-clear:hover { color: #dc2626; background: var(--bg); }
+    .pick-ta-input:not(:placeholder-shown) ~ .pick-ta-clear { display: block; }
     /* v3.44: nickname manager modal */
     .nk-sec-title { font-size: 12px; font-weight: 700; color: var(--text); margin-bottom: 6px; }
     .nk-hint { font-weight: 600; color: var(--muted); font-size: 11px; }
@@ -1725,7 +1730,7 @@
         <div class="search-row" id="pharmacistMultiWrap">
           <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="var(--muted)" stroke-width="2.5" stroke-linecap="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
           <input type="text" id="searchInput" oninput="onSearchInput()" placeholder="พิมพ์ค้นหาชื่อเภสัชกร..." autocomplete="off" />
-          <button id="clearAllBtn" class="pill-btn danger hidden" onclick="resetFilters()">ล้าง</button>
+          <button id="clearAllBtn" class="pill-btn danger hidden" onclick="resetFilters()">ล้างทั้งหมด</button>
           <button id="advFilterBtn" class="pill-btn" onclick="toggleAdvFilters()">
             <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><path d="M3 4h18M7 9h10M10 14h4M12 19h0"/></svg>
             ตัวกรอง
@@ -1742,6 +1747,7 @@
             <label>📅 วันที่</label>
             <div class="pick-ta">
               <input id="fltDateInput" class="pick-ta-input" type="text" autocomplete="off" placeholder="ทุกวัน" oninput="_fltTAFilter('date')" onfocus="_fltTAOpen('date')" onblur="_fltTABlur('date')">
+              <span class="pick-ta-clear" onmousedown="_fltTAClear('date')" title="ล้าง">✕</span>
               <div id="fltDatePop" class="multi-list hidden"></div>
               <input type="hidden" id="dateDropdown">
             </div>
@@ -1750,6 +1756,7 @@
             <label>🏠 ห้องยา</label>
             <div class="pick-ta">
               <input id="fltRoomInput" class="pick-ta-input" type="text" autocomplete="off" placeholder="ทุกห้อง" oninput="_fltTAFilter('room')" onfocus="_fltTAOpen('room')" onblur="_fltTABlur('room')">
+              <span class="pick-ta-clear" onmousedown="_fltTAClear('room')" title="ล้าง">✕</span>
               <div id="fltRoomPop" class="multi-list hidden"></div>
               <input type="hidden" id="roomFilter">
             </div>
@@ -1758,6 +1765,7 @@
             <label>🏥 รหัสเวร</label>
             <div class="pick-ta">
               <input id="fltPosInput" class="pick-ta-input" type="text" autocomplete="off" placeholder="ทุกรหัส (พิมพ์ I13, NM512 ได้)" oninput="_fltTAFilter('pos')" onfocus="_fltTAOpen('pos')" onblur="_fltTABlur('pos')">
+              <span class="pick-ta-clear" onmousedown="_fltTAClear('pos')" title="ล้าง">✕</span>
               <div id="fltPosPop" class="multi-list hidden"></div>
               <input type="hidden" id="posDropdown">
             </div>
@@ -4024,9 +4032,9 @@ window.allPharmacistNames = [];
             //   there's a middle-man (A ≠ B), e.g. "รับ O11 (พรผกา) จาก สมโชค".
             const _A = t ? t.name : '';
             const _B = act.partnerName;
-            const _orig = (_A && _A !== _B) ? ' (<b>' + _A + '</b>)' : '';
+            const _orig = (_A && _A !== _B) ? ' (<b>' + displayName(_A) + '</b>)' : '';
             kind = 'add';
-            desc = 'รับ <b>' + (t ? t.pos : '') + '</b>' + _orig + ' จาก <b>' + _B + '</b>';
+            desc = 'รับ <b>' + (t ? t.pos : '') + '</b>' + _orig + ' จาก <b>' + displayName(_B) + '</b>';
           } else if (act.action === 'swap') {
             // "แลก <myShift> กับ <gotShift> (<A = originOwner>) จาก <B = counterpart>"
             let srcStr = '';
@@ -4038,9 +4046,9 @@ window.allPharmacistNames = [];
             const tgtStr = tx ? '<b>' + tx.pos + '</b>' : '';
             const _A = tx ? tx.name : '';
             const _B = act.partnerName;
-            const _orig = (_A && _A !== _B) ? ' (<b>' + _A + '</b>)' : '';
+            const _orig = (_A && _A !== _B) ? ' (<b>' + displayName(_A) + '</b>)' : '';
             kind = 'swap';
-            desc = 'แลก ' + srcStr + tgtStr + _orig + ' จาก <b>' + _B + '</b>';
+            desc = 'แลก ' + srcStr + tgtStr + _orig + ' จาก <b>' + displayName(_B) + '</b>';
           } else if (act.action === 'give') {
             let srcStr = '';
             if (act.shiftKey && act.shiftKey.indexOf('_g_') !== 0) {
@@ -4048,7 +4056,7 @@ window.allPharmacistNames = [];
               if (sx) srcStr = '<b>' + sx.pos + '</b> ';
             }
             kind = 'give';
-            desc = (srcStr ? 'ยก ' + srcStr : 'ยก') + 'ให้ <b>' + act.partnerName + '</b>';
+            desc = (srcStr ? 'ยก ' + srcStr : 'ยก') + 'ให้ <b>' + displayName(act.partnerName) + '</b>';
           }
           // v3.44: inline ✎ right after the name → edit the counterpart (B) in place. Shown on a
           //   DRAFT (to its author) or on any record when the viewer is Admin (published = final,
@@ -4097,7 +4105,7 @@ window.allPharmacistNames = [];
           _curHolder = viewer;
         }
         const _pinnedSrc = chain.some(a => a && a._retroFinal);
-        html += '<div class="tl-inline-end active">ปัจจุบันเวรนี้อยู่กับ: <b>' + (_curHolder || '?') + '</b>' +
+        html += '<div class="tl-inline-end active">ปัจจุบันเวรนี้อยู่กับ: <b>' + displayName(_curHolder || '?') + '</b>' +
                 (_pinnedSrc ? ' <span title="ปักหมุดจากการบันทึกย้อนหลัง (ข้ามช่วงที่ไม่ทราบ)">🔒</span>' : '') + '</div>';
         // v3.44: publish/unpublish moved OUT of the timeline into the single "🌐 เผยแพร่"
         //   FAB modal (openPublishModal). The timeline is now read-only history.
@@ -4129,12 +4137,12 @@ window.allPharmacistNames = [];
         let html = '';
         chain.forEach((ov, idx) => {
           const act = String(ov.action || '');
-          const actor = String(ov.viewerName || '');
+          const actor = displayName(String(ov.viewerName || ''));   // display only; data-tl-owner below keeps the real name
           let kind = '', desc = '';
           if (act === 'add') {
             kind = 'add';
             const p = _pbShiftPosFromKey(ov.shiftKey);
-            desc = '<b>' + actor + '</b> รับ <b>' + p + '</b> จาก <b>' + ov.partnerName + '</b>';
+            desc = '<b>' + actor + '</b> รับ <b>' + p + '</b> จาก <b>' + displayName(ov.partnerName) + '</b>';
           } else if (act === 'swap') {
             let srcStr = '';
             if (ov.shiftKey && ov.shiftKey.indexOf('_g_') !== 0) {
@@ -4143,7 +4151,7 @@ window.allPharmacistNames = [];
             }
             const tp = _pbShiftPosFromKey(ov.partnerShiftKey);
             kind = 'swap';
-            desc = '<b>' + actor + '</b> แลก ' + srcStr + '<b>' + (tp || '') + '</b> กับ <b>' + ov.partnerName + '</b>';
+            desc = '<b>' + actor + '</b> แลก ' + srcStr + '<b>' + (tp || '') + '</b> กับ <b>' + displayName(ov.partnerName) + '</b>';
           } else if (act === 'give') {
             let srcStr = '';
             if (ov.shiftKey && ov.shiftKey.indexOf('_g_') !== 0) {
@@ -4151,7 +4159,7 @@ window.allPharmacistNames = [];
               if (sp) srcStr = '<b>' + sp + '</b> ';
             }
             kind = 'give';
-            desc = '<b>' + actor + '</b> ' + (srcStr ? 'ยก ' + srcStr : 'ยก') + 'ให้ <b>' + ov.partnerName + '</b>';
+            desc = '<b>' + actor + '</b> ' + (srcStr ? 'ยก ' + srcStr : 'ยก') + 'ให้ <b>' + displayName(ov.partnerName) + '</b>';
           }
           const tsStr = ov.createdAt ? new Date(ov.createdAt).toLocaleString('th-TH', {dateStyle:'short', timeStyle:'short'}) : '';
           if (tsStr) desc += ' <span class="tl-inline-ts">· ' + tsStr + '</span>';
@@ -4180,7 +4188,7 @@ window.allPharmacistNames = [];
         });
         const ep = PBOverlays.getChainEndpoints(chain, pbSide);   // v3.42.9: pbSide picks correct holder for swap
         const _pinnedPB = chain.some(o => o && o._retroFinal);
-        html += '<div class="tl-inline-end active">ปัจจุบันเวรนี้อยู่กับ: <b>' + (ep.last || '?') + '</b>' +
+        html += '<div class="tl-inline-end active">ปัจจุบันเวรนี้อยู่กับ: <b>' + displayName(ep.last || '?') + '</b>' +
                 (_pinnedPB ? ' <span title="ปักหมุดจากการบันทึกย้อนหลัง (ข้ามช่วงที่ไม่ทราบ)">🔒</span>' : '') + '</div>';
         return html;
       } catch (err) {
@@ -4615,7 +4623,7 @@ window.allPharmacistNames = [];
             const rangeStr = targetShift ? targetShift.range : '';
             kind = 'add';
             desc = '<b>รับเวร ' + posStr + '</b> ' + (rangeStr ? '(' + rangeStr + ')' : '') +
-                   '<br>วันที่ ' + dateStr + ' — จาก <b>' + act.partnerName + '</b>';
+                   '<br>วันที่ ' + dateStr + ' — จาก <b>' + displayName(act.partnerName) + '</b>';
           } else if (act.action === 'swap') {
             // Source: real or prior ghost
             let srcDesc = '';
@@ -4628,7 +4636,7 @@ window.allPharmacistNames = [];
             const tgtShift = findShiftByKey(act.partnerShiftKey);
             const tgtStr = tgtShift ? ('<b>' + tgtShift.pos + '</b> วันที่ ' + tgtShift.date) : '';
             kind = 'swap';
-            desc = '<b>แลกเวร</b> ' + srcDesc + ' ↔ ' + tgtStr + '<br>กับ <b>' + act.partnerName + '</b>';
+            desc = '<b>แลกเวร</b> ' + srcDesc + ' ↔ ' + tgtStr + '<br>กับ <b>' + displayName(act.partnerName) + '</b>';
           } else if (act.action === 'give') {
             let srcDesc = '';
             if (act.shiftKey && act.shiftKey.indexOf('_g_') === 0) {
@@ -4638,7 +4646,7 @@ window.allPharmacistNames = [];
               srcDesc = srcShift ? ('<b>' + srcShift.pos + '</b> วันที่ ' + srcShift.date) : '';
             }
             kind = 'give';
-            desc = '<b>ยกเวร</b> ' + srcDesc + '<br>ให้ <b>' + act.partnerName + '</b>';
+            desc = '<b>ยกเวร</b> ' + srcDesc + '<br>ให้ <b>' + displayName(act.partnerName) + '</b>';
           }
           const timeStr = act.createdAt ? new Date(act.createdAt).toLocaleString('th-TH', {dateStyle:'short', timeStyle:'short'}) : '';
           html += '<div class="tl-step tl-' + kind + '">';
@@ -4651,7 +4659,7 @@ window.allPharmacistNames = [];
         // End state
         const lastAct = chain[chain.length - 1];
         if (lastAct.action === 'give') {
-          html += '<div class="tl-end-state ended">เวรนี้ไม่อยู่กับคุณแล้ว — ยกให้ ' + lastAct.partnerName + '</div>';
+          html += '<div class="tl-end-state ended">เวรนี้ไม่อยู่กับคุณแล้ว — ยกให้ ' + displayName(lastAct.partnerName) + '</div>';
         } else {
           html += '<div class="tl-end-state active">เวรนี้อยู่กับคุณตอนนี้</div>';
         }
@@ -5005,10 +5013,12 @@ window.allPharmacistNames = [];
       let html = '<div class="pick-filters">';
       html += '<div class="pick-ta">';
       html += '<input id="pickerPersonInput" class="pick-ta-input" type="text" autocomplete="off" placeholder="ทุกคน" value="' + _pkPV + '" oninput="_pkTAFilter(\'person\')" onfocus="_pkTAOpen(\'person\')" onblur="_pkTABlur(\'person\')">';
+      html += '<span class="pick-ta-clear" onmousedown="_pkTAClear(\'person\')" title="ล้าง">✕</span>';
       html += '<div id="pickerPersonPop" class="multi-list hidden"></div>';
       html += '</div>';
       html += '<div class="pick-ta">';
       html += '<input id="pickerDateInput" class="pick-ta-input" type="text" autocomplete="off" placeholder="ทุกวัน" value="' + _pkDV + '" oninput="_pkTAFilter(\'date\')" onfocus="_pkTAOpen(\'date\')" onblur="_pkTABlur(\'date\')">';
+      html += '<span class="pick-ta-clear" onmousedown="_pkTAClear(\'date\')" title="ล้าง">✕</span>';
       html += '<div id="pickerDatePop" class="multi-list hidden"></div>';
       html += '</div>';
       html += '</div>';
@@ -5097,6 +5107,14 @@ window.allPharmacistNames = [];
         if (inp && inp.value !== cfg.cur) inp.value = cfg.cur || '';
         _pkTAHide(kind);
       }, 150);
+    }
+    function _pkTAClear(kind) {
+      var cfg = _pkTACfg(kind);
+      cfg.set('');
+      var inp = document.getElementById(cfg.inputId);
+      if (inp) inp.value = '';
+      _pkTAHide(kind);
+      updatePickerListContent();
     }
 
     // v3.44: normalize a code for search — keep only letters/digits/Thai, drop EVERY separator
@@ -5601,9 +5619,10 @@ window.allPharmacistNames = [];
       if (!fbDb) return;
       try {
         if (_nkPrivRef) { _nkPrivRef.off(); _nkPrivRef = null; }
-        window._nkPrivate = {};
         var me = _nkMyName();
-        if (!me) { _nkRepaint(); return; }
+        if (!me) { window._nkPrivate = {}; _nkRepaint(); return; }   // logged out → clear
+        // Do NOT clear _nkPrivate on login: a GAS/Sheet pull may have already filled it and
+        //   Firebase may be denied by rules. The success cb below replaces it only when it can.
         _nkPrivRef = fbDb.ref('nicknames/private/' + _nkKey(me));
         _nkPrivRef.on('value',
           function (snap) { window._nkPrivate = _nkMapFromSnap(snap); _nkRepaint(); },
@@ -5668,13 +5687,19 @@ window.allPharmacistNames = [];
       google.script.run.withSuccessHandler(function (res) {
         if (!res || !res.success) return;
         if (window._fbConnected && window._nkFbOk) return;   // Firebase live AND serving nicknames = authoritative
-        window._nkPublic = res.public || {};
-        if (u && u.name) window._nkPrivate = res.private || {};
+        var pub = res.public || {}, priv = res.private || {};
+        // don't wipe an already-populated map with an empty pull (avoids a race clearing good data)
+        if (Object.keys(pub).length || !window._nkPublic || !Object.keys(window._nkPublic).length) window._nkPublic = pub;
+        if (u && u.name && (Object.keys(priv).length || !window._nkPrivate || !Object.keys(window._nkPrivate).length)) window._nkPrivate = priv;
         _nkRepaint();
       }).withFailureHandler(function () {}).nkGetAllFromSheet(u ? u.name : '', u ? (u.hash || '') : '');
     }
     try { if (fbDb) _nkSubscribe(); } catch (e) { console.warn('nk subscribe init failed', e); }
-    try { _nkPullGAS(); } catch (e) { console.warn('nk gas seed failed', e); }
+    // google.script.run may not be ready at parse-time, and Firebase may be denied by rules — pull
+    //   the Sheet copy now AND retry shortly after load so nicknames always hydrate on a hard refresh.
+    try { _nkPullGAS(); } catch (e) {}
+    setTimeout(function () { try { _nkPullGAS(); } catch (e) {} }, 1500);
+    setTimeout(function () { try { _nkPullGAS(); } catch (e) {} }, 4000);
 
     // ---- Nickname manager modal (v3.44) ----
     function _nkErrText(err) {
@@ -6432,6 +6457,14 @@ window.allPharmacistNames = [];
         if (inp) inp.value = _fltLabelFor(c, hid ? hid.value : '');
         _fltTAHide(kind);
       }, 150);
+    }
+    function _fltTAClear(kind) {
+      var c = _fltCfg(kind);
+      var hid = document.getElementById(c.hid), inp = document.getElementById(c.inp);
+      if (hid) hid.value = '';
+      if (inp) inp.value = '';
+      _fltTAHide(kind);
+      if (typeof triggerUpdate === 'function') triggerUpdate();
     }
 
     function onFilterChange(sourceId) {
@@ -10915,6 +10948,7 @@ table.exp-tbl .tm{margin-left:3px;opacity:0.75;}
         localStorage.setItem(PHX_LS_ROLE, role || 'user');
       } catch(e) {}
       try { if (typeof _nkSubscribePrivate === 'function') _nkSubscribePrivate(); } catch(e) {}
+      try { if (typeof _nkPullGAS === 'function') _nkPullGAS(); } catch(e) {}
       // v3.5: bridge to P2B (old name-binding system) — login = bind as that person
       try {
         if (typeof P2B !== 'undefined' && P2B) {
