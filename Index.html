@@ -5594,28 +5594,57 @@ window.allPharmacistNames = [];
         _nkPrivRef.on('value', function (snap) { window._nkPrivate = _nkMapFromSnap(snap); _nkRepaint(); });
       } catch (e) { console.warn('nk private sub failed', e); }
     }
-    // Write my OWN public nickname (empty = clear). cb(err|null).
-    function nkSetPublic(nickname, cb) {
-      var me = _nkMyName();
-      if (!fbDb) { if (cb) cb(new Error('ไม่ได้เชื่อมต่อฐานข้อมูล')); return; }
-      if (!me) { if (cb) cb(new Error('ต้องเข้าสู่ระบบก่อน')); return; }
-      var ref = fbDb.ref('nicknames/public/' + _nkKey(me));
+    function _nkAuthUser() { try { return (typeof phxAuthGetUser === 'function') ? phxAuthGetUser() : null; } catch (e) { return null; } }
+    // Write a nickname to BOTH Firebase (primary/real-time) AND the GAS/Sheet mirror
+    //   (fallback copy). Succeeds if EITHER lands, so a Firebase outage doesn't block saving.
+    //   type = 'public' (target ignored) | 'private' (alias for `target`). Empty nick = clear.
+    function _nkWrite(type, target, nickname, cb) {
+      var u = _nkAuthUser();
+      if (!u || !u.name) { if (cb) cb(new Error('ต้องเข้าสู่ระบบก่อน')); return; }
       var val = (nickname || '').trim();
-      var p = val ? ref.set(val) : ref.remove();
-      p.then(function () { if (cb) cb(null); }).catch(function (e) { if (cb) cb(e); });
+      var settled = false, fbFail = null, gasFail = null, channels = 0;
+      function ok() { if (!settled) { settled = true; if (cb) cb(null); } }
+      function maybeFail() { if (!settled && fbFail && gasFail) { settled = true; if (cb) cb(fbFail); } }
+      if (fbDb) {
+        channels++;
+        var path = (type === 'private')
+          ? 'nicknames/private/' + _nkKey(u.name) + '/' + _nkKey(target)
+          : 'nicknames/public/' + _nkKey(u.name);
+        var ref = fbDb.ref(path);
+        var p = val ? ref.set(val) : ref.remove();
+        p.then(ok).catch(function (e) { fbFail = e || new Error('firebase'); maybeFail(); });
+      } else { fbFail = new Error('no firebase'); }
+      if (typeof google !== 'undefined' && google.script && google.script.run) {
+        channels++;
+        google.script.run
+          .withSuccessHandler(function (res) { if (res && res.success) ok(); else { gasFail = new Error((res && res.error) || 'gas'); maybeFail(); } })
+          .withFailureHandler(function (e) { gasFail = e || new Error('gas'); maybeFail(); })
+          .nkSaveToSheet(u.name, u.hash, type, target || '', val);
+      } else { gasFail = new Error('no gas'); }
+      if (channels === 0) { if (cb) cb(new Error('ไม่มีช่องทางบันทึก')); }
+      else maybeFail();
     }
-    // Write a PRIVATE alias I give to someone else (empty = clear). cb(err|null).
+    function nkSetPublic(nickname, cb) { _nkWrite('public', '', nickname, cb); }
     function nkSetPrivate(targetName, nickname, cb) {
-      var me = _nkMyName();
-      if (!fbDb) { if (cb) cb(new Error('ไม่ได้เชื่อมต่อฐานข้อมูล')); return; }
-      if (!me) { if (cb) cb(new Error('ต้องเข้าสู่ระบบก่อน')); return; }
       if (!targetName) { if (cb) cb(new Error('ไม่พบชื่อ')); return; }
-      var ref = fbDb.ref('nicknames/private/' + _nkKey(me) + '/' + _nkKey(targetName));
-      var val = (nickname || '').trim();
-      var p = val ? ref.set(val) : ref.remove();
-      p.then(function () { if (cb) cb(null); }).catch(function (e) { if (cb) cb(e); });
+      _nkWrite('private', targetName, nickname, cb);
+    }
+    // Fallback READ: pull nicknames from the GAS/Sheet copy. Applied ONLY when Firebase
+    //   isn't the live source (cold start before connect, or a real Firebase outage), so a
+    //   possibly-stale Sheet never clobbers live Firebase data.
+    function _nkPullGAS() {
+      if (typeof google === 'undefined' || !google.script || !google.script.run) return;
+      var u = _nkAuthUser();
+      google.script.run.withSuccessHandler(function (res) {
+        if (!res || !res.success) return;
+        if (window._fbConnected) return;                 // Firebase live = authoritative
+        window._nkPublic = res.public || {};
+        if (u && u.name) window._nkPrivate = res.private || {};
+        _nkRepaint();
+      }).withFailureHandler(function () {}).nkGetAllFromSheet(u ? u.name : '', u ? (u.hash || '') : '');
     }
     try { if (fbDb) _nkSubscribe(); } catch (e) { console.warn('nk subscribe init failed', e); }
+    try { _nkPullGAS(); } catch (e) { console.warn('nk gas seed failed', e); }
 
     // ---- Nickname manager modal (v3.44) ----
     function _nkErrText(err) {
@@ -5849,6 +5878,7 @@ window.allPharmacistNames = [];
       console.log('🔄 เริ่ม GAS Polling สำหรับ:', monthId);
 
       firebasePollTimer = setInterval(function() {
+        if (!window._fbConnected) { try { _nkPullGAS(); } catch (e) {} }  // v3.44: refresh nicknames from the Sheet copy during a Firebase outage
         if (!isDataLoadedInSession) return;
         google.script.run
           .withSuccessHandler(function(res) {
