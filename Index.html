@@ -5571,7 +5571,8 @@ window.allPharmacistNames = [];
     // ==========================================
     window._nkPublic = {};   // { realName: publicNickname }
     window._nkPrivate = {};  // { realName: myAliasForThem }
-    window._nkFbOk = false;  // did Firebase actually SERVE nicknames? (false if RTDB rules deny) → then use GAS/Sheet even while "connected"
+    window._nkFbOk = false;      // did Firebase actually SERVE PUBLIC nicknames? (false if RTDB rules deny) → use GAS/Sheet even while "connected"
+    window._nkFbOkPriv = false;  // same, tracked SEPARATELY for PRIVATE — public may load from Firebase while private falls back to the Sheet
     function _nkKey(name) { return encodeURIComponent(name || '').replace(/\./g, '%2E'); }
     function _nkUnkey(key) { try { return decodeURIComponent(key); } catch (e) { return key; } }
     function _nkMyName() {
@@ -5625,8 +5626,8 @@ window.allPharmacistNames = [];
         //   Firebase may be denied by rules. The success cb below replaces it only when it can.
         _nkPrivRef = fbDb.ref('nicknames/private/' + _nkKey(me));
         _nkPrivRef.on('value',
-          function (snap) { window._nkPrivate = _nkMapFromSnap(snap); _nkRepaint(); },
-          function (err) { console.warn('nk private read denied → using GAS/Sheet', err && err.message); });
+          function (snap) { window._nkPrivate = _nkMapFromSnap(snap); window._nkFbOkPriv = true; _nkRepaint(); },
+          function (err) { window._nkFbOkPriv = false; console.warn('nk private read denied → using GAS/Sheet', err && err.message); });
       } catch (e) { console.warn('nk private sub failed', e); }
     }
     function _nkAuthUser() { try { return (typeof phxAuthGetUser === 'function') ? phxAuthGetUser() : null; } catch (e) { return null; } }
@@ -5686,11 +5687,17 @@ window.allPharmacistNames = [];
       var u = _nkAuthUser();
       google.script.run.withSuccessHandler(function (res) {
         if (!res || !res.success) return;
-        if (window._fbConnected && window._nkFbOk) return;   // Firebase live AND serving nicknames = authoritative
+        var fbLive = window._fbConnected;
         var pub = res.public || {}, priv = res.private || {};
-        // don't wipe an already-populated map with an empty pull (avoids a race clearing good data)
-        if (Object.keys(pub).length || !window._nkPublic || !Object.keys(window._nkPublic).length) window._nkPublic = pub;
-        if (u && u.name && (Object.keys(priv).length || !window._nkPrivate || !Object.keys(window._nkPrivate).length)) window._nkPrivate = priv;
+        // Apply each map from the Sheet UNLESS Firebase is serving THAT map. public + private are
+        //   gated INDEPENDENTLY — public may load from Firebase while private falls back here.
+        //   (Guard against wiping an already-populated map with an empty pull.)
+        if (!(fbLive && window._nkFbOk)) {
+          if (Object.keys(pub).length || !window._nkPublic || !Object.keys(window._nkPublic).length) window._nkPublic = pub;
+        }
+        if (u && u.name && !(fbLive && window._nkFbOkPriv)) {
+          if (Object.keys(priv).length || !window._nkPrivate || !Object.keys(window._nkPrivate).length) window._nkPrivate = priv;
+        }
         _nkRepaint();
       }).withFailureHandler(function () {}).nkGetAllFromSheet(u ? u.name : '', u ? (u.hash || '') : '');
     }
@@ -5933,7 +5940,7 @@ window.allPharmacistNames = [];
       console.log('🔄 เริ่ม GAS Polling สำหรับ:', monthId);
 
       firebasePollTimer = setInterval(function() {
-        if (!(window._fbConnected && window._nkFbOk)) { try { _nkPullGAS(); } catch (e) {} }  // v3.44: refresh nicknames from the Sheet copy when Firebase can't serve them (down OR rules deny)
+        if (!(window._fbConnected && window._nkFbOk) || (typeof _nkMyName === 'function' && _nkMyName() && !window._nkFbOkPriv)) { try { _nkPullGAS(); } catch (e) {} }  // v3.44: refresh from the Sheet when Firebase can't serve public OR (for a logged-in user) private
         if (!isDataLoadedInSession) return;
         google.script.run
           .withSuccessHandler(function(res) {
