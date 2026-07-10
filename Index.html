@@ -5550,6 +5550,7 @@ window.allPharmacistNames = [];
     // ==========================================
     window._nkPublic = {};   // { realName: publicNickname }
     window._nkPrivate = {};  // { realName: myAliasForThem }
+    window._nkFbOk = false;  // did Firebase actually SERVE nicknames? (false if RTDB rules deny) → then use GAS/Sheet even while "connected"
     function _nkKey(name) { return encodeURIComponent(name || '').replace(/\./g, '%2E'); }
     function _nkUnkey(key) { try { return decodeURIComponent(key); } catch (e) { return key; } }
     function _nkMyName() {
@@ -5577,7 +5578,9 @@ window.allPharmacistNames = [];
       try {
         if (!_nkPubRef) {
           _nkPubRef = fbDb.ref('nicknames/public');
-          _nkPubRef.on('value', function (snap) { window._nkPublic = _nkMapFromSnap(snap); _nkRepaint(); });
+          _nkPubRef.on('value',
+            function (snap) { window._nkPublic = _nkMapFromSnap(snap); window._nkFbOk = true; _nkRepaint(); },
+            function (err) { window._nkFbOk = false; console.warn('nk public read denied → using GAS/Sheet', err && err.message); });
         }
       } catch (e) { console.warn('nk public sub failed', e); }
       _nkSubscribePrivate();
@@ -5591,7 +5594,9 @@ window.allPharmacistNames = [];
         var me = _nkMyName();
         if (!me) { _nkRepaint(); return; }
         _nkPrivRef = fbDb.ref('nicknames/private/' + _nkKey(me));
-        _nkPrivRef.on('value', function (snap) { window._nkPrivate = _nkMapFromSnap(snap); _nkRepaint(); });
+        _nkPrivRef.on('value',
+          function (snap) { window._nkPrivate = _nkMapFromSnap(snap); _nkRepaint(); },
+          function (err) { console.warn('nk private read denied → using GAS/Sheet', err && err.message); });
       } catch (e) { console.warn('nk private sub failed', e); }
     }
     function _nkAuthUser() { try { return (typeof phxAuthGetUser === 'function') ? phxAuthGetUser() : null; } catch (e) { return null; } }
@@ -5637,7 +5642,7 @@ window.allPharmacistNames = [];
       var u = _nkAuthUser();
       google.script.run.withSuccessHandler(function (res) {
         if (!res || !res.success) return;
-        if (window._fbConnected) return;                 // Firebase live = authoritative
+        if (window._fbConnected && window._nkFbOk) return;   // Firebase live AND serving nicknames = authoritative
         window._nkPublic = res.public || {};
         if (u && u.name) window._nkPrivate = res.private || {};
         _nkRepaint();
@@ -5878,7 +5883,7 @@ window.allPharmacistNames = [];
       console.log('🔄 เริ่ม GAS Polling สำหรับ:', monthId);
 
       firebasePollTimer = setInterval(function() {
-        if (!window._fbConnected) { try { _nkPullGAS(); } catch (e) {} }  // v3.44: refresh nicknames from the Sheet copy during a Firebase outage
+        if (!(window._fbConnected && window._nkFbOk)) { try { _nkPullGAS(); } catch (e) {} }  // v3.44: refresh nicknames from the Sheet copy when Firebase can't serve them (down OR rules deny)
         if (!isDataLoadedInSession) return;
         google.script.run
           .withSuccessHandler(function(res) {
