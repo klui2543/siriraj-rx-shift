@@ -3803,7 +3803,7 @@ window.allPharmacistNames = [];
         var q = s ? s.value.toLowerCase().trim() : '';
         if (q) {
           var u = {};
-          rawData.forEach(r => { if ((r.name||'').toLowerCase().includes(q)) u[r.name] = true; });
+          rawData.forEach(r => { if (_nkNameMatches(r.name, q)) u[r.name] = true; });
           var ks = Object.keys(u);
           if (ks.length === 1) return ks[0];
         }
@@ -5566,6 +5566,14 @@ window.allPharmacistNames = [];
       if (pub) return pub;
       return name;
     }
+    // Does a person match a search query by REAL name OR by nickname? (for the name search box)
+    function _nkNameMatches(name, q) {
+      q = (q || '').toString().toLowerCase();
+      if (!q) return true;
+      if ((name || '').toLowerCase().indexOf(q) >= 0) return true;
+      var d = displayName(name);
+      return !!(d && d !== name && d.toLowerCase().indexOf(q) >= 0);
+    }
     var _nkPubRef = null, _nkPrivRef = null;
     function _nkMapFromSnap(snap) {
       var v = (snap && snap.val()) || {}; var map = {};
@@ -5608,7 +5616,21 @@ window.allPharmacistNames = [];
       if (!u || !u.name) { if (cb) cb(new Error('ต้องเข้าสู่ระบบก่อน')); return; }
       var val = (nickname || '').trim();
       var settled = false, fbFail = null, gasFail = null, channels = 0;
-      function ok() { if (!settled) { settled = true; if (cb) cb(null); } }
+      function ok() {
+        if (settled) return;
+        settled = true;
+        // Optimistic local apply + repaint so the change shows INSTANTLY, without waiting for
+        //   the Firebase .on (which never fires if RTDB rules deny) or the next GAS poll.
+        if (type === 'private') {
+          if (!window._nkPrivate) window._nkPrivate = {};
+          if (val) window._nkPrivate[target] = val; else delete window._nkPrivate[target];
+        } else {
+          if (!window._nkPublic) window._nkPublic = {};
+          if (val) window._nkPublic[u.name] = val; else delete window._nkPublic[u.name];
+        }
+        if (typeof _nkRepaint === 'function') { try { _nkRepaint(); } catch (e) {} }
+        if (cb) cb(null);
+      }
       function maybeFail() { if (!settled && fbFail && gasFail) { settled = true; if (cb) cb(fbFail); } }
       if (fbDb) {
         channels++;
@@ -6421,7 +6443,7 @@ window.allPharmacistNames = [];
       const _effectiveData = getEffectiveData();
       let baseData = _effectiveData.filter(i => {
         const matchN = (filters.multiNames.length === 0 || filters.multiNames.includes(i.name))
-                    && (filters.nameS === '' || i.name.toLowerCase().includes(filters.nameS));
+                    && (filters.nameS === '' || _nkNameMatches(i.name, filters.nameS));
         const matchD = filters.dateD === '' || i.date === filters.dateD;
         const matchR = filters.room === '' || (i.room && String(i.room).toLowerCase().includes(filters.room.toLowerCase()));
         return matchN && matchD && matchR;
@@ -6663,7 +6685,7 @@ window.allPharmacistNames = [];
       var raw = (typeof rawData !== 'undefined' && Array.isArray(rawData)) ? rawData : [];
       var rows = raw.filter(function(i) {
         var matchN = (filters.multiNames.length === 0 || filters.multiNames.includes(i.name))
-                  && (filters.nameS === '' || (i.name || '').toLowerCase().includes(filters.nameS));
+                  && (filters.nameS === '' || _nkNameMatches(i.name, filters.nameS));
         var matchD = filters.dateD === '' || i.date === filters.dateD;
         var matchR = filters.room === '' || (i.room && String(i.room).toLowerCase().includes(filters.room.toLowerCase()));
         var matchP = !filters.posD || i.pos === filters.posD;
@@ -7007,15 +7029,17 @@ window.allPharmacistNames = [];
         const fromSchedule = window.allPharmacistNames || [];
         const fromPeople = window.activePeopleNames || [];
         const allNames = [...new Set([...fromSchedule, ...fromPeople])].sort();
-        const filtered = ft ? allNames.filter(n => n.toLowerCase().includes(ft)) : allNames;
+        const filtered = ft ? allNames.filter(n => _nkNameMatches(n, ft)) : allNames;
         container.innerHTML = filtered.length === 0
           ? '<div style="padding:12px; text-align:center; font-size:12px; color:#94a3b8;">ไม่พบรายชื่อ</div>'
           : filtered.map(n => {
               const isSel = (window.selectedPharmacists || []).includes(n);
               const safe = n.replace(/"/g, '&quot;');
               const isExtra = !fromSchedule.includes(n) ? ' <span style="color:#f97316; font-size:10px;">(เพิ่มมือ)</span>' : '';
+              const dn = (typeof displayName === 'function') ? displayName(n) : n;
+              const nameHtml = (dn && dn !== n) ? `${dn} <span style="color:#94a3b8; font-size:11px;">· ${n}</span>` : n;
               return `<div data-ms-name="${safe}" class="multi-item${isSel ? ' selected' : ''}">
-                <span>${n}${isExtra}</span>
+                <span>${nameHtml}${isExtra}</span>
               </div>`;
             }).join('');
       }
@@ -7139,7 +7163,7 @@ window.allPharmacistNames = [];
         const _key = i._ghostKey || (typeof makeShiftKey === 'function' ? makeShiftKey(i) : null);
         if (_key && _usedMap[_key]) return false;
         const matchN = (filters.multiNames.length === 0 || filters.multiNames.includes(i.name))
-                    && (filters.nameS === '' || i.name.toLowerCase().includes(filters.nameS));
+                    && (filters.nameS === '' || _nkNameMatches(i.name, filters.nameS));
         const matchD = filters.dateD === '' || i.date === filters.dateD;
         const matchR = filters.room === '' || (i.room && String(i.room).toLowerCase().includes(filters.room.toLowerCase()));
         const matchP = filters.posD === '' || i.pos === filters.posD;
