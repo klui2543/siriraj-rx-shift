@@ -1047,6 +1047,7 @@
     }
     .pick-ta-input:focus { border-color: var(--accent); }
     .pick-ta .multi-list { top: 38px; }
+    .adv-card .pick-ta-input { background: var(--surface); }  /* filter fields = white like the old selects */
     /* v3.44: nickname manager modal */
     .nk-sec-title { font-size: 12px; font-weight: 700; color: var(--text); margin-bottom: 6px; }
     .nk-hint { font-weight: 600; color: var(--muted); font-size: 11px; }
@@ -1739,25 +1740,27 @@
         <div id="advFiltersPanel" class="adv-card hidden">
           <div>
             <label>📅 วันที่</label>
-            <select id="dateDropdown" onchange="onFilterChange('dateDropdown')">
-              <option value="">ทุกวัน</option>
-            </select>
+            <div class="pick-ta">
+              <input id="fltDateInput" class="pick-ta-input" type="text" autocomplete="off" placeholder="ทุกวัน" oninput="_fltTAFilter('date')" onfocus="_fltTAOpen('date')" onblur="_fltTABlur('date')">
+              <div id="fltDatePop" class="multi-list hidden"></div>
+              <input type="hidden" id="dateDropdown">
+            </div>
           </div>
           <div>
             <label>🏠 ห้องยา</label>
-            <select id="roomFilter" onchange="triggerUpdate()">
-              <option value="">ทุกห้อง</option>
-              <option value="103">ห้องยา 103</option>
-              <option value="NM5">ห้องยา NM5</option>
-              <option value="IPD">ห้องยา IPD</option>
-              <option value="clinic">คลินิกพิเศษ</option>
-            </select>
+            <div class="pick-ta">
+              <input id="fltRoomInput" class="pick-ta-input" type="text" autocomplete="off" placeholder="ทุกห้อง" oninput="_fltTAFilter('room')" onfocus="_fltTAOpen('room')" onblur="_fltTABlur('room')">
+              <div id="fltRoomPop" class="multi-list hidden"></div>
+              <input type="hidden" id="roomFilter">
+            </div>
           </div>
           <div class="span-2">
             <label>🏥 รหัสเวร</label>
-            <select id="posDropdown" onchange="onFilterChange('posDropdown')">
-              <option value="">ทุกรหัส</option>
-            </select>
+            <div class="pick-ta">
+              <input id="fltPosInput" class="pick-ta-input" type="text" autocomplete="off" placeholder="ทุกรหัส (พิมพ์ I13, NM512 ได้)" oninput="_fltTAFilter('pos')" onfocus="_fltTAOpen('pos')" onblur="_fltTABlur('pos')">
+              <div id="fltPosPop" class="multi-list hidden"></div>
+              <input type="hidden" id="posDropdown">
+            </div>
           </div>
         </div>
 
@@ -6136,10 +6139,13 @@ window.allPharmacistNames = [];
       if (typeof renderNameDropdown === 'function') renderNameDropdown('');
       if (typeof renderPosDropdown === 'function') renderPosDropdown('');
       
+      window._fltDates = allDates;   // v3.44: source for the date filter typeahead popup
       const dateD = document.getElementById('dateDropdown');
       if (dateD) {
+        const _prevDate = dateD.value;   // v3.44: survive the 30s background refresh — keep the chosen date
         dateD.innerHTML = '<option value="">-- เลือกวันที่ --</option>' +
           allDates.map(d => `<option value="${d}">${d}</option>`).join('');
+        if (_prevDate && allDates.indexOf(_prevDate) >= 0) dateD.value = _prevDate;
       }
 
       // v3.44: the month-chip badge shows Firebase connection (green/grey dot). The old 3-color
@@ -6367,6 +6373,67 @@ window.allPharmacistNames = [];
       }
     }
 
+    // v3.44: filter-panel typeahead popups (วันที่ / ห้องยา / รหัสเวร) — like the picker.
+    //   Value lives in the hidden #dateDropdown/#roomFilter/#posDropdown so every existing
+    //   filter read keeps working; hidden inputs are never rebuilt → the choice survives the
+    //   30s background refresh. รหัสเวร matches run-together codes via _normCode (I13→I-13).
+    function _fltCfg(kind) {
+      if (kind === 'date') return { hid: 'dateDropdown', inp: 'fltDateInput', pop: 'fltDatePop', all: 'ทุกวัน',
+        opts: function () { return (window._fltDates || []).map(function (d) { return [d, d]; }); },
+        match: function (q, v, l) { return v.toLowerCase().indexOf(q) >= 0 || l.toLowerCase().indexOf(q) >= 0; } };
+      if (kind === 'room') return { hid: 'roomFilter', inp: 'fltRoomInput', pop: 'fltRoomPop', all: 'ทุกห้อง',
+        opts: function () { return [['103', 'ห้องยา 103'], ['NM5', 'ห้องยา NM5'], ['IPD', 'ห้องยา IPD'], ['clinic', 'คลินิกพิเศษ']]; },
+        match: function (q, v, l) { return v.toLowerCase().indexOf(q) >= 0 || l.toLowerCase().indexOf(q) >= 0; } };
+      return { hid: 'posDropdown', inp: 'fltPosInput', pop: 'fltPosPop', all: 'ทุกรหัส',
+        opts: function () { return ((window._fltPoses && window._fltPoses.length) ? window._fltPoses : (window.allPositionCodes || [])).map(function (p) { return [p, p]; }); },
+        match: function (q, v) { return _normCode(v).indexOf(_normCode(q)) >= 0; } };
+    }
+    function _fltLabelFor(c, val) {
+      if (!val) return '';
+      var found = null; c.opts().forEach(function (o) { if (o[0] === val) found = o[1]; });
+      return found || val;
+    }
+    function _fltTARender(kind) {
+      var c = _fltCfg(kind);
+      var inp = document.getElementById(c.inp), pop = document.getElementById(c.pop), hid = document.getElementById(c.hid);
+      if (!inp || !pop || !hid) return;
+      var raw = (inp.value || '').trim();
+      var typing = raw && raw !== _fltLabelFor(c, hid.value);
+      var q = raw.toLowerCase();
+      var opts = c.opts();
+      var items = typing ? opts.filter(function (o) { return c.match(q, o[0], o[1]); }) : opts;
+      var html = '<div class="multi-item' + (!hid.value ? ' selected' : '') + '" onmousedown="_fltTAPick(\'' + kind + '\',\'\')">' + c.all + '</div>';
+      items.forEach(function (o) {
+        html += '<div class="multi-item' + (o[0] === hid.value ? ' selected' : '') + '" onmousedown="_fltTAPick(\'' + kind + '\',\'' + encodeURIComponent(o[0]) + '\')">' + o[1] + '</div>';
+      });
+      if (items.length === 0) html += '<div style="padding:8px 10px;font-size:11px;color:var(--muted);">ไม่พบ</div>';
+      pop.innerHTML = html;
+      pop.classList.remove('hidden');
+    }
+    function _fltTAOpen(kind) { ['date', 'room', 'pos'].forEach(function (k) { if (k !== kind) _fltTAHide(k); }); _fltTARender(kind); }
+    function _fltTAFilter(kind) {
+      var c = _fltCfg(kind); var inp = document.getElementById(c.inp), hid = document.getElementById(c.hid);
+      if (inp && inp.value.trim() === '' && hid && hid.value) { hid.value = ''; if (typeof triggerUpdate === 'function') triggerUpdate(); }
+      _fltTARender(kind);
+    }
+    function _fltTAPick(kind, enc) {
+      var c = _fltCfg(kind);
+      var val = enc ? decodeURIComponent(enc) : '';
+      var hid = document.getElementById(c.hid), inp = document.getElementById(c.inp);
+      if (hid) hid.value = val;
+      if (inp) inp.value = _fltLabelFor(c, val);
+      _fltTAHide(kind);
+      if (typeof triggerUpdate === 'function') triggerUpdate();
+    }
+    function _fltTAHide(kind) { var pop = document.getElementById(_fltCfg(kind).pop); if (pop) pop.classList.add('hidden'); }
+    function _fltTABlur(kind) {
+      setTimeout(function () {
+        var c = _fltCfg(kind); var inp = document.getElementById(c.inp), hid = document.getElementById(c.hid);
+        if (inp) inp.value = _fltLabelFor(c, hid ? hid.value : '');
+        _fltTAHide(kind);
+      }, 150);
+    }
+
     function onFilterChange(sourceId) {
       if (sourceId === 'searchInput') {
         const searchText = document.getElementById('searchInput').value;
@@ -6384,7 +6451,7 @@ window.allPharmacistNames = [];
     }
 
     function resetFilters(skipUpdate) {
-      ['searchInput','dateDropdown','posDropdown'].forEach(id => {
+      ['searchInput','dateDropdown','posDropdown','fltDateInput','fltRoomInput','fltPosInput'].forEach(id => {
         const el = document.getElementById(id);
         if (el) el.value = '';
       });
@@ -6450,14 +6517,13 @@ window.allPharmacistNames = [];
       });
 
       const availablePoses = [...new Set(baseData.map(i => i.pos).filter(Boolean))].sort(naturalCompare);
+      window._fltPoses = availablePoses;   // v3.44: contextual options for the รหัสเวร typeahead popup
       const posDropdown = document.getElementById('posDropdown');
-      posDropdown.innerHTML = '<option value="">-- เลือกรหัสเวร --</option>' +
-        (availablePoses.length > 0 ? availablePoses : window.allPositionCodes)
-        .map(p => `<option value="${p}">${p}</option>`).join('');
-      if (filters.posD && availablePoses.includes(filters.posD)) {
-        posDropdown.value = filters.posD;
-      } else {
+      if (filters.posD && !availablePoses.includes(filters.posD)) {
+        // the chosen code no longer exists in the current view → clear it (hidden value + visible input)
         filters.posD = "";
+        if (posDropdown) posDropdown.value = "";
+        const _fpi = document.getElementById('fltPosInput'); if (_fpi) _fpi.value = "";
       }
 
       let fData = baseData;
