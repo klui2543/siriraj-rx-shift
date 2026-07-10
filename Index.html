@@ -5096,8 +5096,10 @@ window.allPharmacistNames = [];
       }, 150);
     }
 
-    // v3.44: normalize a code for search — drop separators so "I10" matches "I-10", "NM518" matches "NM5-18"
-    function _normCode(s) { return (s || '').toLowerCase().replace(/[\s\-\/._]/g, ''); }
+    // v3.44: normalize a code for search — keep only letters/digits/Thai, drop EVERY separator
+    //   (any dash incl. en/em-dash, space incl. nbsp, dot, slash, parens, *, …) so "I10" matches
+    //   "I-10" / "I–10", "NM518" matches "NM5-18", "1031" matches "103(1)*".
+    function _normCode(s) { return (s || '').toString().toLowerCase().replace(/[^0-9a-z฀-๿]/g, ''); }
 
     function renderUndoStep() {
       const info = actionState.usedInfo || { label: '' };
