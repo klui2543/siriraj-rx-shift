@@ -54,11 +54,27 @@ expanded/rendered — the action is a plain whole-shift transfer. Mirrors the ex
         'ไม้ N' chip (`.relay-leg-tag`). 24-check `relay1b_harness` (Sonnet).
   - 1c. ⏳ `renderBanner` count still tallies WHOLE shifts (its own path, not getEffectiveData)
         — the giver's kept leg isn't recounted. Fix count semantics here.
+
+### 🔴 Klui live-test feedback 2026-07-11 (Stage 2/3 backlog — do FRESH, substantial)
+1a. **Names incomplete in the leg typeahead.** `window.allPharmacistNames` (7227) = current-month
+    schedule names + `P2B._peopleNames` only. Missing registered accounts (`_registeredUsers`,
+    ~17254) and people from other months. → union a fuller source (may need backend).
+1b. **🔴 PUBLISH DOESN'T PROPAGATE LEGS.** After เผยแพร่, only the publisher's own leg shows;
+    the other legs' owners don't get their rows. The published action's `legs` must survive to
+    the server + back into `pathBOverlays` so every viewer's `_relayExpand` can split it. Check
+    the publish/sync path drops `legs` (`_phxB3bSerializeShifts` ~14256 field list, phxPushActions,
+    the pathBOverlays mirror). MOST IMPORTANT — the feature isn't usable shared until this works.
+1d. **Edit legs AFTER publish.** Owner may change their mind (cover only part, hand the rest off).
+    Need a post-publish edit flow (like admin-cancel/`_pbEditRecipient` — reason/identity, re-sync).
+1c-disp. **Time clarity.** Show who covers which time plainly (timeline line + confirm summary +
+    maybe the picker), not only the table range.
+1e. **Swap + special-clinic must support relay too.** Today only give/add; swap is deferred and
+    clinic (`range==='ตรวจสอบ'`) disables the toggle. Extend to both.
 - **Stage 2 — time-awareness:** conflict/overlap excludes sibling legs of one shift
-  (`shiftToMinutes`/`checkShiftConflict`/`detectClientOverlaps`); decide count semantics.
-- **Stage 3 — the rest:** export (PDF portrait/landscape, ICS `parseRangeToMinutes`,
-  sync `_phxB3bSerializeShifts`), history/timeline per-leg, LWW `ledger`/`buildRecords`
-  per-leg, swap-relay, and the future swap-flow view.
+  (`shiftToMinutes`/`checkShiftConflict`/`detectClientOverlaps`); count semantics (1c).
+- **Stage 3 — sharing + reach:** publish→server legs (1b) + edit-after-publish (1d) + export
+  (PDF/ICS/`_phxB3bSerializeShifts`) + history/timeline per-leg + LWW `ledger`/`buildRecords`
+  per-leg + swap-relay & clinic (1e) + fuller name source (1a) + swap-flow view.
 
 ## Pipeline map (from Explore agent 2026-07-11 — key touch-points)
 
