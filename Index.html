@@ -2039,7 +2039,7 @@
           <div style="text-align:center; margin-top:10px;">
             <button type="button" onclick="openChangelog()"
               style="background:none; border:none; color:var(--sub); font-size:11px; font-family:inherit; cursor:pointer; text-decoration:underline; text-underline-offset:2px;">
-              เวอร์ชัน v3.45 · ดูว่ามีอะไรอัปเดต
+              เวอร์ชัน v3.45
             </button>
           </div>
         </div>
@@ -5742,6 +5742,7 @@ window.allPharmacistNames = [];
       var segs = '', prev = _swfRelay.startMin;
       _swfRelay.legs.forEach(function(l, i) {
         var endM = (i === _swfRelay.legs.length - 1) ? _swfRelay.endMin : _relayMin(l.end);
+        if (!isNaN(endM) && i !== _swfRelay.legs.length - 1 && endM <= prev) endM += 1440;   // cross-midnight leg
         if (isNaN(endM) || endM <= prev) endM = prev;
         var pct = Math.max(0, (endM - prev) / total * 100);
         segs += '<div class="swf-bar-seg" style="flex:0 0 ' + pct.toFixed(2) + '%; background:' + _relayLegColor(i) + ';"><span>ไม้ ' + (i + 1) + '</span></div>';
@@ -5810,7 +5811,8 @@ window.allPharmacistNames = [];
       var parts = shift ? _relayRangeParts(shift.range) : null;
       var startMin = parts ? _relayMin(parts.start) : NaN;
       var endMin = parts ? _relayMin(parts.end) : NaN;
-      if (!parts || isNaN(startMin) || isNaN(endMin) || endMin <= startMin) {
+      if (parts && !isNaN(startMin) && !isNaN(endMin) && endMin <= startMin) endMin += 1440;   // cross-midnight (e.g. 16:30-0:00)
+      if (!parts || isNaN(startMin) || isNaN(endMin) || (endMin - startMin) < 2) {
         var sub = document.getElementById('swfRelaySub');
         if (sub) sub.innerHTML = 'เวรนี้ยังแบ่งเวลาไม่ได้ (เวลาไม่ชัดเจน)';
         var tg = document.getElementById('swfRelayToggle');
@@ -5824,7 +5826,9 @@ window.allPharmacistNames = [];
         seed = action.legs.map(function(l) { return { owner: l.owner || '', end: l.end || '' }; });
       } else {
         var mid = _relayFmt(_relayMid(startMin, endMin));
-        seed = [{ owner: viewer || '', end: mid }, { owner: action.partnerName || '', end: parts.end }];
+        // give: giver keeps ไม้1, recipient = ไม้2. add/other: actor = ไม้1, ไม้2 blank (pick who covers the rest).
+        var secondOwner = (String(action.action || '') === 'give') ? (action.partnerName || '') : '';
+        seed = [{ owner: viewer || '', end: mid }, { owner: secondOwner, end: parts.end }];
       }
       _swfRelay = { on: hasLegs, legs: seed, start: parts.start, end: parts.end, startMin: startMin, endMin: endMin };
       var toggle = document.getElementById('swfRelayToggle');
@@ -5853,6 +5857,7 @@ window.allPharmacistNames = [];
         var owner = (legs[i].owner || '').trim();
         if (!owner) return { error: 'ไม้ ' + (i + 1) + ' ยังไม่ได้เลือกชื่อ' };
         var endMin = (i === legs.length - 1) ? _swfRelay.endMin : _relayMin(legs[i].end);
+        if (!isNaN(endMin) && i !== legs.length - 1 && endMin <= prevMin) endMin += 1440;   // cross-midnight leg
         if (isNaN(endMin) || endMin <= prevMin) return { error: 'เวลาไม้ ' + (i + 1) + ' ต้องมากกว่าไม้ก่อนหน้า' };
         if (endMin > _swfRelay.endMin) return { error: 'ไม้ ' + (i + 1) + ' เกินเวลาเวร' };
         out.push({ owner: owner, start: _relayFmt(prevMin), end: _relayFmt(endMin) });
@@ -5905,8 +5910,8 @@ window.allPharmacistNames = [];
           '<thead><tr><th>วันที่</th><th>ชื่อเภสัชกร</th><th>ตำแหน่ง</th><th>รอบเวลา</th></tr></thead>' +
           '<tbody>' + rowsHtml + '</tbody></table></div>'
         : '';
-      // v3.45: relay-baton time split — only for a give, only when the flag is on
-      var relayHtml = (window._relayEnabled && kind === 'give') ? _relaySectionShellHtml() : '';
+      // v3.45: relay-baton time split — give or add (รับเวร), only when the flag is on
+      var relayHtml = (window._relayEnabled && (kind === 'give' || kind === 'add')) ? _relaySectionShellHtml() : '';
       var ov = document.createElement('div');
       ov.id = 'swfConfirmOverlay';
       ov.style.cssText = 'position:fixed; inset:0; background:rgba(0,0,0,0.5); z-index:10005; display:flex; align-items:center; justify-content:center; padding:16px;';
@@ -5925,9 +5930,9 @@ window.allPharmacistNames = [];
         '<button type="button" id="swfDiscard" class="swf-link-cancel">ยกเลิกรายการนี้ (ทิ้งร่าง)</button>' +
         '</div>';
       document.body.appendChild(ov);
-      // v3.45: wire the relay-legs editor (give + flag only) after the dialog is in the DOM
-      if (window._relayEnabled && kind === 'give') {
-        try { _relayInit(action, myShift, viewer); } catch (e) { console.warn('[relay] init', e); _swfRelay = null; }
+      // v3.45: wire the relay-legs editor (give/add + flag only) after the dialog is in the DOM
+      if (window._relayEnabled && (kind === 'give' || kind === 'add')) {
+        try { _relayInit(action, (kind === 'give' ? myShift : tgtShift), viewer); } catch (e) { console.warn('[relay] init', e); _swfRelay = null; }
       } else { _swfRelay = null; }
       // ✕ / tap outside / "เก็บร่างไว้ก่อน" — draft stays (already saved); the
       //   pending-drafts popup reminds on the next edit-mode entry.
@@ -5936,7 +5941,7 @@ window.allPharmacistNames = [];
       document.getElementById('swfKeep').addEventListener('click', function() {
         // Keeping a draft is meant to be friction-free: valid legs are saved, an
         //   incomplete relay is dropped to a plain whole-shift draft (not blocked).
-        if (window._relayEnabled && kind === 'give') {
+        if (window._relayEnabled && (kind === 'give' || kind === 'add')) {
           var rc = _relayCollect();
           if (rc.error) {
             _relaySaveLegs(mid, action.id, null);
@@ -5952,7 +5957,7 @@ window.allPharmacistNames = [];
       document.getElementById('swfDone').addEventListener('click', function() {
         // Publishing requires a complete relay — read it BEFORE closing (needs the DOM).
         var relayLegs = null;
-        if (window._relayEnabled && kind === 'give') {
+        if (window._relayEnabled && (kind === 'give' || kind === 'add')) {
           var rc = _relayCollect();
           if (rc.error) { if (typeof _p2bShowToast === 'function') _p2bShowToast(rc.error, 'warn'); return; }
           relayLegs = rc.legs;
