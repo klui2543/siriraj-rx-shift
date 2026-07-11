@@ -711,6 +711,10 @@
     .tl-edit-recipient { cursor: pointer; margin-left: 6px; padding: 1px 5px; border-radius: 4px; color: #2563eb; font-size: 13px; }
     .tl-edit-recipient:hover { background: rgba(37,99,235,0.12); }
     body.dark-theme .tl-edit-recipient { color: #93c5fd; }
+    /* v3.45: inline 🏃✎ on a relay hop — edit the legs (ไม้) after publish */
+    .tl-edit-relay { cursor: pointer; margin-left: 6px; padding: 1px 5px; border-radius: 4px; color: #0d9488; font-size: 12.5px; white-space: nowrap; }
+    .tl-edit-relay:hover { background: rgba(13,148,136,0.14); }
+    body.dark-theme .tl-edit-relay { color: #5eead4; }
     /* v3.44: inline ✕ on the latest draft hop in the timeline — peel it off (revert one step) */
     .tl-remove-hop { cursor: pointer; margin-left: 4px; padding: 1px 5px; border-radius: 4px; color: #dc2626; font-size: 13px; }
     .tl-remove-hop:hover { background: rgba(220,38,38,0.12); }
@@ -3515,6 +3519,15 @@ window.allPharmacistNames = [];
       var id = btn.getAttribute('data-tl-edit');
       if (mid && id && typeof _pbEditRecipient === 'function') _pbEditRecipient(mid, id);
     }, true);
+    // v3.45: inline 🏃✎ in the timeline → edit the relay legs in place (draft or published).
+    document.addEventListener('click', function(e) {
+      var btn = (e.target && e.target.closest) ? e.target.closest('[data-tl-relayedit]') : null;
+      if (!btn) return;
+      e.stopPropagation();
+      var mid = btn.getAttribute('data-tl-mid');
+      var id = btn.getAttribute('data-tl-relayedit');
+      if (mid && id && typeof _relayEditLegs === 'function') _relayEditLegs(mid, id);
+    }, true);
     // v3.44: ✕ on the latest draft hop → remove just that action (reverts the chain one step).
     //   removeAction of a draft is local-only (its sync wrapper skips the server for non-public).
     document.addEventListener('click', function(e) {
@@ -4318,6 +4331,17 @@ window.allPharmacistNames = [];
           if ((act.action === 'add' || act.action === 'give' || act.action === 'swap') &&
               (act._visibility === 'draft' || (typeof phxAuthIsAdmin === 'function' && phxAuthIsAdmin()))) {
             desc += ' <span class="tl-edit-recipient" data-tl-edit="' + act.id + '" data-tl-mid="' + monthId + '" title="แก้ชื่อ" role="button" aria-label="แก้ชื่อ">✎</span>';
+          }
+          // v3.45: 🏃✎ to edit the relay legs (ไม้) — give/add carrying legs. Unlike the name ✎,
+          //   the AUTHOR may edit their own relay even after publish (the split may change later);
+          //   the save re-syncs so every viewer's rows update. Admin may edit anyone's.
+          if (window._relayEnabled && (act.action === 'give' || act.action === 'add') &&
+              Array.isArray(act.legs) && act.legs.length >= 2) {
+            var _rlBnd = (typeof _pbGetLoggedInName === 'function') ? _pbGetLoggedInName() : null;
+            var _rlMine = _rlBnd && String(act.viewerName || '') === String(_rlBnd);
+            if (_rlMine || (typeof phxAuthIsAdmin === 'function' && phxAuthIsAdmin())) {
+              desc += ' <span class="tl-edit-relay" data-tl-relayedit="' + act.id + '" data-tl-mid="' + monthId + '" title="แก้ไม้ (ส่งไม้ต่อเวลา)" role="button" aria-label="แก้ไม้">🏃✎</span>';
+            }
           }
           // v3.44: ✕ to peel off the LATEST hop (DRAFT only) → reverts the chain to the previous
           //   state (e.g. remove the swap-with-กฤตยา → back to just รับ-O9-จาก-พรผกา). Only the tail
@@ -6035,6 +6059,80 @@ window.allPharmacistNames = [];
         if (typeof invalidateGhostCache === 'function') invalidateGhostCache();
         if (typeof triggerUpdate === 'function') triggerUpdate();   // re-render so the split legs show
       } catch (e) { console.warn('[relay] save legs failed', e); }
+    }
+
+    // ═══ v3.45 relay Stage 1d — edit legs after publish (opened from the timeline 🏃✎) ═══
+    //   Reuses the confirm-dialog leg editor (_relaySectionShellHtml + _relayInit + _relayCollect)
+    //   inside a small standalone modal. The author may edit their OWN relay even once it's public;
+    //   on save we mirror the new legs into pathBOverlays and re-sync so every viewer repaints
+    //   (the server now round-trips `legs` — see Phase_PathB_Global.js). Turning the switch OFF and
+    //   saving clears the split back to a plain whole-shift transfer.
+    function _relayEditLegs(mid, id) {
+      var viewer = (typeof _pbGetLoggedInName === 'function') ? _pbGetLoggedInName()
+                 : ((typeof getCurrentUser === 'function') ? getCurrentUser() : null);
+      OverlayManager.load();
+      var bucket = OverlayManager._data && OverlayManager._data[mid];
+      var a = (bucket && bucket.actions) ? bucket.actions.find(function(x) { return x && x.id === id; }) : null;
+      if (!a) { if (typeof _p2bShowToast === 'function') _p2bShowToast('ไม่พบรายการ', 'warn'); return; }
+      if (a.action !== 'give' && a.action !== 'add') return;
+      var isAuthor = viewer && String(a.viewerName || '') === String(viewer);
+      var isAdmin = (typeof phxAuthIsAdmin === 'function' && phxAuthIsAdmin());
+      if (!isAuthor && !isAdmin) { if (typeof _p2bShowToast === 'function') _p2bShowToast('แก้ได้เฉพาะเจ้าของหรือแอดมิน', 'warn'); return; }
+      var shift = _swfResolveShift(a.shiftKey, a.viewerName || viewer);
+      if (!shift) { if (typeof _p2bShowToast === 'function') _p2bShowToast('หาเวรต้นทางไม่เจอ — แก้ไม้ไม่ได้', 'warn'); return; }
+      var wasPublic = (a._visibility !== 'draft');
+
+      _relayCloseEdit();
+      var ov = document.createElement('div');
+      ov.id = 'relayEditOverlay';
+      ov.style.cssText = 'position:fixed; inset:0; background:rgba(0,0,0,0.5); z-index:10008; display:flex; align-items:center; justify-content:center; padding:16px;';
+      var partnerLine = (a.action === 'give')
+        ? (displayName(a.viewerName || viewer) + ' ยก <b>' + _pbEsc(shift.pos || '') + '</b> ให้ ' + displayName(a.partnerName || '?'))
+        : (displayName(a.viewerName || viewer) + ' รับ <b>' + _pbEsc(shift.pos || '') + '</b>');
+      ov.innerHTML = '<div style="background:var(--surface); width:100%; max-width:440px; max-height:88vh; overflow-y:auto; border-radius:16px; padding:18px; font-family:inherit;">' +
+        '<div style="display:flex; align-items:center; gap:7px;"><div style="font-weight:700; font-size:16px;">🏃 แก้ไม้ (ส่งไม้ต่อเวลา)</div>' +
+        '<button type="button" id="relayEditX" style="margin-left:auto; border:none; background:none; color:var(--sub); font-size:18px; cursor:pointer;">✕</button></div>' +
+        '<div style="font-size:12.5px; color:var(--sub); margin:5px 0 4px;">' + partnerLine + '</div>' +
+        '<div style="font-size:11.5px; color:var(--sub); margin:0 0 4px;">' + _pbEsc(shift.date || '') + ' · ' + _pbEsc(shift.range || '') + '</div>' +
+        (wasPublic ? '<div style="font-size:11.5px; color:#b45309; background:rgba(245,158,11,0.12); border-radius:8px; padding:7px 9px; margin:6px 0;">⚠️ เวรนี้เผยแพร่แล้ว — แก้ไม้แล้วจะซิงค์ให้ทุกคนเห็นทันที</div>' : '') +
+        _relaySectionShellHtml() +
+        '<div class="swf-btns" style="margin-top:14px;">' +
+        '<button type="button" id="relayEditCancel" class="swf-btn">ยกเลิก</button>' +
+        '<button type="button" id="relayEditSave" class="swf-btn swf-primary">✓ บันทึกไม้</button>' +
+        '</div></div>';
+      document.body.appendChild(ov);
+      try { _relayInit(a, shift, a.viewerName || viewer); } catch (e) { console.warn('[relay] edit init', e); _swfRelay = null; }
+      if (!_swfRelay) { _relayCloseEdit(); if (typeof _p2bShowToast === 'function') _p2bShowToast('เวรนี้แบ่งเวลาไม่ได้', 'warn'); return; }
+
+      ov.addEventListener('click', function(e) { if (e.target === ov) _relayCloseEdit(); });
+      document.getElementById('relayEditX').addEventListener('click', _relayCloseEdit);
+      document.getElementById('relayEditCancel').addEventListener('click', _relayCloseEdit);
+      document.getElementById('relayEditSave').addEventListener('click', function() {
+        var rc = _relayCollect();                       // {legs}|{legs:null}|{error}
+        if (rc.error) { if (typeof _p2bShowToast === 'function') _p2bShowToast(rc.error, 'warn'); return; }
+        _relayCloseEdit();
+        _relaySaveLegs(mid, id, rc.legs);               // local update + triggerUpdate (rc.legs=null clears split)
+        if (wasPublic) {
+          // Public rows render from pathBOverlays (the server copy) — mirror the change for an
+          //   instant repaint, then push the upsert (debounced). Gated by window._syncPublish.
+          if (typeof pathBOverlays !== 'undefined' && Array.isArray(pathBOverlays)) {
+            pathBOverlays.forEach(function(o) {
+              if (o && String(o.actionId) === String(id)) o.legs = (rc.legs && rc.legs.length) ? rc.legs : null;
+            });
+          }
+          if (typeof invalidateGhostCache === 'function') invalidateGhostCache();
+          if (window._syncPublish && typeof _phxScheduleSync === 'function') {
+            if (typeof phxShowSyncBanner === 'function') phxShowSyncBanner('syncing', 'กำลัง sync...');
+            _phxScheduleSync();
+          }
+        }
+        if (typeof _p2bShowToast === 'function') _p2bShowToast(rc.legs ? 'แก้ไม้แล้ว' : 'ยกเลิกการแบ่งไม้แล้ว', 'ok');
+      });
+    }
+    function _relayCloseEdit() {
+      var e = document.getElementById('relayEditOverlay');
+      if (e) e.remove();
+      _swfRelay = null;
     }
 
     function swfOpenConfirm(mid, action) {

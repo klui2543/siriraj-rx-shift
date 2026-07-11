@@ -69,8 +69,14 @@ expanded/rendered — the action is a plain whole-shift transfer. Mirrors the ex
     fake sheet row (legs survive) and feeds `_relayGather`/`_relayExpand` a `pathBOverlays`-only viewer
     with zero local drafts (both leg owners' rows appear) — 11/11 checks pass. Not yet re-verified on
     live GAS by Klui (needs a new deployment version to go live — see `HANDOFF_v3.45_relay_2026-07-11.md`).
-1d. **Edit legs AFTER publish.** Owner may change their mind (cover only part, hand the rest off).
-    Need a post-publish edit flow (like admin-cancel/`_pbEditRecipient` — reason/identity, re-sync).
+1d. ✅ **DONE — edit legs after publish (timeline 🏃✎).** New `_relayEditLegs(mid, id)` opens a small
+    modal that REUSES the confirm-dialog leg editor (`_relaySectionShellHtml`+`_relayInit`+`_relayCollect`).
+    Entry point = a 🏃✎ control in the timeline hop (`buildTimelineHTML`, `data-tl-relayedit`), shown to
+    the AUTHOR (own chain) or admin, on give/add carrying legs, draft OR published. Save → `_relaySaveLegs`
+    (local) + (if public) mirror `legs` into `pathBOverlays` + `_phxScheduleSync` → propagates via the
+    Stage-1b server fix. Turning the switch OFF + save clears the split back to a whole-shift transfer.
+    Author-only, no reason prompt (unlike `_pbEditRecipient`'s admin-override — a relay split is the
+    owner's own to adjust). 12-check `relay_edit_harness` (edit ไม้2 owner → propagates; toggle-off clears).
 1c-disp. **Time clarity.** Show who covers which time plainly (timeline line + confirm summary +
     maybe the picker), not only the table range.
 1e. **Swap + special-clinic must support relay too.** Today only give/add; swap is deferred and
