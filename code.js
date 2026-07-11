@@ -31,6 +31,11 @@ function doGet(e) {
     return _phxHandleResetRoute(e);
   }
 
+  // 🔖 Sync Stamp — ดูเวอร์ชันที่รันบน GAS: ?action=version
+  if (e && e.parameter && e.parameter.action === 'version') {
+    return renderSyncStampPage();
+  }
+
   // v3.31 (PB-4 cleanup): ICS route (?name=...) removed — was serveICS endpoint
 
  if (e.parameter.admin === 'true') {

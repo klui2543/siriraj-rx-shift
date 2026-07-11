@@ -2,9 +2,11 @@
 # Stop hook: auto `clasp push` ขึ้น GAS หลังโค้ดถูกแก้โดย Claude Code
 # เป้าหมาย: โค้ดบน GAS = โค้ดล่าสุดที่ Claude อัพเดทเสมอ โดยไม่ต้อง copy-paste เอง
 # ปลอดภัย: ถ้าไม่มี clasp / ไม่มี auth (เช่น cloud ที่ยังไม่ setup) จะข้ามเงียบ ไม่ error
-# กัน push ซ้ำ: ถ้าไฟล์ต้นฉบับไม่เปลี่ยนจากครั้งก่อน จะไม่ push
+# กัน push ซ้ำ: ถ้าไฟล์ต้นฉบับ (ไม่นับ _SYNC_STAMP.js) ไม่เปลี่ยนจากครั้งก่อน จะไม่ push
+# stamp: ก่อน push จะปั๊มเวลา push จริง + commit + branch ลง _SYNC_STAMP.js อัตโนมัติ
 set -uo pipefail
 
+STAMP_FILE="_SYNC_STAMP.js"
 PROJECT_DIR="${CLAUDE_PROJECT_DIR:-$(pwd)}"
 cd "$PROJECT_DIR" 2>/dev/null || exit 0
 
@@ -23,14 +25,25 @@ fi
 # ต้อง authenticated (global หรือ per-project)
 [ -f "$HOME/.clasprc.json" ] || [ -f ./.clasprc.json ] || exit 0
 
-# --- ตรวจว่าไฟล์ที่ clasp จะ push เปลี่ยนไหม ---
+# --- ตรวจว่าโค้ดเปลี่ยนไหม (ไม่นับ _SYNC_STAMP.js เพื่อกันวนลูป push ไม่รู้จบ) ---
 HASH_FILE=".claude/.last-clasp-push.hash"
 CUR_HASH="$(find . -type f \( -name '*.js' -o -name '*.gs' -o -name '*.html' -o -name '*.json' \) \
-  -not -path './node_modules/*' -not -path './.git/*' -not -path './.claude/*' -not -name '.clasp.json' \
+  -not -path './node_modules/*' -not -path './.git/*' -not -path './.claude/*' \
+  -not -name '.clasp.json' -not -name "$STAMP_FILE" \
   -exec sha1sum {} + 2>/dev/null | LC_ALL=C sort | sha1sum | awk '{print $1}')"
 PREV_HASH="$(cat "$HASH_FILE" 2>/dev/null || echo '')"
 if [ "$CUR_HASH" = "$PREV_HASH" ]; then
   exit 0   # ไม่มีการเปลี่ยนแปลงโค้ด -> ไม่ต้อง push
+fi
+
+# --- ปั๊ม stamp ด้วยเวลา push จริง ก่อน push (เพื่อให้ของบน GAS มีเวลาที่ถูกต้อง) ---
+if [ -f "$STAMP_FILE" ]; then
+  NOW_TS="$(TZ=Asia/Bangkok date '+%Y-%m-%d %H:%M %z' 2>/dev/null || date '+%Y-%m-%d %H:%M %z' 2>/dev/null || echo '')"
+  BR="$(git rev-parse --abbrev-ref HEAD 2>/dev/null || echo '')"
+  CM="$(git rev-parse --short HEAD 2>/dev/null || echo '')"
+  [ -n "$NOW_TS" ] && sed -i -E "s|(updated:[[:space:]]*')[^']*(')|\1${NOW_TS}\2|" "$STAMP_FILE" 2>/dev/null || true
+  [ -n "$BR" ]     && sed -i -E "s|(branch:[[:space:]]*')[^']*(')|\1${BR}\2|" "$STAMP_FILE" 2>/dev/null || true
+  [ -n "$CM" ]     && sed -i -E "s|(based_on_commit:[[:space:]]*')[^']*(')|\1${CM}\2|" "$STAMP_FILE" 2>/dev/null || true
 fi
 
 # --- push ขึ้น GAS ---
@@ -38,12 +51,16 @@ OUT="$($CLASP push -f 2>&1)"; RC=$?
 if [ "$RC" -eq 0 ]; then
   mkdir -p .claude
   printf '%s' "$CUR_HASH" > "$HASH_FILE"
-  # ดึงจำนวนไฟล์จาก output ของ clasp + หัวข้อจาก stamp เพื่อยืนยันเวอร์ชัน
+  # commit stamp ที่เพิ่งปั๊ม (เฉพาะไฟล์ stamp) เพื่อให้ Git ตรงกับ GAS — ไม่ push git ให้อัตโนมัติ
+  if [ -f "$STAMP_FILE" ] && ! git diff --quiet "$STAMP_FILE" 2>/dev/null; then
+    git add "$STAMP_FILE" 2>/dev/null && \
+      git commit -q -m "chore(stamp): ปั๊มเวลา push จริง ${NOW_TS}" 2>/dev/null || true
+  fi
   NFILES="$(printf '%s' "$OUT" | grep -oiE 'Pushed [0-9]+' | grep -oE '[0-9]+' | head -1)"
-  TOPIC="$(grep 'topic:' _SYNC_STAMP.js 2>/dev/null | head -1 | sed -E "s/.*topic:[^']*'//; s/'.*//")"
-  STAMP="$(grep 'updated:' _SYNC_STAMP.js 2>/dev/null | head -1 | sed -E "s/.*updated:[^']*'//; s/'.*//")"
+  TOPIC="$(grep 'topic:' "$STAMP_FILE" 2>/dev/null | head -1 | sed -E "s/.*topic:[^']*'//; s/'.*//")"
   echo "✅ clasp push สำเร็จ — ขึ้น GAS แล้ว ${NFILES:+(${NFILES} ไฟล์) }พร้อมทดสอบ"
-  [ -n "$TOPIC" ] && echo "   📌 หัวข้อเวอร์ชันนี้: ${TOPIC} | stamp: ${STAMP}"
+  [ -n "$TOPIC" ] && echo "   📌 หัวข้อเวอร์ชันนี้: ${TOPIC} | stamp: ${NOW_TS}"
+  echo "   ℹ️ stamp commit ยังไม่ push ขึ้น Git — ตัวเตือน hygiene จะแจ้งให้ push (หรือ push พร้อมงานถัดไป)"
 else
   echo "‼️ clasp push ไม่สำเร็จ (RC=$RC) — โค้ดบน GAS ยังไม่อัพเดท ต้อง push เอง:"
   printf '%s\n' "$OUT" | tail -6
