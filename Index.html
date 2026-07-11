@@ -2035,6 +2035,13 @@
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M6 9l6 6 6-6"/></svg>
           </button>
 
+          <!-- 🔖 v3.45: version → tap for the update history (openChangelog) -->
+          <div style="text-align:center; margin-top:10px;">
+            <button type="button" onclick="openChangelog()"
+              style="background:none; border:none; color:var(--sub); font-size:11px; font-family:inherit; cursor:pointer; text-decoration:underline; text-underline-offset:2px;">
+              เวอร์ชัน v3.45 · ดูว่ามีอะไรอัปเดต
+            </button>
+          </div>
         </div>
 
       </div>
@@ -10897,6 +10904,53 @@ table.exp-tbl .tm{margin-left:3px;opacity:0.75;}
       document.getElementById('ecmPanel1').style.display = n === 1 ? 'block' : 'none';
       document.getElementById('ecmPanel2').style.display = n === 2 ? 'block' : 'none';
     }
+
+    // ═══ v3.45 CHANGELOG — user-named update history (tap the version text under Export) ═══
+    //   Klui names each release; add a new entry to the TOP each update. Newest first.
+    //   `v` = version tag, `date` = YYYY-MM-DD (Thai display), `title` = Klui's name,
+    //   `detail` = one plain-language line of what changed.
+    var APP_CHANGELOG = [
+      { v: 'v3.45', date: '2026-07-11', title: 'ดูประวัติการอัปเดตได้',
+        detail: 'ย้ายเลขเวอร์ชันมาไว้ใต้ปุ่มบันทึกลงปฏิทิน — กดแล้วเห็นว่าแต่ละรุ่นอัปเดตอะไรบ้าง ย้อนหลังได้' },
+      { v: 'v3.45', date: '2026-07-11', title: 'แอดมินยกเลิกเวรที่เผยแพร่ของคนอื่นได้',
+        detail: 'แอดมินกด ✕ ที่เวรของคนอื่นในไทม์ไลน์ ระบุเหตุผล + รหัสผ่าน แล้วยกเลิกได้ พร้อมบันทึกลงประวัติถาวร' },
+      { v: 'v3.44', date: '2026-07-10', title: 'ชื่อเล่น + ค้นหา/ตัวกรองแบบพิมพ์แล้วเจอ',
+        detail: 'ตั้งชื่อเล่นให้ตัวเองหรือเพื่อนได้ + ช่องค้นหาและตัวกรองขึ้นรายชื่อให้เลือกทันที (พิมพ์ I10 เจอ I-10)' },
+      { v: 'v3.44', date: '2026-07-09', title: 'แก้เผยแพร่แล้วคนอื่นไม่เห็น',
+        detail: 'เดิมกดเผยแพร่แล้วข้อมูลไม่ถึงเซิร์ฟเวอร์ ตอนนี้ส่งถึงจริง คนอื่นรีเฟรชแล้วเห็นทันที' },
+      { v: 'v3.44', date: '2026-07-08', title: 'ศูนย์รวมการเผยแพร่ + แอดมินแก้ผู้ให้/ผู้รับ',
+        detail: 'รวมปุ่มเผยแพร่ไว้ที่เดียว (🌐) เห็นทั้งฉบับร่างและที่เผยแพร่แล้ว + แอดมินแก้ชื่อผู้ให้/ผู้รับได้' }
+    ];
+    function _clClose() { var e = document.getElementById('clOverlay'); if (e) e.remove(); }
+    function openChangelog() {
+      _clClose();
+      var esc = (typeof _pbEsc === 'function') ? _pbEsc : function (s) { return String(s == null ? '' : s); };
+      var items = (APP_CHANGELOG || []).map(function (e, i) {
+        var latest = (i === 0);
+        return '<div style="padding:12px 0; border-bottom:1px solid var(--border);">' +
+          '<div style="display:flex; align-items:center; gap:8px;">' +
+            '<div style="font-size:14px; font-weight:700; color:var(--text); flex:1; min-width:0;">' + esc(e.title) + '</div>' +
+            (latest ? '<span style="font-size:10px; font-weight:700; color:var(--accent); background:var(--accent-bg); border:1px solid var(--accent-border); border-radius:20px; padding:2px 8px; white-space:nowrap;">ล่าสุด</span>' : '') +
+          '</div>' +
+          '<div style="font-size:11px; color:var(--sub); margin-top:2px;">' + esc(e.v) + ' · ' + esc(e.date) + '</div>' +
+          (e.detail ? '<div style="font-size:12.5px; color:var(--text); margin-top:5px; line-height:1.55; opacity:0.9;">' + esc(e.detail) + '</div>' : '') +
+        '</div>';
+      }).join('');
+      var ov = document.createElement('div');
+      ov.id = 'clOverlay';
+      ov.style.cssText = 'position:fixed; inset:0; background:rgba(0,0,0,0.5); z-index:10050; display:flex; align-items:center; justify-content:center; padding:16px;';
+      ov.innerHTML = '<div style="background:var(--surface); width:100%; max-width:460px; max-height:82vh; overflow-y:auto; border-radius:16px; padding:18px; font-family:inherit;">' +
+        '<div style="display:flex; align-items:center; gap:7px;">' +
+          '<div style="font-weight:700; font-size:16px; color:var(--text);">🔖 ประวัติการอัปเดต</div>' +
+          '<button type="button" id="clX" style="margin-left:auto; border:none; background:none; color:var(--sub); font-size:18px; cursor:pointer;">✕</button>' +
+        '</div>' +
+        '<div style="font-size:12px; color:var(--sub); margin:3px 0 4px;">แต่ละรุ่นอัปเดตอะไรบ้าง — ใหม่สุดอยู่บนสุด</div>' +
+        items +
+        '</div>';
+      document.body.appendChild(ov);
+      ov.addEventListener('click', function (e) { if (e.target === ov) _clClose(); });
+      document.getElementById('clX').addEventListener('click', _clClose);
+    }
     // v3.31 (PB-4 cleanup): subscribe via webcal removed — users use download .ics → import instead
     // v3.1: helper — convert "m_พฤษภาคม_2569" → "2026-5" for backend months param
     function _icsMonthIdToYM(monthId) {
@@ -17095,18 +17149,10 @@ table.exp-tbl .tm{margin-left:3px;opacity:0.75;}
     })();
   </script>
 
-  <!-- 🔖 Version badge — เลขเวอร์ชันมุมล่างขวา (กดดูรายละเอียดที่ ?action=version) -->
-  <a id="_verBadge" href="<?= getScriptUrl() ?>?action=version" target="_top"
-     title="ดูรายละเอียดเวอร์ชัน / เวลาอัปเดตล่าสุด"><?= SYNC_STAMP().version ?></a>
-  <style>
-    #_verBadge{position:fixed;right:10px;bottom:8px;z-index:99999;
-      font-family:"Kanit",Tahoma,Arial,sans-serif;font-size:11px;color:#94a3b8;
-      background:rgba(255,255,255,.78);border:1px solid rgba(148,163,184,.35);
-      border-radius:20px;padding:3px 10px;text-decoration:none;line-height:1.4;
-      box-shadow:0 1px 4px rgba(0,0,0,.08);opacity:.6;transition:opacity .2s,color .2s;}
-    #_verBadge:hover{opacity:1;color:#1e3a8a;}
-    @media print{#_verBadge{display:none;}}
-  </style>
+  <!-- 🔖 v3.45: version moved OUT of the fixed footer → plain-text line under the
+       "บันทึกลงปฏิทิน / Export" button (opens openChangelog() with the update history).
+       Deploy-verification page ?action=version still exists (reach by URL). -->
+
 
 </body>
 </html>
