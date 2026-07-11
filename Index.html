@@ -2692,6 +2692,19 @@ window.allPharmacistNames = [];
       try { localStorage.setItem('sync_publish', on ? '1' : '0'); } catch (e) {}
       console.log('[sync publish] ' + (on ? 'ON (persisted)' : 'OFF'));
     };
+
+    // v3.45 — Relay-baton time-split ownership (ส่งไม้ต่อเวลา). Flag OFF by default:
+    //   a give/swap with an action.legs array behaves as a plain whole-shift transfer
+    //   until flipped ON, when getEffectiveData fans the master row into per-leg rows.
+    //   Opt-in per-browser: setRelayLegs(true) → persists 'relay_legs'='1'. See DESIGN_relay_legs.md.
+    window._relayEnabled = (function() { try { return localStorage.getItem('relay_legs') === '1'; } catch (e) { return false; } })();
+    window.setRelayLegs = function(on) {
+      window._relayEnabled = !!on;
+      try { localStorage.setItem('relay_legs', on ? '1' : '0'); } catch (e) {}
+      if (typeof invalidateGhostCache === 'function') invalidateGhostCache();
+      if (typeof triggerUpdate === 'function') triggerUpdate();
+      console.log('[relay legs] ' + (on ? 'ON (persisted)' : 'OFF'));
+    };
     function _lwwViewerRecords(monthId, viewerName) {
       var pub = (Array.isArray(pathBOverlays) ? pathBOverlays : []).filter(function(o) { return o && String(o._visibility || 'public') !== 'draft'; });
       if (!viewerName || typeof OverlayManager === 'undefined') return pub;
