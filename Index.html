@@ -4184,6 +4184,16 @@ window.allPharmacistNames = [];
     document.addEventListener('click', function(e) {
       try {
       if (!editModeActive) return;
+      // v3.45: 0) relay leg-row tap → open the leg editor (the leg's sub-range key isn't a real
+      //   shift, so the normal data-shift-key path below would silently fail on it).
+      const relayTr = e.target.closest('tr[data-relay-actid]');
+      if (relayTr) {
+        e.stopPropagation();
+        const _raid = decodeURIComponent(relayTr.getAttribute('data-relay-actid'));
+        const _rmid = decodeURIComponent(relayTr.getAttribute('data-relay-mid') || '') || getCurrentMonthId();
+        if (_raid && typeof _relayEditLegs === 'function') _relayEditLegs(_rmid, _raid);
+        return;
+      }
       // 1) Table row click (data-shift-key directly on tr)
       const trTarget = e.target.closest('tr[data-shift-key]');
       if (trTarget) {
@@ -7897,6 +7907,11 @@ window.allPharmacistNames = [];
           _tappable ? 'shift-row-tappable' : ''
         ].filter(Boolean).join(' ');
         const _dataAttr = _tappable ? ` data-shift-key="${encodeURIComponent(_shiftKey)}"` : '';
+        // v3.45: a relay leg-row has no real master shift key (its range is a sub-window), so the
+        //   normal tap path can't resolve it — carry the action id so a tap opens the leg editor.
+        const _relayAttr = (editModeActive && i._relayLeg && i._relayLeg.actionId)
+          ? ` data-relay-actid="${encodeURIComponent(i._relayLeg.actionId)}" data-relay-mid="${encodeURIComponent(_mid)}"`
+          : '';
         // Patch ZZ3 / PB-1b: VIEW mode trigger ATTACHED to POS cell only — avoids covering chevron timeline
         const _isHospital = i.room && i.room !== 'clinic';
         const _isClinic = i.room === 'clinic' || timeRange === 'ตรวจสอบ' || (i.shift && i.shift.indexOf('⚠️') >= 0);
@@ -7906,7 +7921,7 @@ window.allPharmacistNames = [];
         } else if (_isClinic) {
           _posAttrs = ` data-phx-note-trigger="1" data-phx-note-date="${encodeURIComponent(i.date || '')}" data-phx-note-pos="${encodeURIComponent(i.pos || '')}" style="cursor:pointer;"`;
         }
-        return `<tr class="${_rowClasses}" style="font-size: var(--table-font-size);"${_dataAttr}>
+        return `<tr class="${_rowClasses}" style="font-size: var(--table-font-size);"${_dataAttr}${_relayAttr}>
           <td class="px-0.5 py-1.5 font-semibold text-gray-600 align-middle text-center whitespace-nowrap ${_strike}">${i.date}</td>
           <td class="px-1 py-1.5 align-middle col-name leading-tight">${nameDisplay}</td>
           <td class="px-0.5 py-1.5 pl-5 text-center font-bold text-gray-800 align-middle whitespace-nowrap ${_strike}"${_posAttrs}>${i.pos}</td>
