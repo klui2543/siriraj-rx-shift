@@ -1,10 +1,13 @@
 # Siriraj Rx Shift — KPI Framework (สำหรับเสนอผู้บริหาร)
 
-**เวอร์ชันเอกสาร:** 1.0
+**เวอร์ชันเอกสาร:** 1.1
 **วันที่:** 11 กรกฎาคม 2569
+**อิงโค้ด ณ:** v3.45 (LWW ownership, Draft/Publish, governance cancel)
 **เป้าหมายเอกสาร:** นิยาม KPI ที่ **วัดผลได้จริงจาก log ที่แอปเก็บอยู่แล้ว** เพื่อให้ผู้บริหารเห็นประโยชน์เชิงประจักษ์ของระบบ และใช้ตัดสินใจขยายทั้งฝ่ายเภสัชกรรม
 
 > เอกสารคู่กัน: [`DESIGN_hospital_scale.md`](DESIGN_hospital_scale.md) — สถาปัตยกรรมและ migration path
+>
+> **v1.1 sync:** ปรับ B1/B2 เป็น LWW record + server-stamped `at`, เพิ่ม B2b (draft→publish), C5 (governance coverage), E2b (Firebase-served ratio)
 
 ---
 
@@ -50,8 +53,9 @@
 
 | KPI | นิยาม | แหล่งข้อมูลในระบบ | Target |
 |-----|-------|-------------------|--------|
-| **B1. Self-service swap rate** | แลก/ยกเวรที่ทำเองในระบบ ÷ ทั้งหมด | `User_Overlays` (action_type) + audit `swap`/`give` | ≥ 90% ทำในระบบ |
-| **B2. Swap turnaround time** | เวลาเฉลี่ยจาก "ยกเวร" → "มีคนรับ" | audit `give` → `add` timestamp diff | ลดลง vs ไลน์ (baseline สำรวจ) |
+| **B1. Self-service swap rate** | แลก/ยกเวรที่ทำเองในระบบ ÷ ทั้งหมด | LWW ownership records + audit `swap`/`give` | ≥ 90% ทำในระบบ |
+| **B2. Swap turnaround time** | เวลาเฉลี่ยจาก "สร้างร่าง (draft)" → "เผยแพร่ (publish)" และ "มีคนถือครบ" | LWW record `at` (draft) → `at` (public); ต้องใช้ **server-stamped `at`** เพื่อความแม่น | ลดลง vs ไลน์ (baseline สำรวจ) |
+| **B2b. Draft-to-publish gap** | ร่างค้างไม่เผยแพร่นานแค่ไหน / % ร่างที่ถูกทิ้ง | `_visibility` draft vs public + timestamp | ร่างค้าง ↓ (สะท้อน UX เผยแพร่) |
 | **B3. เวลาแจกจ่ายตาราง** | เวลาจาก "ตารางเสร็จ" → "ทุกคนเข้าถึง" | เดิม: แจกไลน์/ปรินต์ → ใหม่: อัปโหลด 1 ครั้ง | ~ทันที (จากชั่วโมง/วัน) |
 | **B4. Admin time saved** | เวลาที่หัวหน้าเวรประหยัด/เดือน | สำรวจ + audit admin actions | ประเมินเป็น man-hours |
 
@@ -65,6 +69,7 @@
 | **C2. Missed-shift proxy** | เวรที่ไม่มีคน/ผิดพลาด (ก่อน-หลังใช้ระบบ) | สำรวจ + audit + reminder log | ลดลงอย่างมีนัย |
 | **C3. Data-quality score** | คุณภาพข้อมูลนำเข้าแต่ละเดือน | Statistics log: `rejectedDates`, `unmatched`, `missingNames` | rejected = 0, unmatched ↓ |
 | **C4. Schedule conflict detection** | ความผิดพลาดที่ระบบ validate จับได้ | validation pipeline (Phase_J_Validation) | จับได้ก่อนเผยแพร่ 100% |
+| **C5. Governance coverage** | % การเปลี่ยน/ยกเลิกเวรที่มี "ลงชื่อ + เหตุผล + audit" | `recordedBy` ทุก record + audit `cancel_published`/`admin_cancel_published` (มี reason+password) | 100% ของ destructive action |
 
 ### หมวด D — การสื่อสารทั่วถึง (Communication)
 
@@ -80,6 +85,7 @@
 |-----|-------|-------------------|--------|
 | **E1. Ingestion success rate** | อัปโหลด/sync สำเร็จ ÷ ทั้งหมด | Statistics log + audit system | ≥ 99% |
 | **E2. Sync latency** | เวลาจากอัปโหลด → Firebase พร้อมอ่าน | timestamp diff (upload → firebase push) | < X วินาที |
+| **E2b. Firebase-served ratio** | % การโหลดที่มาจาก Firebase/poll (ไม่ตก fallback GAS) | `connRadar` source (`firebase`/`poll` vs `gas`) | ≥ 95% (ต่ำ = key mismatch/"Firebase ดับ") |
 | **E3. Error rate** | error ต่อ 1,000 actions | Stackdriver + audit | ต่ำ, มีแนวโน้มลด |
 | **E4. Cost per active user** | ต้นทุน Firebase/เดือน ÷ MAU | Firebase billing (Blaze) | คาดการณ์ได้ |
 
@@ -138,7 +144,7 @@
 - 🛡️ *"เตือนก่อนเข้าเวรอัตโนมัติ **>98%** ลดความเสี่ยงลืมเวร"* (C1, C2)
 - 📈 *"เภสัชกร **X%** ใช้งานประจำทุกเดือน แลกเวร **90%** ทำในระบบมีร่องรอยตรวจสอบได้"* (A2, B1)
 - 📢 *"ประกาศถึงคน **80%+** วัดผลได้จริงจาก read-receipt (ไลน์กลุ่มวัดไม่ได้)"* (D1, D2)
-- 🔍 *"ทุกการเปลี่ยนเวรมี audit trail — โปร่งใส ตรวจสอบย้อนหลังได้"* (governance)
+- 🔍 *"ทุกการเปลี่ยนเวร **ลงชื่อผู้ทำ** และการยกเลิกต้อง **มีเหตุผล + ยืนยันตัวตน + บันทึกถาวร** — โปร่งใส ตรวจสอบย้อนหลังได้"* (C5, governance)
 
 ---
 
@@ -148,7 +154,9 @@
 |----------|------------------|
 | Login/Active (A2,A3) | `phxLogAudit` action=login, `_phxTouchLastSeen` (Phase_Z_B3) |
 | Device (A4) | `logDeviceType` (code.js:1573) |
-| Swap/Give (B1,B2) | `User_Overlays` + audit action=swap/give; `saveOverlayAction` (Phase2B) |
+| Swap/Give (B1,B2,B2b) | LWW ownership records (`slotKey`/`newOwner`/`recordedBy`/`at`/`_visibility`) + audit swap/give; `phxPushActions` (Phase_Z_B3) — **ต้องมี server-stamped `at`** |
+| Governance (C5) | `recordedBy` ทุก record; audit `cancel_published`/`admin_cancel_published` + `phxVerifyPassword` (Phase_Z_B1) |
+| Firebase health (E2b) | `connRadar` source tag (`firebase`/`poll`/`gas`) ใน `Index.html`; `syncMonthToFirebase` (code.js) |
 | Data quality (C3) | `logStatisticsToSheet_` (code.js:833) → `rejectedDates`, `unmatched`, `missingNames` |
 | Validation (C4) | `runPositionNoteValidation` (Phase_J_Validation), `runNoteIngestPipeline` |
 | Reminder (C1) | Phase_Z_B2 reminder queue, `phxB3bHourlyTrigger` |
