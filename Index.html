@@ -5680,36 +5680,66 @@ window.allPharmacistNames = [];
     function _lwwNamePickerClose() { var e = document.getElementById('lwwNamePickerOverlay'); if (e) e.remove(); }
     function _lwwNamePicker(current, onPick) {
       var names = (window.allPharmacistNames || []).slice();
+      var esc = (typeof _pbEsc === 'function') ? _pbEsc
+        : function (s) { return String(s == null ? '' : s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;'); };
+      var dn = (typeof displayName === 'function') ? displayName : function (n) { return n; };
+      var matches = (typeof _nkNameMatches === 'function') ? _nkNameMatches
+        : function (n, q) { return !q || String(n).toLowerCase().indexOf(String(q).toLowerCase()) >= 0; };
       var ov = document.createElement('div');
       ov.id = 'lwwNamePickerOverlay';
       ov.style.cssText = 'position:fixed; inset:0; background:rgba(0,0,0,0.5); z-index:10002; display:flex; align-items:center; justify-content:center; padding:16px;';
       ov.innerHTML = '<div style="background:var(--surface); width:100%; max-width:380px; height:70vh; border-radius:14px; padding:14px; font-family:inherit; display:flex; flex-direction:column;">' +
         '<div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px;"><div style="font-weight:700; font-size:15px;">ระบุชื่อผู้สัมปทานเวร</div>' +
         '<button type="button" onclick="_lwwNamePickerClose()" style="border:none;background:none;font-size:18px;cursor:pointer;color:var(--sub);">✕</button></div>' +
-        '<input id="lwwNameSearch" placeholder="พิมพ์ค้นหาชื่อ…" autocomplete="off" style="width:100%; padding:10px; border:1px solid var(--border); border-radius:8px; font-family:inherit; font-size:15px; box-sizing:border-box; margin-bottom:8px;" />' +
+        '<input id="lwwNameSearch" placeholder="พิมพ์ค้นหาชื่อ / ชื่อเล่น…" autocomplete="off" style="width:100%; padding:10px; border:1px solid var(--border); border-radius:8px; font-family:inherit; font-size:15px; box-sizing:border-box; margin-bottom:8px;" />' +
         '<div id="lwwNameList" style="overflow-y:auto; flex:1; -webkit-overflow-scrolling:touch;"></div>' +
+        '<div style="border-top:1px solid var(--border); margin-top:8px; padding-top:10px;">' +
+          '<label style="display:flex; align-items:center; gap:8px; font-size:13px; color:var(--text); cursor:pointer;">' +
+            '<input type="checkbox" id="lwwFreeChk" style="width:16px; height:16px; flex:none;"> ไม่มีชื่อในระบบ — พิมพ์ชื่อเอง' +
+          '</label>' +
+          '<div id="lwwFreeWrap" style="display:none; gap:6px; margin-top:8px;">' +
+            '<input id="lwwFreeInput" placeholder="พิมพ์ชื่อที่ต้องการ…" autocomplete="off" style="flex:1; min-width:0; padding:9px 10px; border:1px solid var(--border); border-radius:8px; font-family:inherit; font-size:14px; box-sizing:border-box;" />' +
+            '<button type="button" id="lwwFreeOk" style="flex:none; padding:9px 14px; border:none; border-radius:8px; background:var(--accent); color:#fff; font-family:inherit; font-size:14px; font-weight:600; cursor:pointer;">ใช้ชื่อนี้</button>' +
+          '</div>' +
+        '</div>' +
         '</div>';
       document.body.appendChild(ov);
       ov.addEventListener('click', function(e) { if (e.target === ov) _lwwNamePickerClose(); });
       var search = document.getElementById('lwwNameSearch');
       var list = document.getElementById('lwwNameList');
       function render() {
-        var q = (search.value || '').trim().toLowerCase();
         var qt = (search.value || '').trim();
-        var filtered = names.filter(function(n) { return !q || String(n).toLowerCase().indexOf(q) >= 0; });
+        var filtered = names.filter(function(n) { return matches(n, qt); });
         var html = filtered.slice(0, 80).map(function(n) {
-          return '<div class="lww-name-row" data-name="' + String(n).replace(/"/g, '&quot;') + '" style="padding:12px 8px; border-bottom:1px solid var(--border); cursor:pointer; font-size:15px;">' + n + '</div>';
+          var d = dn(n);
+          var sub = (d && d !== n) ? '<span style="color:var(--sub); font-size:12px; margin-left:6px;">(' + esc(n) + ')</span>' : '';
+          return '<div class="lww-name-row" data-name="' + esc(n) + '" style="padding:12px 8px; border-bottom:1px solid var(--border); cursor:pointer; font-size:15px;"><span style="font-weight:600;">' + esc(d) + '</span>' + sub + '</div>';
         }).join('');
-        // v3.44: known-names only — no free-text. The picked name MUST exist in the People
-        //   master list or the current month's schedule. Forces everyone to be registered
-        //   (the app already requires login), so "รับจาก" always points at a real account.
-        list.innerHTML = html || '<div style="padding:14px; color:var(--sub); font-size:13px;">ไม่พบชื่อในระบบ — เลือกได้เฉพาะชื่อที่ลงทะเบียนไว้ หรืออยู่ในตารางเวรเดือนนี้</div>';
+        list.innerHTML = html || '<div style="padding:14px; color:var(--sub); font-size:13px;">ไม่พบชื่อในระบบ — ค้นด้วยชื่อจริงหรือชื่อเล่น หรือติ๊ก “พิมพ์ชื่อเอง” ด้านล่าง</div>';
         Array.prototype.forEach.call(list.querySelectorAll('.lww-name-row'), function(row) {
           row.addEventListener('click', function() { var nm = row.getAttribute('data-name'); _lwwNamePickerClose(); if (typeof onPick === 'function') onPick(nm); });
         });
       }
       search.addEventListener('input', render);
       render();
+      // v3.45: free-text opt-in — for someone not registered in the system (checkbox-gated so
+      //   the default stays known-names-only). Prefills with whatever was typed in the search box.
+      var chk = document.getElementById('lwwFreeChk');
+      var freeWrap = document.getElementById('lwwFreeWrap');
+      var freeInput = document.getElementById('lwwFreeInput');
+      var freeOk = document.getElementById('lwwFreeOk');
+      chk.addEventListener('change', function() {
+        freeWrap.style.display = chk.checked ? 'flex' : 'none';
+        if (chk.checked) { freeInput.value = (search.value || '').trim(); setTimeout(function() { try { freeInput.focus(); } catch (e) {} }, 30); }
+      });
+      function commitFree() {
+        var v = (freeInput.value || '').trim();
+        if (!v) { try { freeInput.focus(); } catch (e) {} return; }
+        _lwwNamePickerClose();
+        if (typeof onPick === 'function') onPick(v);
+      }
+      freeOk.addEventListener('click', commitFree);
+      freeInput.addEventListener('keydown', function(e) { if (e.key === 'Enter') { e.preventDefault(); commitFree(); } });
       setTimeout(function() { try { search.focus(); } catch (e) {} }, 60);
     }
 
