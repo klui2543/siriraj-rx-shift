@@ -908,6 +908,26 @@
       padding: 10px 12px; margin: 14px 0 4px; font-size: 12px; color: #9a3412; line-height: 1.55;
     }
     body.dark-theme .swf-draft-note { background: #3a2408; color: #fcd9b0; }
+    /* v3.45 relay legs (ส่งไม้ต่อเวลา) — capture UI inside the confirm dialog */
+    .swf-relay { margin-top: 14px; border: 1px dashed var(--accent-border); border-radius: 12px; padding: 12px; background: var(--accent-bg); }
+    .swf-relay-head { display: flex; align-items: center; gap: 9px; }
+    .swf-relay-title { font-weight: 700; font-size: 13.5px; color: var(--text); }
+    .swf-relay-sub { font-size: 11.5px; color: var(--sub); margin: 3px 0 0; line-height: 1.5; }
+    .swf-relay-sw { margin-left: auto; width: 42px; height: 24px; border-radius: 12px; background: var(--border); border: none; position: relative; cursor: pointer; flex: none; transition: background .15s; }
+    .swf-relay-sw::after { content: ""; position: absolute; top: 2px; left: 2px; width: 20px; height: 20px; border-radius: 50%; background: #fff; transition: left .15s; }
+    .swf-relay-sw.on { background: var(--accent); }
+    .swf-relay-sw.on::after { left: 20px; }
+    .swf-bar { height: 32px; border-radius: 8px; overflow: hidden; display: flex; border: 1px solid var(--border); margin: 12px 0 5px; }
+    .swf-bar-seg { display: flex; align-items: center; justify-content: center; font-size: 11px; font-weight: 700; color: #fff; min-width: 0; overflow: hidden; white-space: nowrap; }
+    .swf-bar-ticks { display: flex; justify-content: space-between; font-size: 10px; color: var(--sub); margin-bottom: 12px; font-variant-numeric: tabular-nums; }
+    .swf-leg { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; }
+    .swf-leg-dot { width: 10px; height: 10px; border-radius: 50%; flex: none; }
+    .swf-leg-owner { flex: 1; min-width: 0; text-align: left; background: var(--surface); border: 1px solid var(--border); border-radius: 8px; padding: 8px 10px; font-size: 13px; font-family: inherit; color: var(--text); cursor: pointer; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .swf-leg-until { font-size: 11.5px; color: var(--sub); white-space: nowrap; }
+    .swf-leg-time { width: 94px; background: var(--surface); border: 1px solid var(--border); border-radius: 8px; padding: 7px 8px; font-size: 13px; font-family: inherit; color: var(--text); }
+    .swf-leg-time-fixed { width: 94px; text-align: center; font-size: 13px; font-weight: 600; color: var(--sub); background: var(--bg); border: 1px solid var(--border); border-radius: 8px; padding: 8px; }
+    .swf-leg-del { border: none; background: none; color: #dc2626; font-size: 15px; cursor: pointer; padding: 2px 4px; flex: none; }
+    .swf-leg-add { width: 100%; margin-top: 2px; padding: 8px; border: 1px dashed var(--border); border-radius: 8px; background: transparent; color: var(--accent); font-size: 12.5px; font-weight: 600; font-family: inherit; cursor: pointer; }
     .swf-btns { display: flex; gap: 8px; margin-top: 16px; }
     .swf-btn {
       flex: 1; padding: 11px; border-radius: 9px; font-family: inherit;
@@ -5670,6 +5690,187 @@ window.allPharmacistNames = [];
       return me + ' รับ <b>' + _pbEsc(tgtShift ? tgtShift.pos : '?') + '</b> จาก ' + partner;
     }
     function _swfClose() { var e = document.getElementById('swfConfirmOverlay'); if (e) e.remove(); }
+
+    // ═══ v3.45 relay-baton legs (ส่งไม้ต่อเวลา) — capture UI in the confirm dialog ═══
+    //   State lives in _swfRelay while a give-dialog is open; _relayCollect() reads it
+    //   back into a validated legs array on confirm. Flag-gated (window._relayEnabled).
+    var _swfRelay = null;
+    var _RELAY_COLORS = ['#2563eb', '#0f766e', '#b45309', '#7c3aed', '#be185d'];
+    function _relayLegColor(i) { return _RELAY_COLORS[i % _RELAY_COLORS.length]; }
+    function _relayRangeParts(rangeStr) {
+      var m = String(rangeStr || '').replace(/\s/g, '').match(/^(\d{1,2}:\d{2})-(\d{1,2}:\d{2})$/);
+      return m ? { start: m[1], end: m[2] } : null;
+    }
+    function _relayMin(hhmm) {
+      var p = String(hhmm || '').split(':'); if (p.length < 2) return NaN;
+      var h = parseInt(p[0], 10), m = parseInt(p[1], 10);
+      return (isNaN(h) || isNaN(m)) ? NaN : h * 60 + m;
+    }
+    function _relayFmt(min) {
+      min = ((Math.round(min) % 1440) + 1440) % 1440;
+      var h = Math.floor(min / 60), m = min % 60;
+      return (h < 10 ? '0' : '') + h + ':' + (m < 10 ? '0' : '') + m;
+    }
+    function _relayMid(startMin, endMin) {      // sensible default split, rounded to 30 min
+      var mid = Math.round((startMin + endMin) / 2 / 30) * 30;
+      if (mid <= startMin) mid = startMin + 30;
+      if (mid >= endMin) mid = Math.max(startMin + 1, endMin - 30);
+      return mid;
+    }
+    function _relaySectionShellHtml() {
+      return '<div class="swf-relay" id="swfRelay">' +
+        '<div class="swf-relay-head">' +
+          '<span style="font-size:15px;">🏃</span>' +
+          '<span class="swf-relay-title">ส่งไม้ต่อเวลา</span>' +
+          '<button type="button" id="swfRelayToggle" class="swf-relay-sw" role="switch" aria-checked="false" aria-label="ส่งไม้ต่อเวลา"></button>' +
+        '</div>' +
+        '<div class="swf-relay-sub" id="swfRelaySub">เปิดเมื่อ<b>ไม่ได้อยู่เต็มเวร</b> — แบ่งเวรว่าใครอยู่ถึงกี่โมง</div>' +
+        '<div id="swfRelayBody" style="display:none;"></div>' +
+      '</div>';
+    }
+    function _relayBarHtml() {
+      if (!_swfRelay) return '';
+      var total = _swfRelay.endMin - _swfRelay.startMin;
+      if (total <= 0) return '';
+      var segs = '', prev = _swfRelay.startMin;
+      _swfRelay.legs.forEach(function(l, i) {
+        var endM = (i === _swfRelay.legs.length - 1) ? _swfRelay.endMin : _relayMin(l.end);
+        if (isNaN(endM) || endM <= prev) endM = prev;
+        var pct = Math.max(0, (endM - prev) / total * 100);
+        segs += '<div class="swf-bar-seg" style="flex:0 0 ' + pct.toFixed(2) + '%; background:' + _relayLegColor(i) + ';"><span>ไม้ ' + (i + 1) + '</span></div>';
+        prev = endM;
+      });
+      return '<div class="swf-bar">' + segs + '</div>' +
+        '<div class="swf-bar-ticks"><span>' + _pbEsc(_swfRelay.start) + '</span><span>' + _pbEsc(_swfRelay.end) + '</span></div>';
+    }
+    function _relayRenderLegs() {
+      if (!_swfRelay) return;
+      var body = document.getElementById('swfRelayBody');
+      if (!body) return;
+      var legs = _swfRelay.legs;
+      legs[legs.length - 1].end = _swfRelay.end;   // last leg always ends at the shift end
+      var html = _relayBarHtml();
+      legs.forEach(function(l, i) {
+        var isLast = (i === legs.length - 1);
+        html += '<div class="swf-leg" data-leg="' + i + '">' +
+          '<span class="swf-leg-dot" style="background:' + _relayLegColor(i) + ';"></span>' +
+          '<button type="button" class="swf-leg-owner" data-leg-owner="' + i + '">' +
+            (l.owner ? _pbEsc(displayName(l.owner)) : '— เลือกชื่อ —') + ' ▾</button>' +
+          '<span class="swf-leg-until">อยู่ถึง</span>' +
+          (isLast
+            ? '<span class="swf-leg-time-fixed">' + _pbEsc(_swfRelay.end) + '</span>'
+            : '<input type="time" class="swf-leg-time" data-leg-time="' + i + '" value="' + _pbEsc(l.end || '') + '">') +
+          (legs.length > 2 && !isLast ? '<button type="button" class="swf-leg-del" data-leg-del="' + i + '" aria-label="ลบไม้นี้">✕</button>' : '') +
+          '</div>';
+      });
+      html += '<button type="button" class="swf-leg-add" id="swfLegAdd">+ เพิ่มไม้</button>';
+      body.innerHTML = html;
+      Array.prototype.forEach.call(body.querySelectorAll('[data-leg-owner]'), function(btn) {
+        btn.addEventListener('click', function() {
+          var i = parseInt(btn.getAttribute('data-leg-owner'), 10);
+          _lwwNamePicker(_swfRelay.legs[i].owner || '', function(nm) {
+            _swfRelay.legs[i].owner = nm || '';
+            _relayRenderLegs();
+          });
+        });
+      });
+      Array.prototype.forEach.call(body.querySelectorAll('[data-leg-time]'), function(inp) {
+        inp.addEventListener('change', function() {
+          var i = parseInt(inp.getAttribute('data-leg-time'), 10);
+          _swfRelay.legs[i].end = inp.value || '';
+          _relayRenderLegs();
+        });
+      });
+      var addBtn = document.getElementById('swfLegAdd');
+      if (addBtn) addBtn.addEventListener('click', function() {
+        var ls = (legs.length >= 2) ? _relayMin(legs[legs.length - 2].end) : _swfRelay.startMin;
+        var mid = _relayFmt(_relayMid(ls, _swfRelay.endMin));
+        legs.splice(legs.length - 1, 0, { owner: '', end: mid });
+        _relayRenderLegs();
+      });
+      Array.prototype.forEach.call(body.querySelectorAll('[data-leg-del]'), function(btn) {
+        btn.addEventListener('click', function() {
+          var i = parseInt(btn.getAttribute('data-leg-del'), 10);
+          if (_swfRelay.legs.length <= 2) return;
+          _swfRelay.legs.splice(i, 1);
+          _relayRenderLegs();
+        });
+      });
+    }
+    function _relayInit(action, shift, viewer) {
+      var wrap = document.getElementById('swfRelay');
+      if (!wrap) { _swfRelay = null; return; }
+      var parts = shift ? _relayRangeParts(shift.range) : null;
+      var startMin = parts ? _relayMin(parts.start) : NaN;
+      var endMin = parts ? _relayMin(parts.end) : NaN;
+      if (!parts || isNaN(startMin) || isNaN(endMin) || endMin <= startMin) {
+        var sub = document.getElementById('swfRelaySub');
+        if (sub) sub.innerHTML = 'เวรนี้ยังแบ่งเวลาไม่ได้ (เวลาไม่ชัดเจน)';
+        var tg = document.getElementById('swfRelayToggle');
+        if (tg) { tg.disabled = true; tg.style.opacity = '0.4'; tg.style.cursor = 'default'; }
+        _swfRelay = null;
+        return;
+      }
+      var hasLegs = Array.isArray(action.legs) && action.legs.length >= 2;
+      var seed;
+      if (hasLegs) {
+        seed = action.legs.map(function(l) { return { owner: l.owner || '', end: l.end || '' }; });
+      } else {
+        var mid = _relayFmt(_relayMid(startMin, endMin));
+        seed = [{ owner: viewer || '', end: mid }, { owner: action.partnerName || '', end: parts.end }];
+      }
+      _swfRelay = { on: hasLegs, legs: seed, start: parts.start, end: parts.end, startMin: startMin, endMin: endMin };
+      var toggle = document.getElementById('swfRelayToggle');
+      var bodyEl = document.getElementById('swfRelayBody');
+      function paint() {
+        toggle.setAttribute('aria-checked', _swfRelay.on ? 'true' : 'false');
+        toggle.classList.toggle('on', _swfRelay.on);
+        bodyEl.style.display = _swfRelay.on ? 'block' : 'none';
+      }
+      toggle.addEventListener('click', function() {
+        if (toggle.disabled) return;
+        _swfRelay.on = !_swfRelay.on;
+        paint();
+        if (_swfRelay.on) _relayRenderLegs();
+      });
+      paint();
+      if (_swfRelay.on) _relayRenderLegs();
+    }
+    // Read the open dialog's legs back → { legs } (null = relay off) or { error }.
+    function _relayCollect() {
+      if (!_swfRelay || !_swfRelay.on) return { legs: null };
+      var legs = _swfRelay.legs;
+      if (!legs || legs.length < 2) return { error: 'ต้องมีอย่างน้อย 2 ไม้' };
+      var prevMin = _swfRelay.startMin, out = [];
+      for (var i = 0; i < legs.length; i++) {
+        var owner = (legs[i].owner || '').trim();
+        if (!owner) return { error: 'ไม้ ' + (i + 1) + ' ยังไม่ได้เลือกชื่อ' };
+        var endMin = (i === legs.length - 1) ? _swfRelay.endMin : _relayMin(legs[i].end);
+        if (isNaN(endMin) || endMin <= prevMin) return { error: 'เวลาไม้ ' + (i + 1) + ' ต้องมากกว่าไม้ก่อนหน้า' };
+        if (endMin > _swfRelay.endMin) return { error: 'ไม้ ' + (i + 1) + ' เกินเวลาเวร' };
+        out.push({ owner: owner, start: _relayFmt(prevMin), end: _relayFmt(endMin) });
+        prevMin = endMin;
+      }
+      if (prevMin !== _swfRelay.endMin) return { error: 'ช่วงเวลารวมกันไม่ครบทั้งเวร' };
+      // a single owner covering the whole shift = not really a relay
+      var distinct = {}; out.forEach(function(l) { distinct[l.owner] = 1; });
+      if (Object.keys(distinct).length < 2) return { error: 'ต้องมีอย่างน้อย 2 คนที่ต่างกัน' };
+      return { legs: out };
+    }
+    // Persist legs onto the draft action (or clear them). Local-only until published.
+    function _relaySaveLegs(mid, actionId, legs) {
+      try {
+        OverlayManager.load();
+        var bucket = OverlayManager._data && OverlayManager._data[mid];
+        if (!bucket || !bucket.actions) return;
+        var a = bucket.actions.find(function(x) { return x.id === actionId; });
+        if (!a) return;
+        if (legs && legs.length) a.legs = legs; else delete a.legs;
+        OverlayManager.save();
+        if (typeof invalidateGhostCache === 'function') invalidateGhostCache();
+      } catch (e) { console.warn('[relay] save legs failed', e); }
+    }
+
     function swfOpenConfirm(mid, action) {
       if (!action || !action.id) return;
       _swfClose();
@@ -5697,6 +5898,8 @@ window.allPharmacistNames = [];
           '<thead><tr><th>วันที่</th><th>ชื่อเภสัชกร</th><th>ตำแหน่ง</th><th>รอบเวลา</th></tr></thead>' +
           '<tbody>' + rowsHtml + '</tbody></table></div>'
         : '';
+      // v3.45: relay-baton time split — only for a give, only when the flag is on
+      var relayHtml = (window._relayEnabled && kind === 'give') ? _relaySectionShellHtml() : '';
       var ov = document.createElement('div');
       ov.id = 'swfConfirmOverlay';
       ov.style.cssText = 'position:fixed; inset:0; background:rgba(0,0,0,0.5); z-index:10005; display:flex; align-items:center; justify-content:center; padding:16px;';
@@ -5706,6 +5909,7 @@ window.allPharmacistNames = [];
         '<div style="font-size:12px; color:var(--sub); margin:3px 0 12px; text-align:center;">ตรวจสอบก่อนเผยแพร่ให้ทุกคนเห็น</div>' +
         '<div class="swf-summary">' + _swfSummaryHtml(action, viewer, myShift, tgtShift) + '</div>' +
         tableHtml +
+        relayHtml +
         '<div class="swf-draft-note">💾 <div>บันทึกเป็น <b>ฉบับร่าง</b> ไว้แล้ว — เน็ตหลุดก็ไม่หาย กด <b>"เสร็จสิ้น"</b> เพื่อเผยแพร่ให้คนอื่นเห็น</div></div>' +
         '<div class="swf-btns">' +
         '<button type="button" id="swfKeep" class="swf-btn">เก็บร่างไว้ก่อน</button>' +
@@ -5714,17 +5918,41 @@ window.allPharmacistNames = [];
         '<button type="button" id="swfDiscard" class="swf-link-cancel">ยกเลิกรายการนี้ (ทิ้งร่าง)</button>' +
         '</div>';
       document.body.appendChild(ov);
+      // v3.45: wire the relay-legs editor (give + flag only) after the dialog is in the DOM
+      if (window._relayEnabled && kind === 'give') {
+        try { _relayInit(action, myShift, viewer); } catch (e) { console.warn('[relay] init', e); _swfRelay = null; }
+      } else { _swfRelay = null; }
       // ✕ / tap outside / "เก็บร่างไว้ก่อน" — draft stays (already saved); the
       //   pending-drafts popup reminds on the next edit-mode entry.
       ov.addEventListener('click', function(e) { if (e.target === ov) _swfClose(); });
       document.getElementById('swfX').addEventListener('click', _swfClose);
       document.getElementById('swfKeep').addEventListener('click', function() {
+        // Keeping a draft is meant to be friction-free: valid legs are saved, an
+        //   incomplete relay is dropped to a plain whole-shift draft (not blocked).
+        if (window._relayEnabled && kind === 'give') {
+          var rc = _relayCollect();
+          if (rc.error) {
+            _relaySaveLegs(mid, action.id, null);
+            _swfClose();
+            if (typeof _p2bShowToast === 'function') _p2bShowToast('เก็บร่างแบบเต็มเวร (ยังแบ่งไม้ไม่ครบ)', 'ok');
+            return;
+          }
+          _relaySaveLegs(mid, action.id, rc.legs);
+        }
         _swfClose();
         if (typeof _p2bShowToast === 'function') _p2bShowToast('เก็บเป็นร่างแล้ว — ยังไม่เผยแพร่', 'ok');
       });
       document.getElementById('swfDone').addEventListener('click', function() {
+        // Publishing requires a complete relay — read it BEFORE closing (needs the DOM).
+        var relayLegs = null;
+        if (window._relayEnabled && kind === 'give') {
+          var rc = _relayCollect();
+          if (rc.error) { if (typeof _p2bShowToast === 'function') _p2bShowToast(rc.error, 'warn'); return; }
+          relayLegs = rc.legs;
+        }
         var bound = (typeof _pbGetLoggedInName === 'function') ? _pbGetLoggedInName() : null;
         _swfClose();
+        if (window._relayEnabled && kind === 'give') _relaySaveLegs(mid, action.id, relayLegs);
         if (!bound) {
           if (typeof _p2bShowToast === 'function') _p2bShowToast('ต้อง login ก่อนเผยแพร่ — บันทึกร่างไว้แล้ว', 'warn');
           return;
