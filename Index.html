@@ -863,6 +863,55 @@
     }
     .cal-badge { position: relative; }
 
+    /* v3.45 SWF — transaction confirm dialog (draft → เสร็จสิ้น·เผยแพร่) */
+    .swf-summary {
+      background: var(--accent-bg); border: 1px solid var(--accent-border);
+      border-radius: 10px; padding: 12px 13px; margin: 4px 0 13px;
+      font-size: 14.5px; color: var(--text); line-height: 1.5; text-align: center;
+    }
+    .swf-summary b { color: var(--accent); }
+    .swf-mini-label { font-size: 11px; color: var(--sub); margin: 0 2px 6px; font-weight: 600; text-align: center; }
+    .swf-tbl-wrap { border: 1px solid var(--border); border-radius: 10px; overflow: hidden; }
+    table.swf-tbl { width: 100%; border-collapse: collapse; font-size: var(--table-font-size); }
+    .swf-tbl thead th {
+      background: var(--bg); color: var(--sub); font-weight: 700;
+      font-size: calc(var(--table-font-size) - 0.5px);
+      padding: 6px 4px; white-space: nowrap; width: 1%; border-bottom: 1px solid var(--border);
+    }
+    .swf-tbl td {
+      padding: 7px 5px; text-align: center; vertical-align: middle;
+      white-space: nowrap; width: 1%; border-bottom: 1px solid var(--border);
+    }
+    .swf-tbl tr:last-child td { border-bottom: none; }
+    .swf-tbl tr.swf-mine td { background: var(--accent-bg); }
+    .swf-c-date { font-weight: 600; color: var(--sub); }
+    .swf-c-name { font-weight: 700; color: #1e3a8a; width: auto !important; }
+    body.dark-theme .swf-c-name { color: #93c5fd; }
+    .swf-c-pos { font-weight: 800; }
+    .swf-c-you { font-size: 9px; font-weight: 700; color: var(--sub); margin-left: 4px; }
+    .swf-badge {
+      display: inline-flex; align-items: center; font-weight: 700; border-radius: 6px;
+      padding: 3px 7px; white-space: nowrap; font-size: calc(var(--table-font-size) - 0.5px);
+    }
+    .swf-badge .swf-rng { font-weight: 300; opacity: 0.9; margin-left: 3px; }
+    .swf-draft-note {
+      display: flex; gap: 8px; background: #fff7ed; border-radius: 9px;
+      padding: 10px 12px; margin: 14px 0 4px; font-size: 12px; color: #9a3412; line-height: 1.55;
+    }
+    body.dark-theme .swf-draft-note { background: #3a2408; color: #fcd9b0; }
+    .swf-btns { display: flex; gap: 8px; margin-top: 16px; }
+    .swf-btn {
+      flex: 1; padding: 11px; border-radius: 9px; font-family: inherit;
+      font-size: 14px; font-weight: 600; cursor: pointer;
+      border: 1px solid var(--border); background: var(--surface); color: var(--text);
+    }
+    .swf-btn.swf-primary { background: var(--accent); border-color: var(--accent); color: #fff; }
+    .swf-link-cancel {
+      display: block; text-align: center; margin-top: 11px; font-size: 12.5px;
+      color: #dc2626; text-decoration: underline; cursor: pointer; background: none; border: none;
+      font-family: inherit; width: 100%;
+    }
+
     /* Ghost row (received from swap or add) */
     .shift-ghost-received td:first-child { border-left: 3px solid #22c55e; }
     .shift-ghost-received { background: #f0fdf4 !important; }
@@ -5313,15 +5362,19 @@ window.allPharmacistNames = [];
         const myKey = actionState.shiftKey, mineName = mine.name;
         _lwwTransferConfirm({ kind: 'swap', targetKey: targetKey, targetShift: targetShift, defaultFrom: _curHolder,
           onConfirm: function(fromName) {
-            OverlayManager.addAction(mid, { action: 'swap', shiftKey: myKey, partnerShiftKey: targetKey, partnerName: fromName, originalOwner: mineName });
+            var stored = OverlayManager.addAction(mid, { action: 'swap', shiftKey: myKey, partnerShiftKey: targetKey, partnerName: fromName, originalOwner: mineName });
             closeActionModal(); triggerUpdate();
+            // v3.45: transaction confirm — draft saved; เสร็จสิ้น = publish now, or keep draft
+            if (stored && typeof swfOpenConfirm === 'function') swfOpenConfirm(mid, stored);
           } });
         return;
       } else if (actionState.step === 'add') {
         _lwwTransferConfirm({ kind: 'add', targetKey: targetKey, targetShift: targetShift, defaultFrom: _curHolder,
           onConfirm: function(fromName) {
-            OverlayManager.addAction(mid, { action: 'add', shiftKey: targetKey, partnerName: fromName });
+            var stored = OverlayManager.addAction(mid, { action: 'add', shiftKey: targetKey, partnerName: fromName });
             closeActionModal(); triggerUpdate();
+            // v3.45: transaction confirm — draft saved; เสร็จสิ้น = publish now, or keep draft
+            if (stored && typeof swfOpenConfirm === 'function') swfOpenConfirm(mid, stored);
           } });
         return;
       }
@@ -5332,11 +5385,16 @@ window.allPharmacistNames = [];
     function confirmPickName(partnerName) {
       if (actionState.step === 'give' && actionState.shiftKey) {
         const mid = getCurrentMonthId();
-        OverlayManager.addAction(mid, {
+        const stored = OverlayManager.addAction(mid, {
           action: 'give',
           shiftKey: actionState.shiftKey,
           partnerName: partnerName
         });
+        closeActionModal();
+        triggerUpdate();
+        // v3.45: transaction confirm — draft saved; เสร็จสิ้น = publish now, or keep draft
+        if (stored && typeof swfOpenConfirm === 'function') swfOpenConfirm(mid, stored);
+        return;
       }
       closeActionModal();
       triggerUpdate();
@@ -5429,6 +5487,135 @@ window.allPharmacistNames = [];
       search.addEventListener('input', render);
       render();
       setTimeout(function() { try { search.focus(); } catch (e) {} }, 60);
+    }
+
+    // ═══════════════════════════════════════════════════════════
+    // v3.45 SWF — transaction confirm dialog (draft-first → เสร็จสิ้น = เผยแพร่)
+    //   After a pick (give/add/swap) the action is ALREADY saved as a draft
+    //   (survives net loss / refresh). This dialog shows the transaction in the
+    //   familiar main-table format + lets the user publish NOW ("เสร็จสิ้น·เผยแพร่"),
+    //   keep the draft, or discard it. Publish = whole connected chain
+    //   (_pbPopupPublish — same rule as the publish modal).
+    // ═══════════════════════════════════════════════════════════
+    function _swfBadgeClass(s) {
+      var sl = String((s && s.shift) || '').toLowerCase();
+      if (sl.indexOf('⚠️') >= 0) return 'badge-purple';
+      if (sl.indexOf('กลางวัน') >= 0 || sl.indexOf('เช้า') >= 0) return 'badge-day';
+      if (sl.indexOf('รอบ 1') >= 0 || sl.indexOf('รอบ1') >= 0) return 'badge-s1';
+      if (sl.indexOf('รอบ 2') >= 0 || sl.indexOf('รอบ2') >= 0) return 'badge-s2';
+      if (sl.indexOf('รอบ 3') >= 0 || sl.indexOf('รอบ3') >= 0) return 'badge-s3';
+      return 'badge-other';
+    }
+    // Resolve a (possibly chained '_g_') key to a displayable shift row.
+    function _swfResolveShift(key, consumerVN) {
+      if (!key) return null;
+      var s = findShiftByKey(key);
+      if (s) return s;
+      if (String(key).indexOf('_g_') === 0 && typeof LWW !== 'undefined' && LWW._resolveKey) {
+        try {
+          var ov = (typeof pathBOverlays !== 'undefined' && Array.isArray(pathBOverlays)) ? pathBOverlays : [];
+          var real = LWW._resolveKey(key, consumerVN || '', ov, (typeof rawData !== 'undefined' ? rawData : []));
+          if (real) return findShiftByKey(real);
+        } catch (e) {}
+      }
+      return null;
+    }
+    // One main-table-style row: วันที่ | ชื่อเภสัชกร | ตำแหน่ง | รอบเวลา
+    function _swfRowHtml(s, isMine) {
+      if (!s) return '';
+      var youTag = isMine ? '<span class="swf-c-you">(คุณ)</span>' : '';
+      var shiftName = (s.shift && s.shift !== '-') ? s.shift : '';
+      var rng = (s.range && s.range !== '-') ? s.range : '';
+      var badgeInner = (rng === 'ตรวจสอบ')
+        ? 'ตรวจสอบ'
+        : _pbEsc(shiftName) + (rng ? '<span class="swf-rng">' + _pbEsc(rng) + '</span>' : '');
+      return '<tr' + (isMine ? ' class="swf-mine"' : '') + '>' +
+        '<td class="swf-c-date">' + _pbEsc(s.date || '') + '</td>' +
+        '<td class="swf-c-name">' + _pbEsc(displayName(s.name || '')) + youTag + '</td>' +
+        '<td class="swf-c-pos">' + _pbEsc(s.pos || '') + '</td>' +
+        '<td><span class="swf-badge ' + _swfBadgeClass(s) + '">' + badgeInner + '</span></td>' +
+        '</tr>';
+    }
+    // Centered action summary — same wording the timeline uses.
+    function _swfSummaryHtml(act, viewer, myShift, tgtShift) {
+      var me = '<span style="font-weight:700;">' + _pbEsc(displayName(viewer)) + '</span>';
+      var partner = '<b>' + _pbEsc(displayName(act.partnerName || '?')) + '</b>';
+      if (act.action === 'swap') {
+        return me + ' แลก <b>' + _pbEsc(myShift ? myShift.pos : '?') + '</b> ↔ <b>' + _pbEsc(tgtShift ? tgtShift.pos : '?') + '</b> กับ ' + partner;
+      }
+      if (act.action === 'give') {
+        return me + ' ยก <b>' + _pbEsc(myShift ? myShift.pos : '?') + '</b> ให้ ' + partner;
+      }
+      return me + ' รับ <b>' + _pbEsc(tgtShift ? tgtShift.pos : '?') + '</b> จาก ' + partner;
+    }
+    function _swfClose() { var e = document.getElementById('swfConfirmOverlay'); if (e) e.remove(); }
+    function swfOpenConfirm(mid, action) {
+      if (!action || !action.id) return;
+      _swfClose();
+      var viewer = action.viewerName || getCurrentUser() || '';
+      var kind = String(action.action || '');
+      var myShift = null, tgtShift = null, rowsHtml = '', miniLabel = '';
+      if (kind === 'swap') {
+        myShift = _swfResolveShift(action.shiftKey, viewer);
+        tgtShift = _swfResolveShift(action.partnerShiftKey, viewer);
+        rowsHtml = _swfRowHtml(myShift, true) + _swfRowHtml(tgtShift, false);
+        miniLabel = 'เวรเดิมของแต่ละคน';
+      } else if (kind === 'give') {
+        myShift = _swfResolveShift(action.shiftKey, viewer);
+        rowsHtml = _swfRowHtml(myShift, true);
+        miniLabel = 'เวรที่ยกให้';
+      } else {  // add
+        tgtShift = _swfResolveShift(action.shiftKey, action.partnerName || '');
+        rowsHtml = _swfRowHtml(tgtShift, false);
+        miniLabel = 'เวรที่รับมา';
+      }
+      var title = kind === 'swap' ? '🔄 ยืนยันการแลกเวร' : (kind === 'give' ? '🎁 ยืนยันการยกเวร' : '🤝 ยืนยันการรับเวร');
+      var tableHtml = rowsHtml
+        ? '<div class="swf-mini-label">' + miniLabel + '</div>' +
+          '<div class="swf-tbl-wrap"><table class="swf-tbl">' +
+          '<thead><tr><th>วันที่</th><th>ชื่อเภสัชกร</th><th>ตำแหน่ง</th><th>รอบเวลา</th></tr></thead>' +
+          '<tbody>' + rowsHtml + '</tbody></table></div>'
+        : '';
+      var ov = document.createElement('div');
+      ov.id = 'swfConfirmOverlay';
+      ov.style.cssText = 'position:fixed; inset:0; background:rgba(0,0,0,0.5); z-index:10005; display:flex; align-items:center; justify-content:center; padding:16px;';
+      ov.innerHTML = '<div style="background:var(--surface); width:100%; max-width:440px; max-height:88vh; overflow-y:auto; border-radius:16px; padding:18px; font-family:inherit;">' +
+        '<div style="display:flex; align-items:center; gap:7px;"><div style="font-weight:700; font-size:16px;">' + title + '</div>' +
+        '<button type="button" id="swfX" style="margin-left:auto; border:none; background:none; color:var(--sub); font-size:18px; cursor:pointer;">✕</button></div>' +
+        '<div style="font-size:12px; color:var(--sub); margin:3px 0 12px; text-align:center;">ตรวจสอบก่อนเผยแพร่ให้ทุกคนเห็น</div>' +
+        '<div class="swf-summary">' + _swfSummaryHtml(action, viewer, myShift, tgtShift) + '</div>' +
+        tableHtml +
+        '<div class="swf-draft-note">💾 <div>บันทึกเป็น <b>ฉบับร่าง</b> ไว้แล้ว — เน็ตหลุดก็ไม่หาย กด <b>"เสร็จสิ้น"</b> เพื่อเผยแพร่ให้คนอื่นเห็น</div></div>' +
+        '<div class="swf-btns">' +
+        '<button type="button" id="swfKeep" class="swf-btn">เก็บร่างไว้ก่อน</button>' +
+        '<button type="button" id="swfDone" class="swf-btn swf-primary">✓ เสร็จสิ้น · เผยแพร่</button>' +
+        '</div>' +
+        '<button type="button" id="swfDiscard" class="swf-link-cancel">ยกเลิกรายการนี้ (ทิ้งร่าง)</button>' +
+        '</div>';
+      document.body.appendChild(ov);
+      // ✕ / tap outside / "เก็บร่างไว้ก่อน" — draft stays (already saved); the
+      //   pending-drafts popup reminds on the next edit-mode entry.
+      ov.addEventListener('click', function(e) { if (e.target === ov) _swfClose(); });
+      document.getElementById('swfX').addEventListener('click', _swfClose);
+      document.getElementById('swfKeep').addEventListener('click', function() {
+        _swfClose();
+        if (typeof _p2bShowToast === 'function') _p2bShowToast('เก็บเป็นร่างแล้ว — ยังไม่เผยแพร่', 'ok');
+      });
+      document.getElementById('swfDone').addEventListener('click', function() {
+        var bound = (typeof _pbGetLoggedInName === 'function') ? _pbGetLoggedInName() : null;
+        _swfClose();
+        if (!bound) {
+          if (typeof _p2bShowToast === 'function') _p2bShowToast('ต้อง login ก่อนเผยแพร่ — บันทึกร่างไว้แล้ว', 'warn');
+          return;
+        }
+        _pbPopupPublish(mid, action.id);
+      });
+      document.getElementById('swfDiscard').addEventListener('click', function() {
+        _swfClose();
+        OverlayManager.removeAction(mid, action.id);
+        if (typeof triggerUpdate === 'function') triggerUpdate();
+        if (typeof _p2bShowToast === 'function') _p2bShowToast('ทิ้งร่างแล้ว', 'ok');
+      });
     }
 
     // 🆕 PHASE 1: Auto-select user จาก URL param (?user=NAME)
