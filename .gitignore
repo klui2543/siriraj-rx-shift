@@ -6,3 +6,4 @@ node_modules/
 
 # local hook state
 .claude/.last-clasp-push.hash
+.claude/.last-hygiene-reminder
