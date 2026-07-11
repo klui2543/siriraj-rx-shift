@@ -4202,12 +4202,16 @@ window.allPharmacistNames = [];
         const viewer = getCurrentUser();
         if (!viewer || isNaN(day)) return;
         const eff = getEffectiveData();
-        const todayShifts = eff.filter(s =>
-          s.name === viewer &&
-          parseInt((s.date || '').split('/')[0], 10) === day
-        );
+        // v3.45: match day AND month so a cross-month spillover shift isn't tapped on the wrong cell
+        const _calMonNum = (typeof _calSelectedMonthNum === 'function') ? _calSelectedMonthNum() : null;
+        const _sameCell = (dateStr) => {
+          const _dp = String(dateStr || '').split('/');
+          const _dm = parseInt(_dp[1], 10);
+          return parseInt(_dp[0], 10) === day && (_calMonNum == null || isNaN(_dm) || _dm === _calMonNum);
+        };
+        const todayShifts = eff.filter(s => s.name === viewer && _sameCell(s.date));
         // v9: determine the date string for this cell (for pre-filling)
-        const anyShiftOnDay = (rawData || []).find(s => parseInt((s.date || '').split('/')[0], 10) === day);
+        const anyShiftOnDay = (rawData || []).find(s => _sameCell(s.date));
         const cellDate = anyShiftOnDay ? anyShiftOnDay.date : '';
         // v11: always show cell picker for cells with shifts (1 or 2+)
         // so user can also access "+ เพิ่มเวรในวันนี้" button
@@ -8008,6 +8012,19 @@ window.allPharmacistNames = [];
       document.getElementById('resBody').innerHTML = html.join('');
     }
 
+    // v3.45: 1-based month number of the currently-selected schedule (parsed from the Thai label
+    //   e.g. "ธันวาคม 2568" → 12). Used to keep a cross-month spillover shift (a Jan-2 shift sitting
+    //   in a December sheet) off the same-numbered day-cell of THIS month. null if unresolvable.
+    function _calSelectedMonthNum() {
+      try {
+        var sel = document.getElementById('mainMonthSelector');
+        if (!sel || sel.selectedIndex < 0) return null;
+        var label = sel.options[sel.selectedIndex].text;
+        var thaiMonths = ["มกราคม","กุมภาพันธ์","มีนาคม","เมษายน","พฤษภาคม","มิถุนายน","กรกฎาคม","สิงหาคม","กันยายน","ตุลาคม","พฤศจิกายน","ธันวาคม"];
+        var mIdx = thaiMonths.indexOf(String(label).split(' ')[0]);
+        return mIdx >= 0 ? mIdx + 1 : null;
+      } catch (e) { return null; }
+    }
     function renderCalendar(name) {
       document.getElementById('calendarNotice').classList.add('hidden');
       document.getElementById('calendarGridWrapper').classList.remove('hidden');
@@ -8091,7 +8108,14 @@ window.allPharmacistNames = [];
       const _calPBUsedMap = (typeof PBOverlays !== 'undefined') ? PBOverlays.getUsedMap(_pbGetLoggedInName()) : {};
       const _calEffective = getEffectiveData();
       for (let day = 1; day <= totalDays; day++) {
-        let shiftsToday = _calEffective.filter(i => i.name === name && parseInt(i.date.split('/')[0], 10) === day);
+        // v3.45: match by day AND month — a cross-month spillover shift (e.g. a Jan-2 shift stored
+        //   in a December sheet) must not land on the same-numbered day-cell of THIS month.
+        let shiftsToday = _calEffective.filter(i => {
+          if (!i || i.name !== name) return false;
+          const _dp = String(i.date || '').split('/');
+          const _dm = parseInt(_dp[1], 10);
+          return parseInt(_dp[0], 10) === day && (isNaN(_dm) || _dm === mIdx + 1);
+        });
 
         // v3.12: sort by start-time
         shiftsToday.sort((a, b) => {
