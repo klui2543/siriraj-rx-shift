@@ -38,7 +38,12 @@ OUT="$($CLASP push -f 2>&1)"; RC=$?
 if [ "$RC" -eq 0 ]; then
   mkdir -p .claude
   printf '%s' "$CUR_HASH" > "$HASH_FILE"
-  echo "✅ clasp push สำเร็จ — โค้ดล่าสุดขึ้น GAS แล้ว พร้อมให้ทดสอบได้เลย"
+  # ดึงจำนวนไฟล์จาก output ของ clasp + หัวข้อจาก stamp เพื่อยืนยันเวอร์ชัน
+  NFILES="$(printf '%s' "$OUT" | grep -oiE 'Pushed [0-9]+' | grep -oE '[0-9]+' | head -1)"
+  TOPIC="$(grep 'topic:' _SYNC_STAMP.js 2>/dev/null | head -1 | sed -E "s/.*topic:[^']*'//; s/'.*//")"
+  STAMP="$(grep 'updated:' _SYNC_STAMP.js 2>/dev/null | head -1 | sed -E "s/.*updated:[^']*'//; s/'.*//")"
+  echo "✅ clasp push สำเร็จ — ขึ้น GAS แล้ว ${NFILES:+(${NFILES} ไฟล์) }พร้อมทดสอบ"
+  [ -n "$TOPIC" ] && echo "   📌 หัวข้อเวอร์ชันนี้: ${TOPIC} | stamp: ${STAMP}"
 else
   echo "‼️ clasp push ไม่สำเร็จ (RC=$RC) — โค้ดบน GAS ยังไม่อัพเดท ต้อง push เอง:"
   printf '%s\n' "$OUT" | tail -6
