@@ -274,6 +274,11 @@
     body.dark-theme .cal-cell.cal-empty {
       background-image: repeating-linear-gradient(135deg, transparent, transparent 7px, rgba(255,255,255,0.02) 7px, rgba(255,255,255,0.02) 8px);
     }
+    /* v3.45: cells for the spillover of the NEXT month (a schedule that runs a few days past
+       month-end) — subtly tinted + a small month tag so they read as a different month. */
+    .cal-cell.cal-spill { background: rgba(99,102,241,0.06); }
+    body.dark-theme .cal-cell.cal-spill { background: rgba(129,140,248,0.10); }
+    .cal-spill-mon { font-size: 8.5px; font-weight: 700; color: var(--accent, #6366f1); margin-left: 2px; vertical-align: top; }
     .cal-day-num {
       display: inline-flex; align-items: center; justify-content: center;
       font-size: 14px; font-weight: 700; line-height: 1;
@@ -4212,8 +4217,11 @@ window.allPharmacistNames = [];
         const viewer = getCurrentUser();
         if (!viewer || isNaN(day)) return;
         const eff = getEffectiveData();
-        // v3.45: match day AND month so a cross-month spillover shift isn't tapped on the wrong cell
-        const _calMonNum = (typeof _calSelectedMonthNum === 'function') ? _calSelectedMonthNum() : null;
+        // v3.45: match day AND month so a cross-month shift isn't tapped on the wrong cell.
+        //   Prefer the cell's own month (spillover cells carry data-cal-month = next month);
+        //   fall back to the selected schedule's month for normal cells.
+        const _cellMon = parseInt(cell.getAttribute('data-cal-month'), 10);
+        const _calMonNum = !isNaN(_cellMon) ? _cellMon : ((typeof _calSelectedMonthNum === 'function') ? _calSelectedMonthNum() : null);
         const _sameCell = (dateStr) => {
           const _dp = String(dateStr || '').split('/');
           const _dm = parseInt(_dp[1], 10);
@@ -4248,8 +4256,13 @@ window.allPharmacistNames = [];
         const viewer = (typeof getCurrentUser === 'function') ? getCurrentUser() : null;
         if (!viewer || isNaN(day)) return;
         const eff = (typeof getEffectiveData === 'function') ? getEffectiveData() : (rawData || []);
+        // v3.45: month-aware (spillover cells carry data-cal-view-month = next month)
+        const _vCellMon = parseInt(cell.getAttribute('data-cal-view-month'), 10);
+        const _vMon = !isNaN(_vCellMon) ? _vCellMon : ((typeof _calSelectedMonthNum === 'function') ? _calSelectedMonthNum() : null);
         const todayShifts = eff.filter(function(s) {
-          return s.name === viewer && parseInt((s.date || '').split('/')[0], 10) === day;
+          const _dp = String(s.date || '').split('/');
+          const _dm = parseInt(_dp[1], 10);
+          return s.name === viewer && parseInt(_dp[0], 10) === day && (_vMon == null || isNaN(_dm) || _dm === _vMon);
         });
         if (todayShifts.length < 2) return;
         openCellViewPicker(todayShifts, todayShifts[0].date || '');
@@ -8083,10 +8096,29 @@ window.allPharmacistNames = [];
       let startDayIndex = (firstDayDoW - startDowNum + 7) % 7;
 
       const today = new Date();
-      const isCurrentMonth = (today.getFullYear() === year && today.getMonth() === mIdx);
-      const todayDate = isCurrentMonth ? today.getDate() : -1;
+      const _todayD = today.getDate(), _todayMon = today.getMonth() + 1, _todayYr = today.getFullYear();
 
-      const totalCells = startDayIndex + totalDays;
+      // v3.45: cross-month spillover — if THIS person has shift(s) dated in the immediately
+      //   following month, extend the grid past month-end so they render in their own cells
+      //   (instead of vanishing, or colliding on a same-numbered day of this month).
+      const calMonthNum = mIdx + 1;
+      const _spillNextMonth = (calMonthNum === 12) ? 1 : calMonthNum + 1;
+      const _spillYear = (calMonthNum === 12) ? year + 1 : year;
+      const _calEffective = (typeof getEffectiveData === 'function') ? getEffectiveData() : [];
+      const _spillDim = new Date(_spillYear, _spillNextMonth, 0).getDate();  // days in next month
+      let spilloverDays = 0;
+      _calEffective.forEach(function(i) {
+        if (!i || i.name !== name) return;
+        const _dp = String(i.date || '').split('/');
+        const _d = parseInt(_dp[0], 10), _m = parseInt(_dp[1], 10);
+        if (!isNaN(_d) && _m === _spillNextMonth && _d >= 1 && _d <= _spillDim && _d > spilloverDays) spilloverDays = _d;
+      });
+      // ordered cell list = this month's days (1..totalDays) + spillover days (1..spilloverDays)
+      const _calCells = [];
+      for (let _d = 1; _d <= totalDays; _d++) _calCells.push({ day: _d, mon: calMonthNum, yr: year, spill: false });
+      for (let _d = 1; _d <= spilloverDays; _d++) _calCells.push({ day: _d, mon: _spillNextMonth, yr: _spillYear, spill: true });
+
+      const totalCells = startDayIndex + _calCells.length;
       const trailingEmpty = (7 - (totalCells % 7)) % 7;
       const totalRows = (totalCells + trailingEmpty) / 7;
 
@@ -8121,15 +8153,16 @@ window.allPharmacistNames = [];
       const _calUser = getCurrentUser();
       const _calUsedMap = OverlayManager.getUsedMap(_calMid, _calUser);
       const _calPBUsedMap = (typeof PBOverlays !== 'undefined') ? PBOverlays.getUsedMap(_pbGetLoggedInName()) : {};
-      const _calEffective = getEffectiveData();
-      for (let day = 1; day <= totalDays; day++) {
-        // v3.45: match by day AND month — a cross-month spillover shift (e.g. a Jan-2 shift stored
-        //   in a December sheet) must not land on the same-numbered day-cell of THIS month.
+      for (let _ci = 0; _ci < _calCells.length; _ci++) {
+        const cell = _calCells[_ci];
+        const day = cell.day;
+        // v3.45: match by day AND the CELL's month (spillover cells carry the next month) — a
+        //   cross-month shift must land only in the cell of its own month.
         let shiftsToday = _calEffective.filter(i => {
           if (!i || i.name !== name) return false;
           const _dp = String(i.date || '').split('/');
           const _dm = parseInt(_dp[1], 10);
-          return parseInt(_dp[0], 10) === day && (isNaN(_dm) || _dm === mIdx + 1);
+          return parseInt(_dp[0], 10) === day && (isNaN(_dm) || _dm === cell.mon);
         });
 
         // v3.12: sort by start-time
@@ -8184,10 +8217,14 @@ window.allPharmacistNames = [];
           return `<div class="cal-badge ${bc}${_calExtraCls}"${_badgeAttrs}>${_calDot}<span class="cal-text">${s.pos}</span></div>`;
         }).join('');
 
-        const dow = new Date(year, mIdx, day).getDay();
+        const dow = new Date(cell.yr, cell.mon - 1, day).getDay();
         const dowClass = dow === 0 ? 'cal-dow-sun' : dow === 6 ? 'cal-dow-sat' : '';
-        const todayClass = (day === todayDate) ? 'cal-today' : '';
+        const todayClass = (day === _todayD && cell.mon === _todayMon && cell.yr === _todayYr) ? 'cal-today' : '';
         const dayNumClasses = `cal-day-num ${dowClass} ${todayClass}`.trim();
+        // v3.45: spillover cells carry the next month → tag the cell + small month label so the
+        //   viewer sees the month changed; carry data-cal-month so a tap resolves to the right date.
+        const _spillCls = cell.spill ? ' cal-spill' : '';
+        const _monTag = cell.spill ? `<span class="cal-spill-mon">${thaiMonths[cell.mon - 1].slice(0, 3)}</span>` : '';
 
         // v7: cell-level data-cal-day for any cell in edit mode
         // Patch ZZ3-B: VIEW mode cells with 2+ shifts → multi-shift picker
@@ -8195,7 +8232,7 @@ window.allPharmacistNames = [];
         let _cellCls = '';
         let _cellPlus = '';
         if (editModeActive) {
-          _cellData = ` data-cal-day="${day}"`;
+          _cellData = ` data-cal-day="${day}" data-cal-month="${cell.mon}"`;
           _cellCls = ' cal-cell-tappable';
           // ZZ4: นับเฉพาะ shift ที่ยัง alive (ไม่ใช่ struck) — ถ้าทั้งหมดถูกยก/แลกไปแล้ว ให้แสดง "+"
           const _hasAliveShifts = shiftsToday.some(function(s) {
@@ -8204,10 +8241,10 @@ window.allPharmacistNames = [];
           });
           if (!_hasAliveShifts) _cellPlus = '<span class="cal-empty-plus">+</span>';
         } else if (shiftsToday.length >= 2) {
-          _cellData = ` data-cal-view-day="${day}"`;
+          _cellData = ` data-cal-view-day="${day}" data-cal-view-month="${cell.mon}"`;
           _cellCls = ' cal-cell-view-tappable';
         }
-        html += `<div class="${cellClasses(cellIndex)}${_cellCls}"${_cellData}><span class="${dayNumClasses}">${day}</span><div class="cal-badges-wrap">${badgesHtml}${_cellPlus}</div></div>`;
+        html += `<div class="${cellClasses(cellIndex)}${_cellCls}${_spillCls}"${_cellData}><span class="${dayNumClasses}">${day}${_monTag}</span><div class="cal-badges-wrap">${badgesHtml}${_cellPlus}</div></div>`;
         cellIndex++;
       }
 
