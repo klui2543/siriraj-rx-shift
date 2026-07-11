@@ -6963,7 +6963,10 @@ window.allPharmacistNames = [];
     function _pbOverlaySignature(pb) {
       if (!Array.isArray(pb)) return '';
       return pb.length + ':' + pb.map(function(o) {
-        return (o && o.actionId || '') + '~' + (o && o._visibility || 'public') + '~' + (o && o.partnerName || '');
+        var legsFp = (o && Array.isArray(o.legs))
+          ? o.legs.map(function(l) { return (l && l.owner || '') + ':' + (l && l.end || ''); }).join('+')
+          : '';
+        return (o && o.actionId || '') + '~' + (o && o._visibility || 'public') + '~' + (o && o.partnerName || '') + '~' + legsFp;
       }).sort().join(',');
     }
     // v3.44: adopt fresh overlays + re-render in place (shared by the poll and manual refresh).

@@ -59,11 +59,16 @@ expanded/rendered — the action is a plain whole-shift transfer. Mirrors the ex
 1a. **Names incomplete in the leg typeahead.** `window.allPharmacistNames` (7227) = current-month
     schedule names + `P2B._peopleNames` only. Missing registered accounts (`_registeredUsers`,
     ~17254) and people from other months. → union a fuller source (may need backend).
-1b. **🔴 PUBLISH DOESN'T PROPAGATE LEGS.** After เผยแพร่, only the publisher's own leg shows;
-    the other legs' owners don't get their rows. The published action's `legs` must survive to
-    the server + back into `pathBOverlays` so every viewer's `_relayExpand` can split it. Check
-    the publish/sync path drops `legs` (`_phxB3bSerializeShifts` ~14256 field list, phxPushActions,
-    the pathBOverlays mirror). MOST IMPORTANT — the feature isn't usable shared until this works.
+1b. ✅ **FIXED — publish now propagates legs.** Root cause: `phxGetAllActiveOverlaysForMonth`
+    (`Phase_PathB_Global.js`) whitelists which payload fields become `pathBOverlays` entries and
+    never included `legs` — every viewer's `_relayExpand` silently saw a legless action. `phxPushActions`
+    was already fine (stores the full JSON payload verbatim). Fix: added `legs: Array.isArray(payload.legs)
+    ? payload.legs : null` to the pushed overlay object; also folded a legs fingerprint into
+    `_pbOverlaySignature` (Index.html) so a future legs-only edit (see 1d) still trips the live-poll
+    refresh. Verified with a harness that runs the real `phxGetAllActiveOverlaysForMonth` against a
+    fake sheet row (legs survive) and feeds `_relayGather`/`_relayExpand` a `pathBOverlays`-only viewer
+    with zero local drafts (both leg owners' rows appear) — 11/11 checks pass. Not yet re-verified on
+    live GAS by Klui (needs a new deployment version to go live — see `HANDOFF_v3.45_relay_2026-07-11.md`).
 1d. **Edit legs AFTER publish.** Owner may change their mind (cover only part, hand the rest off).
     Need a post-publish edit flow (like admin-cancel/`_pbEditRecipient` — reason/identity, re-sync).
 1c-disp. **Time clarity.** Show who covers which time plainly (timeline line + confirm summary +

@@ -75,7 +75,10 @@ function phxGetAllActiveOverlaysForMonth(monthId) {
         // v3.44: admin override audit — pass through so every viewer sees the ⚖️ badge (who/when/why)
         _overrideBy: payload._overrideBy || null,
         _overrideAt: payload._overrideAt || null,
-        _overrideReason: payload._overrideReason || null
+        _overrideReason: payload._overrideReason || null,
+        // v3.45 relay: pass through per-leg ownership split so every viewer's _relayExpand
+        //   can fan this shift into per-leg rows (was dropped here — publish never propagated legs)
+        legs: Array.isArray(payload.legs) ? payload.legs : null
       });
     });
     
