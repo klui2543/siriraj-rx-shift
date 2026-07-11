@@ -3419,6 +3419,16 @@ window.allPharmacistNames = [];
       var id = btn.getAttribute('data-tl-cancelpub');
       if (mid && id && typeof swfCancelPublished === 'function') swfCancelPublished(mid, id);
     }, true);
+    // v3.45: Admin ✕ on ANOTHER user's PUBLISHED tail → cancel with reason + admin password (audited).
+    document.addEventListener('click', function(e) {
+      var btn = (e.target && e.target.closest) ? e.target.closest('[data-tl-admincancel]') : null;
+      if (!btn) return;
+      e.stopPropagation();
+      var mid = btn.getAttribute('data-tl-mid');
+      var id = btn.getAttribute('data-tl-admincancel');
+      var owner = btn.getAttribute('data-tl-owner');
+      if (mid && id && typeof swfAdminCancelPublished === 'function') swfAdminCancelPublished(mid, id, owner);
+    }, true);
     // v3.44: Admin ✎ on ANOTHER user's timeline hop → override the counterpart (B) as that owner.
     document.addEventListener('click', function(e) {
       var btn = (e.target && e.target.closest) ? e.target.closest('[data-tl-pbedit]') : null;
@@ -4312,6 +4322,15 @@ window.allPharmacistNames = [];
           //   current name so _pbAdminOverride can pull→patch→push AS that owner.
           if ((act === 'add' || act === 'give' || act === 'swap') && (typeof phxAuthIsAdmin === 'function' && phxAuthIsAdmin())) {
             desc += ' <span class="tl-edit-recipient" data-tl-pbedit="' + _pbEsc(ov.actionId) + '" data-tl-owner="' + _pbEsc(ov.viewerName || '') + '" data-tl-cur="' + _pbEsc(ov.partnerName || '') + '" data-tl-mid="' + _pbEsc(getCurrentMonthId()) + '" title="override (แอดมิน)" role="button" aria-label="override">✎</span>';
+          }
+          // v3.45: Admin ✕ to CANCEL another user's PUBLISHED tail hop (reason + password, audited).
+          //   Tail only (idx === last) — cancelling a hop that feeds a later hop would orphan the chain.
+          //   Everything in this PB view is already public (drafts never reach pathBOverlays).
+          if (idx === chain.length - 1 && (typeof phxAuthIsAdmin === 'function' && phxAuthIsAdmin())) {
+            const _adm = (typeof phxAuthGetUser === 'function') ? phxAuthGetUser() : null;
+            if (!_adm || String(ov.viewerName || '') !== String(_adm.name || '')) {
+              desc += ' <span class="tl-remove-hop" data-tl-admincancel="' + _pbEsc(ov.actionId) + '" data-tl-owner="' + _pbEsc(ov.viewerName || '') + '" data-tl-mid="' + _pbEsc(getCurrentMonthId()) + '" title="ยกเลิกรายการนี้ (แอดมิน — ระบุเหตุผล + รหัสผ่าน)" role="button" aria-label="ยกเลิกรายการนี้ (แอดมิน)">✕</span>';
+            }
           }
           html += '<div class="tl-inline-step tl-' + kind + '">';
           html += '<div class="tl-inline-num">' + (idx + 1) + '</div>';
@@ -5884,6 +5903,132 @@ window.allPharmacistNames = [];
         }
       });
       setTimeout(function() { try { document.getElementById('swfCanPw').focus(); } catch (e) {} }, 60);
+    }
+
+    // ═══════════════════════════════════════════════════════════
+    // v3.45: ADMIN cancels ANOTHER user's PUBLISHED tail hop.
+    //   Same gate as the author flow (swfCancelPublished): reason (radio) + password
+    //   + permanent audit. BUT the record lives on the server under its OWNER, not in
+    //   the admin's local OverlayManager — so we delete via the admin-gated actingAs
+    //   path phxRemoveAction(admin, adminHash, id, owner). Audited 'admin_cancel_published'.
+    //   Tail-only (a hop with a child would orphan the chain). The password re-check
+    //   proves the person at the keyboard really is the admin (session hash isn't enough).
+    // ═══════════════════════════════════════════════════════════
+    function swfAdminCancelPublished(mid, actionId, ownerViewer) {
+      if (!(typeof phxAuthIsAdmin === 'function' && phxAuthIsAdmin())) {
+        if (typeof _p2bShowToast === 'function') _p2bShowToast('เฉพาะแอดมิน', 'warn');
+        return;
+      }
+      var admin = (typeof phxAuthGetUser === 'function') ? phxAuthGetUser() : null;
+      if (!admin || !admin.name || !admin.hash) {
+        if (typeof _p2bShowToast === 'function') _p2bShowToast('ต้อง login ก่อนยกเลิก', 'warn');
+        return;
+      }
+      // Reconstruct the target hop from the public mirror (drafts never reach PBOverlays).
+      var chain = (typeof PBOverlays !== 'undefined' && PBOverlays.buildChain) ? PBOverlays.buildChain(actionId) : null;
+      var act = (chain || []).find(function(o) { return o && o.actionId === actionId; });
+      if (!act) { if (typeof _p2bShowToast === 'function') _p2bShowToast('ไม่พบรายการ', 'warn'); return; }
+      var owner = ownerViewer || act.viewerName || '';
+      if (!owner) { if (typeof _p2bShowToast === 'function') _p2bShowToast('ไม่พบเจ้าของรายการ', 'warn'); return; }
+      // tail-only guard — cancelling a hop that feeds a later hop would break the chain
+      var hasChild = (chain || []).some(function(o) { return o && o.shiftKey === '_g_' + actionId; });
+      if (hasChild) {
+        if (typeof _p2bShowToast === 'function') _p2bShowToast('ยกเลิกได้เฉพาะขั้นล่าสุดของเชน', 'warn');
+        return;
+      }
+      _swfCancelClose();
+      var sh = _swfActionShifts(act);
+      var choices = '';
+      _SWF_CANCEL_REASONS.forEach(function(r, i) {
+        choices += '<label class="swf-choice"><input type="radio" name="swfARz" value="' + i + '"> ' + _pbEsc(r) + '</label>';
+      });
+      choices += '<label class="swf-choice"><input type="radio" name="swfARz" value="other"> อื่นๆ (ระบุเอง)</label>';
+      var ov = document.createElement('div');
+      ov.id = 'swfCancelOverlay';
+      ov.style.cssText = 'position:fixed; inset:0; background:rgba(0,0,0,0.55); z-index:10006; display:flex; align-items:center; justify-content:center; padding:16px;';
+      ov.innerHTML = '<div style="background:var(--surface); width:100%; max-width:440px; max-height:88vh; overflow-y:auto; border-radius:16px; padding:18px; font-family:inherit;">' +
+        '<div style="display:flex; align-items:center; gap:7px;"><div style="font-weight:700; font-size:16px;">⚖️ ยกเลิกรายการนี้ (แอดมิน)</div>' +
+        '<button type="button" id="swfACanX" style="margin-left:auto; border:none; background:none; color:var(--sub); font-size:18px; cursor:pointer;">✕</button></div>' +
+        '<div style="font-size:12px; color:var(--sub); margin:3px 0 10px;">คุณกำลังยกเลิกรายการของ <b>' + _pbEsc(displayName(owner)) + '</b> ในฐานะแอดมิน — ต้องระบุเหตุผลและยืนยันรหัสผ่านของคุณ</div>' +
+        '<div class="swf-summary">' + _swfSummaryHtml(act, act.viewerName || owner, sh.my, sh.tgt) + '</div>' +
+        '<div class="swf-warn-note">↩️ <div>ยกเลิกแล้วเวรจะ<b>คืนกลับสถานะก่อนหน้า</b> และถูกบันทึกใน<b>ประวัติถาวร</b> ว่าแอดมินยกเลิก เมื่อไหร่ เพราะอะไร</div></div>' +
+        '<div class="swf-field-label">เหตุผลในการยกเลิก (จำเป็น)</div>' +
+        '<div id="swfARzChoices">' + choices + '</div>' +
+        '<textarea id="swfARzOther" class="swf-input" rows="2" placeholder="ระบุเหตุผล…" style="display:none; margin-top:4px; resize:vertical;"></textarea>' +
+        '<div class="swf-field-label">รหัสผ่านของคุณ (ยืนยันตัวตนแอดมิน)</div>' +
+        '<input id="swfACanPw" class="swf-input" type="password" autocomplete="current-password" placeholder="••••••••">' +
+        '<div id="swfACanErr" style="color:#dc2626; font-size:12px; min-height:16px; margin:6px 2px 0;"></div>' +
+        '<div class="swf-btns">' +
+        '<button type="button" id="swfACanClose" class="swf-btn">ปิด</button>' +
+        '<button type="button" id="swfACanOk" class="swf-btn swf-danger">ยืนยันยกเลิก</button>' +
+        '</div></div>';
+      document.body.appendChild(ov);
+      ov.addEventListener('click', function(e) { if (e.target === ov) _swfCancelClose(); });
+      document.getElementById('swfACanX').addEventListener('click', _swfCancelClose);
+      document.getElementById('swfACanClose').addEventListener('click', _swfCancelClose);
+      // radio highlight + "อื่นๆ" reveals the free-text box
+      Array.prototype.forEach.call(ov.querySelectorAll('#swfARzChoices input'), function(r) {
+        r.addEventListener('change', function() {
+          Array.prototype.forEach.call(ov.querySelectorAll('#swfARzChoices .swf-choice'), function(c) {
+            c.classList.toggle('sel', c.querySelector('input').checked);
+          });
+          var isOther = r.value === 'other' && r.checked;
+          var box = document.getElementById('swfARzOther');
+          box.style.display = isOther ? 'block' : 'none';
+          if (isOther) setTimeout(function() { try { box.focus(); } catch (e) {} }, 40);
+        });
+      });
+      document.getElementById('swfACanOk').addEventListener('click', function() {
+        var errEl = document.getElementById('swfACanErr');
+        var sel = ov.querySelector('#swfARzChoices input:checked');
+        if (!sel) { errEl.textContent = 'กรุณาเลือกเหตุผลก่อน'; return; }
+        var reason = sel.value === 'other'
+          ? (document.getElementById('swfARzOther').value || '').trim()
+          : _SWF_CANCEL_REASONS[parseInt(sel.value, 10)];
+        if (!reason) { errEl.textContent = 'กรุณาระบุเหตุผล'; return; }
+        var pw = document.getElementById('swfACanPw').value || '';
+        if (!pw) { errEl.textContent = 'กรุณาใส่รหัสผ่าน'; return; }
+        var okBtn = this;
+        okBtn.disabled = true; okBtn.textContent = 'กำลังตรวจสอบ...'; errEl.textContent = '';
+        function fail(msg) {
+          okBtn.disabled = false; okBtn.textContent = 'ยืนยันยกเลิก';
+          errEl.textContent = msg || 'เกิดข้อผิดพลาด';
+        }
+        try {
+          google.script.run
+            .withSuccessHandler(function(res) {
+              if (!res || !res.success) return fail(res && res.error);
+              if (!res.valid) return fail(res.error || 'รหัสผ่านไม่ถูกต้อง');
+              // password OK → delete the owner's record via the admin-gated actingAs path
+              okBtn.textContent = 'กำลังยกเลิก...';
+              google.script.run
+                .withSuccessHandler(function(r2) {
+                  if (!r2 || !r2.success) return fail((r2 && r2.error) || 'ลบไม่สำเร็จ');
+                  // reason → permanent audit trail (only after the delete truly happened)
+                  try { phxAuditLog('admin_cancel_published', actionId, act, { reason: reason, owner: owner }, 'web'); } catch (e) {}
+                  // drop the hop from the local mirror for instant feedback, then re-sync from server
+                  if (typeof pathBOverlays !== 'undefined' && Array.isArray(pathBOverlays)) {
+                    for (var i = pathBOverlays.length - 1; i >= 0; i--) {
+                      if (pathBOverlays[i] && String(pathBOverlays[i].actionId) === String(actionId)) pathBOverlays.splice(i, 1);
+                    }
+                  }
+                  if (typeof invalidateGhostCache === 'function') invalidateGhostCache();
+                  _swfCancelClose();
+                  if (typeof triggerUpdate === 'function') triggerUpdate();
+                  var selEl = document.getElementById('mainMonthSelector');
+                  if (typeof fetchPathBOverlays === 'function') fetchPathBOverlays((selEl && selEl.value) || mid);
+                  if (typeof _p2bShowToast === 'function') _p2bShowToast('ยกเลิกแล้ว — บันทึกเหตุผลลงประวัติ', 'ok');
+                })
+                .withFailureHandler(function(err) { fail('ลบไม่สำเร็จ: ' + ((err && err.message) || err)); })
+                .phxRemoveAction(admin.name, admin.hash, actionId, owner);
+            })
+            .withFailureHandler(function(err) { fail('เชื่อมต่อไม่ได้: ' + ((err && err.message) || err)); })
+            .phxVerifyPassword(admin.name, pw);
+        } catch (e) {
+          fail('เชื่อมต่อ server ไม่ได้');
+        }
+      });
+      setTimeout(function() { try { document.getElementById('swfACanPw').focus(); } catch (e) {} }, 60);
     }
 
     // 🆕 PHASE 1: Auto-select user จาก URL param (?user=NAME)
