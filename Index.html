@@ -928,6 +928,9 @@
     .swf-leg-time-fixed { width: 94px; text-align: center; font-size: 13px; font-weight: 600; color: var(--sub); background: var(--bg); border: 1px solid var(--border); border-radius: 8px; padding: 8px; }
     .swf-leg-del { border: none; background: none; color: #dc2626; font-size: 15px; cursor: pointer; padding: 2px 4px; flex: none; }
     .swf-leg-add { width: 100%; margin-top: 2px; padding: 8px; border: 1px dashed var(--border); border-radius: 8px; background: transparent; color: var(--accent); font-size: 12.5px; font-weight: 600; font-family: inherit; cursor: pointer; }
+    /* v3.45 relay: 'ไม้ N' chip on a split leg-row in the main table */
+    .relay-leg-tag { display: inline-block; font-size: 8.5px; font-weight: 700; color: #0f766e; background: #e6f5f2; border-radius: 4px; padding: 1px 4px; margin-right: 3px; vertical-align: middle; }
+    body.dark-theme .relay-leg-tag { color: #5eead4; background: #134e48; }
     .swf-btns { display: flex; gap: 8px; margin-top: 16px; }
     .swf-btn {
       flex: 1; padding: 11px; border-radius: 9px; font-family: inherit;
@@ -2832,6 +2835,67 @@ window.allPharmacistNames = [];
     }
 
     /** Combined rawData + ghost rows for current viewer */
+    // ═══ v3.45 relay Stage 1b — fan a legged shift into per-leg rows in the effective data ═══
+    //   A give/add carrying action.legs replaces its master row with one row per leg (owner +
+    //   sub-range), and the plain whole-shift ghost of that same action is dropped (the legs
+    //   already cover everyone). Flag-gated: window._relayEnabled OFF → untouched pass-through.
+    function _relayGather(mid) {
+      var out = [], seen = {};
+      function consider(a) {
+        if (!a || !Array.isArray(a.legs) || a.legs.length < 2) return;
+        var id = a.id || a.actionId;
+        if (!id || seen[id]) return;
+        var sk = String(a.shiftKey || '');
+        if (sk.indexOf('_g_') === 0) {          // chained hop — resolve to the real master key
+          if (typeof LWW !== 'undefined' && LWW._resolveKey) {
+            var consumer = (String(a.action || '') === 'add') ? (a.partnerName || '') : (a.viewerName || '');
+            var ov = (typeof pathBOverlays !== 'undefined' && Array.isArray(pathBOverlays)) ? pathBOverlays : [];
+            sk = LWW._resolveKey(sk, consumer, ov, (typeof rawData !== 'undefined' ? rawData : [])) || '';
+          } else { sk = ''; }
+        }
+        if (!sk || typeof findShiftByKey !== 'function' || !findShiftByKey(sk)) return;  // must be a real master row
+        seen[id] = 1;
+        out.push({ slotKey: sk, legs: a.legs, actionId: id });
+      }
+      try {
+        OverlayManager.load();
+        var own = (OverlayManager._data && OverlayManager._data[mid] && OverlayManager._data[mid].actions) || [];
+        own.forEach(consider);
+      } catch (e) {}
+      try {
+        (typeof pathBOverlays !== 'undefined' && Array.isArray(pathBOverlays) ? pathBOverlays : []).forEach(consider);
+      } catch (e) {}
+      return out;
+    }
+    function _relayExpand(rows, mid) {
+      if (!window._relayEnabled || !Array.isArray(rows)) return rows;
+      var relays = _relayGather(mid);
+      if (!relays.length) return rows;
+      var bySlot = {}, actIds = {};
+      relays.forEach(function(r) { bySlot[r.slotKey] = r; actIds[r.actionId] = 1; });
+      var out = [];
+      rows.forEach(function(r) {
+        if (!r) return;
+        // drop the plain whole-shift ghost of a relayed action — leg-rows replace it
+        if (r._ghost && r._ghostActionId && actIds[r._ghostActionId]) return;
+        var key = r._ghost ? null : (typeof makeShiftKey === 'function' ? makeShiftKey(r) : null);
+        var rel = key ? bySlot[key] : null;
+        if (rel) {
+          rel.legs.forEach(function(leg, i) {
+            var lr = Object.assign({}, r);
+            lr.name = leg.owner;
+            lr.range = String(leg.start || '') + '-' + String(leg.end || '');
+            lr._relayLeg = { i: i + 1, of: rel.legs.length, actionId: rel.actionId, from: r.name };
+            lr._ghost = undefined; lr._ghostKey = undefined;   // a leg is a first-class row, not a ghost
+            out.push(lr);
+          });
+        } else {
+          out.push(r);
+        }
+      });
+      return out;
+    }
+
     function getEffectiveData() {
       try {
         const mid = getCurrentMonthId();
@@ -2865,7 +2929,7 @@ window.allPharmacistNames = [];
             } catch(e) {}
           });
         }
-        return (rawData || []).concat(ghosts);
+        return _relayExpand((rawData || []).concat(ghosts), mid);
       } catch(err) {
         v10ShowError('getEffectiveData', err);
         return rawData || [];
@@ -7578,6 +7642,8 @@ window.allPharmacistNames = [];
         } else {
           displayFormat = "-";
         }
+        // v3.45 relay: tag a leg-row with its ไม้ number (ส่งไม้ต่อเวลา)
+        if (i._relayLeg) displayFormat = '<span class="relay-leg-tag">ไม้ ' + i._relayLeg.i + '</span>' + displayFormat;
 
         let _suffix = '';
         let _overlayActionId = null;
