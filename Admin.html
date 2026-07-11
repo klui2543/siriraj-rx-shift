@@ -497,5 +497,18 @@
         .cancelScheduledHotPolling();
     }
   </script>
+
+  <!-- 🔖 Version badge — เลขเวอร์ชันมุมล่างขวา (กดดูรายละเอียดที่ ?action=version) -->
+  <a id="_verBadge" href="<?= getScriptUrl() ?>?action=version" target="_top"
+     title="ดูรายละเอียดเวอร์ชัน / เวลาอัปเดตล่าสุด"><?= SYNC_STAMP().version ?></a>
+  <style>
+    #_verBadge{position:fixed;right:10px;bottom:8px;z-index:99999;
+      font-family:"Kanit",Tahoma,Arial,sans-serif;font-size:11px;color:#94a3b8;
+      background:rgba(255,255,255,.78);border:1px solid rgba(148,163,184,.35);
+      border-radius:20px;padding:3px 10px;text-decoration:none;line-height:1.4;
+      box-shadow:0 1px 4px rgba(0,0,0,.08);opacity:.6;transition:opacity .2s,color .2s;}
+    #_verBadge:hover{opacity:1;color:#1e3a8a;}
+    @media print{#_verBadge{display:none;}}
+  </style>
 </body>
 </html>

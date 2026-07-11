@@ -16,10 +16,11 @@
  */
 function SYNC_STAMP() {
   return {
-    topic:   'auto-push ปั๊มเวลา push จริง + หน้า ?action=version ดู stamp ในเว็บ',
-    updated: '2026-07-11 15:55 +0700',
+    version: 'v3.45',   // ← เลขเวอร์ชัน (bump เองตอนออกรุ่นใหม่) แสดงที่ footer เว็บ
+    topic:   'version badge ที่ footer เว็บ (Index/Admin) + หน้า ?action=version',
+    updated: '2026-07-11 16:20 +0700',
     branch:  'main',
-    based_on_commit: 'd5cd982',
+    based_on_commit: 'a6af1ca',
     note:    'เวลา updated ถูกปั๊มอัตโนมัติเป็นเวลา push จริงตอนขึ้น GAS'
   };
 }
@@ -65,6 +66,7 @@ function renderSyncStampPage() {
     '<h1>เวอร์ชันระบบที่กำลังรันบน GAS</h1>' +
     '<p class="sub">เทียบกับหัวข้อที่คุยกันในแชท เพื่อยืนยันว่าเป็นเวอร์ชันล่าสุด</p>' +
     '<div class="topic">📌 ' + esc(s.topic) + '</div>' +
+    row('🏷️ เวอร์ชัน', s.version) +
     row('⏱️ เวลา push จริง', s.updated) +
     row('🌿 กิ่ง (branch)', s.branch) +
     row('🔗 commit', s.based_on_commit) +
