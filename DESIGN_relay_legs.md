@@ -46,14 +46,14 @@ expanded/rendered — the action is a plain whole-shift transfer. Mirrors the ex
         relay entry UI in `swfOpenConfirm` (give only); `_relayCollect` validates →
         `_relaySaveLegs` persists `action.legs=[{owner,start,end}]`. 25-check `relay_harness`.
         Helpers: `_relayRangeParts/_relayMin/_relayFmt/_relayMid/_relayRenderLegs/_relayInit`.
-  - 1b. ⏳ NEXT — `_relayExpand(effData, monthId)` — fan a legged master row into leg-rows;
-        suppress the whole-shift ghost for that action. Wire into `getEffectiveData` behind
-        flag. Key primary-file anchors (re-grep, they shift): `getEffectiveData`,
-        `buildGhostRows`/`_lwwBackedGhosts` (copy range verbatim — the seam), `renderTable`.
-        A leg-row = `{...master, name:leg.owner, range:leg.start+'-'+leg.end, _leg:{actionId,i,of}}`.
-        Legged actions must be READ from OverlayManager (own draft) + PBOverlays (published).
-  - 1c. table (`renderTable`) + calendar (`renderCalendar`) + banner count (`renderBanner`)
-        show leg-rows (they already iterate row-by-row / read `range`).
+  - 1b. ✅ DONE (`75bf3ee`). `_relayGather(mid)` (legged give/add from OverlayManager +
+        pathBOverlays → slotKey, dedup) + `_relayExpand(rows, mid)` (replace matching master
+        row with per-leg rows `{...master, name:leg.owner, range:leg.start+'-'+leg.end,
+        _relayLeg:{i,of,actionId,from}}`; drop the whole-shift ghost of that action). Wired
+        into `getEffectiveData` return → table + calendar both split. `renderTable` adds a
+        'ไม้ N' chip (`.relay-leg-tag`). 24-check `relay1b_harness` (Sonnet).
+  - 1c. ⏳ `renderBanner` count still tallies WHOLE shifts (its own path, not getEffectiveData)
+        — the giver's kept leg isn't recounted. Fix count semantics here.
 - **Stage 2 — time-awareness:** conflict/overlap excludes sibling legs of one shift
   (`shiftToMinutes`/`checkShiftConflict`/`detectClientOverlaps`); decide count semantics.
 - **Stage 3 — the rest:** export (PDF portrait/landscape, ICS `parseRangeToMinutes`,

@@ -5944,6 +5944,7 @@ window.allPharmacistNames = [];
         if (legs && legs.length) a.legs = legs; else delete a.legs;
         OverlayManager.save();
         if (typeof invalidateGhostCache === 'function') invalidateGhostCache();
+        if (typeof triggerUpdate === 'function') triggerUpdate();   // re-render so the split legs show
       } catch (e) { console.warn('[relay] save legs failed', e); }
     }
 
