@@ -12,3 +12,8 @@
 !*.js
 !*.gs
 !*.html
+
+# 3) กันไฟล์ Node build tooling (บรรทัดแรกเป็น shebang #!/usr/bin/env node →
+#    GAS parse ไม่ได้ "Unexpected token ILLEGAL" → clasp push พังทั้งชุด)
+#    ต้องอยู่หลัง !*.js เพราะ pattern ทีหลังชนะ (gitignore semantics)
+generate-index.js
