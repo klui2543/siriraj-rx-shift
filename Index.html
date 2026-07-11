@@ -12292,11 +12292,19 @@ table.exp-tbl .tm{margin-left:3px;opacity:0.75;}
       const isCustom = sel.value === '__custom__';
       customInput.style.display = isCustom ? 'block' : 'none';
       hint.style.display = isCustom ? 'block' : 'none';
+      const chk = document.getElementById('phxRegCustomChk');   // v3.45: keep the checkbox in sync
+      if (chk) chk.checked = isCustom;
       if (isCustom) {
         setTimeout(function() { customInput.focus(); }, 50);
       } else {
         customInput.value = '';
       }
+    }
+    // v3.45: checkbox under the name dropdown → toggle the free-text ("__custom__") path.
+    function phxRegToggleCustom(chk) {
+      const sel = document.getElementById('phxRegNameSelect');
+      if (sel) sel.value = chk.checked ? '__custom__' : '';
+      phxOnRegNameChange();
     }
 
     function phxShowFormMsg(msg, isSuccess) {
@@ -14894,6 +14902,10 @@ table.exp-tbl .tm{margin-left:3px;opacity:0.75;}
         <select id="phxRegNameSelect" class="phx-select" onchange="phxOnRegNameChange()">
           <option value="">เลือกชื่อของท่าน</option>
         </select>
+        <!-- v3.45: clearer free-text trigger — a checkbox under the dropdown (reuses __custom__) -->
+        <label style="display:flex; align-items:center; gap:8px; font-size:12px; color:var(--text); cursor:pointer; margin:8px 0 2px;">
+          <input type="checkbox" id="phxRegCustomChk" onchange="phxRegToggleCustom(this)" style="width:15px; height:15px; flex:none;"> ไม่มีชื่อในรายการ — พิมพ์ชื่อเอง
+        </label>
         <!-- v3.19: Custom name input (revealed when "ไม่พบชื่อ" selected) -->
         <input type="text" id="phxRegCustomName" class="phx-input" placeholder="ชื่อและนามสกุล เช่น สมศรี ใจดี" style="display:none; margin-top:6px;" autocomplete="off">
         <div id="phxRegCustomHint" style="display:none; font-size:10px; color:var(--sub); margin:4px 0 8px; line-height:1.5;">
