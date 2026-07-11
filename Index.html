@@ -911,6 +911,23 @@
       color: #dc2626; text-decoration: underline; cursor: pointer; background: none; border: none;
       font-family: inherit; width: 100%;
     }
+    .swf-pend-item {
+      display: flex; align-items: center; gap: 9px; background: var(--bg);
+      border: 1px solid var(--border); border-radius: 10px; padding: 9px 11px; margin: 8px 0;
+    }
+    .swf-pend-main { flex: 1; min-width: 0; }
+    .swf-pend-t { font-size: 13px; font-weight: 600; }
+    .swf-pend-s { font-size: 11px; color: var(--sub); margin-top: 1px; }
+    .swf-pend-go {
+      font-size: 12px; font-weight: 600; color: var(--accent); background: var(--accent-bg);
+      border: 1px solid var(--accent-border); border-radius: 7px; padding: 5px 11px;
+      cursor: pointer; white-space: nowrap; font-family: inherit;
+    }
+    .swf-draft-tag {
+      font-size: 9.5px; font-weight: 700; color: #b45309; background: #fef3c7;
+      border-radius: 5px; padding: 2px 6px; margin-left: 4px;
+    }
+    body.dark-theme .swf-draft-tag { color: #fcd34d; background: #3a2408; }
 
     /* Ghost row (received from swap or add) */
     .shift-ghost-received td:first-child { border-left: 3px solid #22c55e; }
@@ -3886,6 +3903,13 @@ window.allPharmacistNames = [];
       }
       editModeActive = !editModeActive;
       document.body.classList.toggle('edit-mode-on', editModeActive);
+      // v3.45: entering edit mode with unpublished drafts → remind (ทำต่อ / เผยแพร่ทั้งหมด).
+      //   Delayed so the repaint (which may auto-disable edit mode for non-owners) runs first.
+      if (editModeActive) {
+        setTimeout(function() {
+          if (editModeActive && typeof swfShowPendingDrafts === 'function') swfShowPendingDrafts();
+        }, 150);
+      }
       triggerUpdate();
     }
 
@@ -5615,6 +5639,75 @@ window.allPharmacistNames = [];
         OverlayManager.removeAction(mid, action.id);
         if (typeof triggerUpdate === 'function') triggerUpdate();
         if (typeof _p2bShowToast === 'function') _p2bShowToast('ทิ้งร่างแล้ว', 'ok');
+      });
+    }
+
+    // v3.45: pending-drafts reminder — entering edit mode with unpublished drafts
+    //   → "มีรายการค้างอยู่ ทำต่อไหม?" (ทำต่อ › opens the confirm dialog / เผยแพร่ทั้งหมด / ไว้ก่อน)
+    function _swfPendingClose() { var e = document.getElementById('swfPendingOverlay'); if (e) e.remove(); }
+    function _swfActionShifts(act) {
+      var viewer = act.viewerName || getCurrentUser() || '';
+      if (act.action === 'swap') return { my: _swfResolveShift(act.shiftKey, viewer), tgt: _swfResolveShift(act.partnerShiftKey, viewer) };
+      if (act.action === 'give') return { my: _swfResolveShift(act.shiftKey, viewer), tgt: null };
+      return { my: null, tgt: _swfResolveShift(act.shiftKey, act.partnerName || '') };
+    }
+    function swfShowPendingDrafts() {
+      var bound = (typeof _pbGetLoggedInName === 'function') ? _pbGetLoggedInName() : null;
+      if (!bound) return;                       // publishing needs a logged-in identity
+      var mid = getCurrentMonthId();
+      if (!mid) return;
+      var acts = OverlayManager.getActions(mid, bound) || [];
+      // one entry per connected chain (same collapsing rule as the publish modal)
+      var reps = (typeof _pbChainReps === 'function')
+        ? _pbChainReps(mid, acts)
+        : acts.map(function(a) { return { rep: a, size: 1 }; });
+      var drafts = reps.filter(function(r) { return r.rep && r.rep._visibility === 'draft'; });
+      if (!drafts.length) return;
+      _swfPendingClose();
+      var items = '';
+      drafts.forEach(function(r) {
+        var a = r.rep;
+        var sh = _swfActionShifts(a);
+        var main = sh.my || sh.tgt;
+        var sub = main
+          ? (_pbEsc(main.date || '') + (main.shift ? ' · ' + _pbEsc(main.shift) : '') + (main.range && main.range !== '-' ? ' ' + _pbEsc(main.range) : ''))
+          : '';
+        var chainHint = r.size > 1 ? ' · เชน ' + r.size + ' ขั้น' : '';
+        items += '<div class="swf-pend-item">' +
+          '<div class="swf-pend-main">' +
+          '<div class="swf-pend-t">' + _swfSummaryHtml(a, a.viewerName || bound, sh.my, sh.tgt) + '<span class="swf-draft-tag">ร่าง</span></div>' +
+          (sub ? '<div class="swf-pend-s">' + sub + chainHint + '</div>' : '') +
+          '</div>' +
+          '<button type="button" class="swf-pend-go" data-swf-continue="' + a.id + '">ทำต่อ ›</button>' +
+          '</div>';
+      });
+      var ov = document.createElement('div');
+      ov.id = 'swfPendingOverlay';
+      ov.style.cssText = 'position:fixed; inset:0; background:rgba(0,0,0,0.5); z-index:10005; display:flex; align-items:center; justify-content:center; padding:16px;';
+      ov.innerHTML = '<div style="background:var(--surface); width:100%; max-width:440px; max-height:80vh; overflow-y:auto; border-radius:16px; padding:18px; font-family:inherit;">' +
+        '<div style="display:flex; align-items:center; gap:7px;"><div style="font-weight:700; font-size:16px;">📝 มีรายการค้างอยู่</div>' +
+        '<button type="button" id="swfPendX" style="margin-left:auto; border:none; background:none; color:var(--sub); font-size:18px; cursor:pointer;">✕</button></div>' +
+        '<div style="font-size:12px; color:var(--sub); margin:3px 0 8px;">คุณมีเวรที่ยัง<b>ไม่ได้เผยแพร่</b> ' + drafts.length + ' รายการ ทำต่อไหม?</div>' +
+        items +
+        '<div class="swf-btns">' +
+        '<button type="button" id="swfPendLater" class="swf-btn">ไว้ก่อน</button>' +
+        '<button type="button" id="swfPendAll" class="swf-btn swf-primary">เผยแพร่ทั้งหมด</button>' +
+        '</div></div>';
+      document.body.appendChild(ov);
+      ov.addEventListener('click', function(e) { if (e.target === ov) _swfPendingClose(); });
+      document.getElementById('swfPendX').addEventListener('click', _swfPendingClose);
+      document.getElementById('swfPendLater').addEventListener('click', _swfPendingClose);
+      document.getElementById('swfPendAll').addEventListener('click', function() {
+        _swfPendingClose();
+        _pbPublishAllDrafts(mid);
+      });
+      Array.prototype.forEach.call(ov.querySelectorAll('[data-swf-continue]'), function(btn) {
+        btn.addEventListener('click', function() {
+          var id = btn.getAttribute('data-swf-continue');
+          var act = (OverlayManager.getActions(mid, bound) || []).find(function(x) { return x.id === id; });
+          _swfPendingClose();
+          if (act) swfOpenConfirm(mid, act);
+        });
       });
     }
 
