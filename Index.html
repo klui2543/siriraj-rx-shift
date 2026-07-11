@@ -3232,7 +3232,13 @@ window.allPharmacistNames = [];
     function _pbPublishAllDrafts(mid) {
       var viewer = (typeof _pbGetLoggedInName === 'function') ? _pbGetLoggedInName() : null;
       if (!mid || !viewer) return;
-      var acts = OverlayManager.getActions(mid, viewer) || [];
+      // v3.45: include retro hops this login recorded for others (_retroBy) — same
+      //   widening as the pending-drafts popup, so "เผยแพร่ทั้งหมด" covers what it lists.
+      OverlayManager.load();
+      var _all = ((OverlayManager._data && OverlayManager._data[mid]) || {}).actions || [];
+      var acts = _all.filter(function(a) {
+        return a && (String(a.viewerName || '') === String(viewer) || String(a._retroBy || '') === String(viewer));
+      });
       var seen = {};
       acts.filter(function(a) { return a._visibility === 'draft'; }).forEach(function(a) {
         _collectConnectedChain(mid, a.id).forEach(function(x) {
@@ -4525,7 +4531,7 @@ window.allPharmacistNames = [];
         html += '</div>';
         html += '<div style="color:#6b7280; font-size:11px; margin-bottom:10px;">' +
                 'บันทึกเป็น <b>ร่าง (ส่วนตัว)</b> ก่อน — เห็นแค่คุณ (ขีดเส้นประ) ' +
-                'จนกว่าจะกด <b>🌐 เผยแพร่</b> ในตารางหรือไทม์ไลน์ ทุกขั้นติดสัญลักษณ์ 🔄' +
+                'เผยแพร่ได้จากป๊อปอัพ<b>รายการค้าง</b>ตอนกดดินสอ ทุกขั้นติดสัญลักษณ์ 🔄' +
                 (retroState.override ? '<br>🔒 ปักหมุด <b>' + retroState.chain[retroState.chain.length - 1] + '</b> เป็นผู้ถือปัจจุบัน (ข้ามช่วงที่ไม่ทราบ)' : '') +
                 '</div>';
         html += '<div style="display:flex; gap:8px;">';
@@ -4672,7 +4678,7 @@ window.allPharmacistNames = [];
         if (typeof _applyRetroMirror === 'function') _applyRetroMirror();
         else if (typeof invalidateGhostCache === 'function') invalidateGhostCache();
         if (typeof _p2bShowToast === 'function') {
-          _p2bShowToast('บันทึก ' + hopsWritten + ' ขั้น (ร่าง 🔄) — กด 🌐 เพื่อเผยแพร่', 'ok');
+          _p2bShowToast('บันทึก ' + hopsWritten + ' ขั้น (ร่าง 🔄) — เผยแพร่ได้จากป๊อปอัพรายการค้าง', 'ok');
         }
         closeRetroModal();
         if (typeof triggerUpdate === 'function') triggerUpdate();
@@ -5463,10 +5469,17 @@ window.allPharmacistNames = [];
 
     function confirmUndo() {
       const mid = getCurrentMonthId();
-      if (actionState.usedInfo && actionState.usedInfo.actionId) {
-        OverlayManager.removeAction(mid, actionState.usedInfo.actionId);
-      }
+      const aid = actionState.usedInfo && actionState.usedInfo.actionId;
       closeActionModal();
+      if (!aid) { triggerUpdate(); return; }
+      // v3.45: undo is DRAFT-only. A published record must go through the cancel
+      //   flow (reason + password → permanent audit) — no silent revert of a
+      //   public transaction (chain safety + no cheating).
+      if (typeof _isActionDraft === 'function' && !_isActionDraft(aid)) {
+        if (typeof swfCancelPublished === 'function') swfCancelPublished(mid, aid);
+        return;
+      }
+      OverlayManager.removeAction(mid, aid);
       triggerUpdate();
     }
 
@@ -5693,7 +5706,14 @@ window.allPharmacistNames = [];
       if (!bound) return;                       // publishing needs a logged-in identity
       var mid = getCurrentMonthId();
       if (!mid) return;
-      var acts = OverlayManager.getActions(mid, bound) || [];
+      // Own actions + retro hops THIS login recorded for others (_retroBy) — retro chains
+      //   live under historical actors' viewerNames so getActions(bound) alone misses them
+      //   (and since the inline 🌐 was removed they'd otherwise have no publish surface).
+      OverlayManager.load();
+      var _all = ((OverlayManager._data && OverlayManager._data[mid]) || {}).actions || [];
+      var acts = _all.filter(function(a) {
+        return a && (String(a.viewerName || '') === String(bound) || String(a._retroBy || '') === String(bound));
+      });
       // one entry per connected chain (same collapsing rule as the publish modal)
       var reps = (typeof _pbChainReps === 'function')
         ? _pbChainReps(mid, acts)
@@ -5741,7 +5761,7 @@ window.allPharmacistNames = [];
       Array.prototype.forEach.call(ov.querySelectorAll('[data-swf-continue]'), function(btn) {
         btn.addEventListener('click', function() {
           var id = btn.getAttribute('data-swf-continue');
-          var act = (OverlayManager.getActions(mid, bound) || []).find(function(x) { return x.id === id; });
+          var act = acts.find(function(x) { return x.id === id; });
           _swfPendingClose();
           if (act) swfOpenConfirm(mid, act);
         });
@@ -13217,7 +13237,10 @@ table.exp-tbl .tm{margin-left:3px;opacity:0.75;}
         const viewer = (typeof getCurrentUser === 'function') ? getCurrentUser() : null;
         if (!mid || !viewer || typeof OverlayManager === 'undefined') return false;
         const actions = OverlayManager.getActions(mid, viewer) || [];
-        return actions.length > 0;
+        // v3.45: undo is DRAFT-only — a published tail disables the button.
+        //   Published records revert via the cancel flow (reason + password).
+        if (actions.length === 0) return false;
+        return actions[actions.length - 1]._visibility === 'draft';
       } catch(e) { return false; }
     }
 
@@ -13263,10 +13286,8 @@ table.exp-tbl .tm{margin-left:3px;opacity:0.75;}
           const u = (typeof phxAuthGetUser === 'function') ? phxAuthGetUser() : null;
           const willSync = !!(u && u.name === target);
           if (floppyBtn) floppyBtn.style.display = willSync ? 'none' : 'flex';
-          // v3.44: publish button — only useful when logged in (draft/publish needs identity)
-          const publishBtn = document.getElementById('phxFabPublish');
-          const bound = (typeof _pbGetLoggedInName === 'function') ? _pbGetLoggedInName() : null;
-          if (publishBtn) publishBtn.style.display = bound ? 'flex' : 'none';
+          // v3.45: 🌐 publish button removed — publish lives in the transaction
+          //   confirm dialog + pending-drafts popup now.
         } else {
           // Edit mode off — show just pencil
           fab.style.display = 'flex';
@@ -13285,6 +13306,12 @@ table.exp-tbl .tm{margin-left:3px;opacity:0.75;}
         const actions = OverlayManager.getActions(mid, viewer) || [];
         if (actions.length === 0) return;
         const last = actions[actions.length - 1];
+        // v3.45: undo is DRAFT-only — never silently revert a published record
+        //   (breaks chains + bypasses the reason/password cancel flow).
+        if (last._visibility !== 'draft') {
+          if (typeof _p2bShowToast === 'function') _p2bShowToast('รายการล่าสุดเผยแพร่แล้ว — ยกเลิกได้จากประวัติ (✕) เท่านั้น', 'warn');
+          return;
+        }
         const snapshot = JSON.parse(JSON.stringify(last));
         OverlayManager.removeAction(mid, last.id);
         phxRedoStack.push({ monthId: mid, action: snapshot });
@@ -14420,10 +14447,8 @@ table.exp-tbl .tm{margin-left:3px;opacity:0.75;}
     <button id="phxFabFloppy" class="phx-fab-action phx-fab-floppy" onclick="phxSaveAndConfirm()" style="display:none;" title="บันทึก local">
       <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 21H5a2 2 0 01-2-2V5a2 2 0 012-2h11l5 5v11a2 2 0 01-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg>
     </button>
-    <!-- v3.44: publish center — open the "🌐 เผยแพร่" modal (replaces the old offline-chain button) -->
-    <button id="phxFabPublish" class="phx-fab-action" onclick="openPublishModal()" style="display:none;" title="เผยแพร่เวร">
-      <span style="font-size:16px; line-height:1;">🌐</span>
-    </button>
+    <!-- v3.45: 🌐 publish button removed — publishing now happens in the transaction
+         confirm dialog ("เสร็จสิ้น·เผยแพร่") and the pending-drafts popup. -->
     <button class="phx-fab-done" onclick="toggleEditMode()" title="ออกจากโหมดแก้ไข">
       <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
       เสร็จสิ้น
