@@ -212,6 +212,30 @@ function phxLogin(rawName, password) {
 
 
 // ════════════════════════════════════════════════════════════
+// 🌐 Public: Verify password only (v3.45)
+//   Identity re-check for destructive actions (e.g. cancelling a PUBLISHED
+//   swap/give) — proves the logged-in session's owner typed their password.
+//   Read-only: no session created, no lastSeen update, no state change.
+// ════════════════════════════════════════════════════════════
+function phxVerifyPassword(rawName, password) {
+  try {
+    const name = String(rawName || '').trim();
+    const pw = String(password || '');
+    if (!name || !pw) return { success: false, valid: false, error: 'กรุณาใส่ชื่อและรหัสผ่าน' };
+
+    const row = _phxFindPharmacistRow(name);
+    if (!row) return { success: true, valid: false, error: 'ไม่พบชื่อนี้ในระบบ' };
+
+    const valid = _phxHashPassword(name, pw) === row.passwordHash;
+    return { success: true, valid: valid, error: valid ? null : 'รหัสผ่านไม่ถูกต้อง' };
+  } catch (e) {
+    console.error('phxVerifyPassword error: ' + e.message);
+    return { success: false, valid: false, error: 'เกิดข้อผิดพลาด: ' + e.message };
+  }
+}
+
+
+// ════════════════════════════════════════════════════════════
 // 🌐 doGet handler — render verify success/error HTML page
 // ════════════════════════════════════════════════════════════
 function _phxHandleVerifyRoute(e) {

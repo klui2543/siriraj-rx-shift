@@ -928,6 +928,27 @@
       border-radius: 5px; padding: 2px 6px; margin-left: 4px;
     }
     body.dark-theme .swf-draft-tag { color: #fcd34d; background: #3a2408; }
+    .swf-warn-note {
+      display: flex; gap: 8px; background: #fef2f2; border: 1px solid #fee2e2;
+      border-radius: 9px; padding: 10px 12px; margin: 13px 0;
+      font-size: 12px; color: #991b1b; line-height: 1.55;
+    }
+    body.dark-theme .swf-warn-note { background: #450a0a; border-color: #7f1d1d; color: #fca5a5; }
+    .swf-field-label { font-size: 12px; color: var(--sub); margin: 13px 2px 6px; font-weight: 600; }
+    .swf-choice {
+      display: flex; align-items: center; gap: 10px; padding: 11px 12px;
+      border: 1px solid var(--border); border-radius: 9px; margin-bottom: 7px;
+      cursor: pointer; font-size: 13.5px; color: var(--text);
+    }
+    .swf-choice:hover { background: var(--bg); }
+    .swf-choice input { width: 17px; height: 17px; accent-color: var(--accent); flex: 0 0 auto; }
+    .swf-choice.sel { border-color: var(--accent); background: var(--accent-bg); }
+    .swf-input {
+      width: 100%; padding: 10px 12px; border: 1px solid var(--border); border-radius: 8px;
+      background: var(--surface); color: var(--text); font-family: inherit; font-size: 15px;
+      box-sizing: border-box;
+    }
+    .swf-btn.swf-danger { background: #dc2626; border-color: #dc2626; color: #fff; }
 
     /* Ghost row (received from swap or add) */
     .shift-ghost-received td:first-child { border-left: 3px solid #22c55e; }
@@ -3374,6 +3395,15 @@ window.allPharmacistNames = [];
       if (typeof triggerUpdate === 'function') triggerUpdate();
       if (typeof _p2bShowToast === 'function') _p2bShowToast('เอาขั้นล่าสุดออกแล้ว', 'ok');
     }, true);
+    // v3.45: ✕ on a PUBLISHED tail → cancel with reason + password (audited).
+    document.addEventListener('click', function(e) {
+      var btn = (e.target && e.target.closest) ? e.target.closest('[data-tl-cancelpub]') : null;
+      if (!btn) return;
+      e.stopPropagation();
+      var mid = btn.getAttribute('data-tl-mid');
+      var id = btn.getAttribute('data-tl-cancelpub');
+      if (mid && id && typeof swfCancelPublished === 'function') swfCancelPublished(mid, id);
+    }, true);
     // v3.44: Admin ✎ on ANOTHER user's timeline hop → override the counterpart (B) as that owner.
     document.addEventListener('click', function(e) {
       var btn = (e.target && e.target.closest) ? e.target.closest('[data-tl-pbedit]') : null;
@@ -4144,6 +4174,13 @@ window.allPharmacistNames = [];
           //   (idx === last) is removable — deleting a middle hop would orphan its children.
           if (idx === chain.length - 1 && act._visibility === 'draft') {
             desc += ' <span class="tl-remove-hop" data-tl-remove="' + act.id + '" data-tl-mid="' + monthId + '" title="เอาขั้นล่าสุดนี้ออก (กลับไปขั้นก่อนหน้า)" role="button" aria-label="เอาขั้นล่าสุดออก">✕</span>';
+          } else if (idx === chain.length - 1 && act._visibility !== 'draft') {
+            // v3.45: cancel a PUBLISHED tail — reason + password, audited (swfCancelPublished).
+            //   Author only (this builder renders the author's own chain).
+            const _bnd = (typeof _pbGetLoggedInName === 'function') ? _pbGetLoggedInName() : null;
+            if (_bnd && String(act.viewerName || '') === String(_bnd)) {
+              desc += ' <span class="tl-remove-hop" data-tl-cancelpub="' + act.id + '" data-tl-mid="' + monthId + '" title="ยกเลิกรายการที่เผยแพร่แล้ว (ต้องระบุเหตุผล + รหัสผ่าน)" role="button" aria-label="ยกเลิกรายการนี้">✕</span>';
+            }
           }
           const tsStr = act.createdAt ? new Date(act.createdAt).toLocaleString('th-TH', {dateStyle:'short', timeStyle:'short'}) : '';
           if (tsStr) desc += ' <span class="tl-inline-ts">· ' + tsStr + '</span>';
@@ -5709,6 +5746,109 @@ window.allPharmacistNames = [];
           if (act) swfOpenConfirm(mid, act);
         });
       });
+    }
+
+    // ═══════════════════════════════════════════════════════════
+    // v3.45: cancel a PUBLISHED tail hop — reason (radio) + password.
+    //   Only the chain TAIL can be cancelled (a child hop would orphan) and only
+    //   by the record's author (identity re-checked server-side via
+    //   phxVerifyPassword). The reason is written to the permanent audit trail
+    //   (phxAuditLog 'cancel_published') BEFORE the record is removed.
+    // ═══════════════════════════════════════════════════════════
+    var _SWF_CANCEL_REASONS = ['ตกลงกันใหม่ / เปลี่ยนใจ', 'เลือกคน หรือ เวรผิด', 'อีกฝ่ายไม่รับแล้ว'];
+    function _swfCancelClose() { var e = document.getElementById('swfCancelOverlay'); if (e) e.remove(); }
+    function swfCancelPublished(mid, actionId) {
+      var u = (typeof phxAuthGetUser === 'function') ? phxAuthGetUser() : null;
+      if (!u || !u.name || !u.hash) {
+        if (typeof _p2bShowToast === 'function') _p2bShowToast('ต้อง login ก่อนยกเลิก', 'warn');
+        return;
+      }
+      var acts = OverlayManager.getActions(mid, u.name) || [];
+      var act = acts.find(function(x) { return x.id === actionId; });
+      if (!act) { if (typeof _p2bShowToast === 'function') _p2bShowToast('ไม่พบรายการ', 'warn'); return; }
+      // tail-only guard — cancelling a hop that feeds a later hop would break the chain
+      var hasChild = acts.some(function(x) { return x && x.shiftKey === '_g_' + actionId; });
+      if (hasChild) {
+        if (typeof _p2bShowToast === 'function') _p2bShowToast('ยกเลิกได้เฉพาะขั้นล่าสุดของเชน', 'warn');
+        return;
+      }
+      _swfCancelClose();
+      var sh = _swfActionShifts(act);
+      var choices = '';
+      _SWF_CANCEL_REASONS.forEach(function(r, i) {
+        choices += '<label class="swf-choice"><input type="radio" name="swfRz" value="' + i + '"> ' + _pbEsc(r) + '</label>';
+      });
+      choices += '<label class="swf-choice"><input type="radio" name="swfRz" value="other"> อื่นๆ (ระบุเอง)</label>';
+      var ov = document.createElement('div');
+      ov.id = 'swfCancelOverlay';
+      ov.style.cssText = 'position:fixed; inset:0; background:rgba(0,0,0,0.55); z-index:10006; display:flex; align-items:center; justify-content:center; padding:16px;';
+      ov.innerHTML = '<div style="background:var(--surface); width:100%; max-width:440px; max-height:88vh; overflow-y:auto; border-radius:16px; padding:18px; font-family:inherit;">' +
+        '<div style="display:flex; align-items:center; gap:7px;"><div style="font-weight:700; font-size:16px;">⚠️ ยกเลิกรายการนี้</div>' +
+        '<button type="button" id="swfCanX" style="margin-left:auto; border:none; background:none; color:var(--sub); font-size:18px; cursor:pointer;">✕</button></div>' +
+        '<div style="font-size:12px; color:var(--sub); margin:3px 0 10px;">รายการนี้เผยแพร่แล้ว — การยกเลิกต้องระบุเหตุผลและยืนยันตัวตน</div>' +
+        '<div class="swf-summary">' + _swfSummaryHtml(act, act.viewerName || u.name, sh.my, sh.tgt) + '</div>' +
+        '<div class="swf-warn-note">↩️ <div>ยกเลิกแล้วเวรจะ<b>คืนกลับสถานะก่อนหน้า</b> และถูกบันทึกใน<b>ประวัติถาวร</b> ว่าใครยกเลิก เมื่อไหร่ เพราะอะไร</div></div>' +
+        '<div class="swf-field-label">เหตุผลในการยกเลิก (จำเป็น)</div>' +
+        '<div id="swfRzChoices">' + choices + '</div>' +
+        '<textarea id="swfRzOther" class="swf-input" rows="2" placeholder="ระบุเหตุผล…" style="display:none; margin-top:4px; resize:vertical;"></textarea>' +
+        '<div class="swf-field-label">รหัสผ่านของคุณ (ยืนยันตัวตน)</div>' +
+        '<input id="swfCanPw" class="swf-input" type="password" autocomplete="current-password" placeholder="••••••••">' +
+        '<div id="swfCanErr" style="color:#dc2626; font-size:12px; min-height:16px; margin:6px 2px 0;"></div>' +
+        '<div class="swf-btns">' +
+        '<button type="button" id="swfCanClose" class="swf-btn">ปิด</button>' +
+        '<button type="button" id="swfCanOk" class="swf-btn swf-danger">ยืนยันยกเลิก</button>' +
+        '</div></div>';
+      document.body.appendChild(ov);
+      ov.addEventListener('click', function(e) { if (e.target === ov) _swfCancelClose(); });
+      document.getElementById('swfCanX').addEventListener('click', _swfCancelClose);
+      document.getElementById('swfCanClose').addEventListener('click', _swfCancelClose);
+      // radio highlight + "อื่นๆ" reveals the free-text box
+      Array.prototype.forEach.call(ov.querySelectorAll('#swfRzChoices input'), function(r) {
+        r.addEventListener('change', function() {
+          Array.prototype.forEach.call(ov.querySelectorAll('#swfRzChoices .swf-choice'), function(c) {
+            c.classList.toggle('sel', c.querySelector('input').checked);
+          });
+          var isOther = r.value === 'other' && r.checked;
+          var box = document.getElementById('swfRzOther');
+          box.style.display = isOther ? 'block' : 'none';
+          if (isOther) setTimeout(function() { try { box.focus(); } catch (e) {} }, 40);
+        });
+      });
+      document.getElementById('swfCanOk').addEventListener('click', function() {
+        var errEl = document.getElementById('swfCanErr');
+        var sel = ov.querySelector('#swfRzChoices input:checked');
+        if (!sel) { errEl.textContent = 'กรุณาเลือกเหตุผลก่อน'; return; }
+        var reason = sel.value === 'other'
+          ? (document.getElementById('swfRzOther').value || '').trim()
+          : _SWF_CANCEL_REASONS[parseInt(sel.value, 10)];
+        if (!reason) { errEl.textContent = 'กรุณาระบุเหตุผล'; return; }
+        var pw = document.getElementById('swfCanPw').value || '';
+        if (!pw) { errEl.textContent = 'กรุณาใส่รหัสผ่าน'; return; }
+        var okBtn = this;
+        okBtn.disabled = true; okBtn.textContent = 'กำลังตรวจสอบ...'; errEl.textContent = '';
+        function fail(msg) {
+          okBtn.disabled = false; okBtn.textContent = 'ยืนยันยกเลิก';
+          errEl.textContent = msg || 'เกิดข้อผิดพลาด';
+        }
+        try {
+          google.script.run
+            .withSuccessHandler(function(res) {
+              if (!res || !res.success) return fail(res && res.error);
+              if (!res.valid) return fail(res.error || 'รหัสผ่านไม่ถูกต้อง');
+              // reason → permanent audit trail FIRST, then remove (local + server sync)
+              try { phxAuditLog('cancel_published', actionId, act, { reason: reason }, 'web'); } catch (e) {}
+              OverlayManager.removeAction(mid, actionId);
+              _swfCancelClose();
+              if (typeof _pbReconcile === 'function') _pbReconcile(mid);
+              if (typeof _p2bShowToast === 'function') _p2bShowToast('ยกเลิกแล้ว — บันทึกเหตุผลลงประวัติ', 'ok');
+            })
+            .withFailureHandler(function(err) { fail('เชื่อมต่อไม่ได้: ' + ((err && err.message) || err)); })
+            .phxVerifyPassword(u.name, pw);
+        } catch (e) {
+          fail('เชื่อมต่อ server ไม่ได้');
+        }
+      });
+      setTimeout(function() { try { document.getElementById('swfCanPw').focus(); } catch (e) {} }, 60);
     }
 
     // 🆕 PHASE 1: Auto-select user จาก URL param (?user=NAME)
