@@ -13,6 +13,17 @@ cd "$PROJECT_DIR" 2>/dev/null || exit 0
 command -v git >/dev/null 2>&1 || exit 0
 git rev-parse --is-inside-work-tree >/dev/null 2>&1 || exit 0
 
+# --- (optional) bootstrap clasp auth บน cloud จาก secret ---
+# ตั้งค่า env var ชื่อ CLASPRC_JSON (เนื้อหาไฟล์ ~/.clasprc.json) ใน Claude Code web
+# เพื่อให้ auto clasp push ทำงานได้จากมือถือ/ทุกที่ ไม่กระทบ PC (ที่ login อยู่แล้ว)
+if [ -n "${CLASPRC_JSON:-}" ] && [ ! -f "$HOME/.clasprc.json" ]; then
+  printf '%s' "$CLASPRC_JSON" > "$HOME/.clasprc.json" 2>/dev/null && chmod 600 "$HOME/.clasprc.json" 2>/dev/null || true
+  # ติดตั้ง clasp บน cloud ถ้ายังไม่มี (container จะถูก cache หลัง hook เสร็จ)
+  if [ -f "$HOME/.clasprc.json" ] && ! command -v clasp >/dev/null 2>&1 && [ ! -x node_modules/.bin/clasp ]; then
+    npm install -g @google/clasp >/dev/null 2>&1 || true
+  fi
+fi
+
 # ดึงข้อมูลล่าสุดจาก remote (ทนต่อกรณีไม่มีเน็ต)
 git fetch --quiet --all --prune 2>/dev/null || true
 
