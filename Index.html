@@ -513,6 +513,15 @@
     }
     .inline-pencil:hover { background: rgba(37, 99, 235, 0.28); transform: scale(1.15); }
     body.dark-theme .inline-pencil { color: #60a5fa; background: rgba(96, 165, 250, 0.18); }
+    /* v3.45: quick nickname pencil in the personal-summary banner */
+    .nk-quick-pencil {
+      display: inline-block; color: var(--accent); font-weight: 700;
+      font-size: 11px; vertical-align: baseline; cursor: pointer;
+      padding: 1px 6px; border-radius: 5px; background: rgba(37, 99, 235, 0.12);
+      transition: all 0.15s;
+    }
+    .nk-quick-pencil:hover { background: rgba(37, 99, 235, 0.28); transform: scale(1.1); }
+    body.dark-theme .nk-quick-pencil { color: #93c5fd; background: rgba(96, 165, 250, 0.18); }
     /* v3.43: inline "publish this draft" — sits where the pencil would, only on the author's own draft rows */
     .inline-publish {
       display: inline-block; margin-left: 4px; font-size: 11px; vertical-align: baseline;
@@ -3981,8 +3990,14 @@ window.allPharmacistNames = [];
         : '';
       // v3.10: anyone can toggle edit mode (login is for cloud sync, not edit permission)
       // v3.13: pencil + save moved to FAB (bottom-right) — banner stays clean
+      // v3.45: quick nickname pencil right after the name — self = public nickname,
+      //   other = my private alias. Only when logged in (saving needs identity).
+      var _nkMe = (typeof _nkMyName === 'function') ? _nkMyName() : '';
+      var _nkPencil = _nkMe
+        ? ' <span class="nk-quick-pencil" data-nk-quickedit="' + encodeURIComponent(target) + '" title="ตั้งชื่อเล่น" role="button" aria-label="ตั้งชื่อเล่น">✎</span>'
+        : '';
       notice.innerHTML =
-        '<b>' + displayName(target) + '</b> ปฏิบัติงานเดือนนี้: ' +
+        '<b>' + displayName(target) + '</b>' + _nkPencil + ' ปฏิบัติงานเดือนนี้: ' +
         '<span style="font-size:18px;font-weight:800;margin:0 4px;">' + total + '</span> เวร ' +
         ovlTag +
         '<button onclick="toggleSettingsPopup(event)" style="position:absolute;right:8px;top:50%;transform:translateY(-50%);background:none;border:1px solid transparent;border-radius:8px;cursor:pointer;padding:4px;color:var(--accent);opacity:0.7;" title="ตั้งค่า">' +
@@ -6119,6 +6134,68 @@ window.allPharmacistNames = [];
       if (!targetName) { if (cb) cb(new Error('ไม่พบชื่อ')); return; }
       _nkWrite('private', targetName, nickname, cb);
     }
+    // v3.45: quick nickname editor — opened from the ✎ after the name in the banner.
+    //   Viewing yourself → your PUBLIC nickname (everyone sees). Viewing someone else →
+    //   YOUR PRIVATE alias for them (only you see). Same write path as the full manager,
+    //   just fewer taps than digging through the user menu.
+    function _nkQuickClose() { var e = document.getElementById('nkQuickOverlay'); if (e) e.remove(); }
+    function nkQuickEdit(targetName) {
+      var me = (typeof _nkMyName === 'function') ? _nkMyName() : '';
+      if (!me) {
+        if (typeof _p2bShowToast === 'function') _p2bShowToast('ต้องเข้าสู่ระบบก่อนตั้งชื่อเล่น', 'warn');
+        return;
+      }
+      if (!targetName) return;
+      var isSelf = (String(targetName) === String(me));
+      var cur = isSelf
+        ? ((window._nkPublic && window._nkPublic[me]) || '')
+        : ((window._nkPrivate && window._nkPrivate[targetName]) || '');
+      _nkQuickClose();
+      var title = isSelf ? 'ตั้งชื่อเล่นของฉัน' : 'ตั้งชื่อเล่นให้ ' + _pbEsc(targetName);
+      var scope = isSelf ? 'ทุกคนจะเห็นชื่อเล่นนี้' : 'เห็นแค่คุณคนเดียว (ไม่กระทบชื่อจริง/การแลกเวร)';
+      var ov = document.createElement('div');
+      ov.id = 'nkQuickOverlay';
+      ov.style.cssText = 'position:fixed; inset:0; background:rgba(0,0,0,0.5); z-index:10007; display:flex; align-items:center; justify-content:center; padding:16px;';
+      ov.innerHTML = '<div style="background:var(--surface); width:100%; max-width:380px; border-radius:14px; padding:16px; font-family:inherit;">' +
+        '<div style="display:flex; align-items:center; gap:7px;"><div style="font-weight:700; font-size:15px;">🏷️ ' + title + '</div>' +
+        '<button type="button" id="nkQX" style="margin-left:auto; border:none; background:none; color:var(--sub); font-size:18px; cursor:pointer;">✕</button></div>' +
+        '<div style="font-size:11.5px; color:var(--sub); margin:3px 0 11px;">' + scope + '</div>' +
+        '<input id="nkQInput" class="nk-input" maxlength="40" placeholder="เช่น โต้ง" value="' + String(cur).replace(/"/g, '&quot;') + '" style="width:100%; box-sizing:border-box; padding:10px 12px; font-size:15px;">' +
+        '<div id="nkQMsg" class="nk-msg"></div>' +
+        '<div class="swf-btns" style="margin-top:12px;">' +
+        (cur ? '<button type="button" id="nkQClear" class="swf-btn">ล้างชื่อเล่น</button>' : '') +
+        '<button type="button" id="nkQSave" class="swf-btn swf-primary">บันทึก</button>' +
+        '</div></div>';
+      document.body.appendChild(ov);
+      ov.addEventListener('click', function(e) { if (e.target === ov) _nkQuickClose(); });
+      document.getElementById('nkQX').addEventListener('click', _nkQuickClose);
+      function _save(val) {
+        var msg = document.getElementById('nkQMsg');
+        if (msg) { msg.style.color = 'var(--muted)'; msg.textContent = 'กำลังบันทึก...'; }
+        function done(err) {
+          if (err) { if (msg) { msg.style.color = '#dc2626'; msg.textContent = (typeof _nkErrText === 'function') ? _nkErrText(err) : 'บันทึกไม่สำเร็จ'; } return; }
+          _nkQuickClose();
+          if (typeof _p2bShowToast === 'function') _p2bShowToast(val ? '✓ ตั้งชื่อเล่นแล้ว' : '✓ ล้างชื่อเล่นแล้ว', 'ok');
+        }
+        if (isSelf) nkSetPublic(val, done); else nkSetPrivate(targetName, val, done);
+      }
+      document.getElementById('nkQSave').addEventListener('click', function() {
+        _save((document.getElementById('nkQInput').value || '').trim());
+      });
+      var clr = document.getElementById('nkQClear');
+      if (clr) clr.addEventListener('click', function() { _save(''); });
+      var inp = document.getElementById('nkQInput');
+      inp.addEventListener('keydown', function(e) { if (e.key === 'Enter') { e.preventDefault(); _save((inp.value || '').trim()); } });
+      setTimeout(function() { try { inp.focus(); inp.select(); } catch (e) {} }, 60);
+    }
+    // Delegated click for the banner ✎ (banner re-renders via innerHTML each paint)
+    document.addEventListener('click', function(e) {
+      var btn = (e.target && e.target.closest) ? e.target.closest('[data-nk-quickedit]') : null;
+      if (!btn) return;
+      e.stopPropagation();
+      var nm = decodeURIComponent(btn.getAttribute('data-nk-quickedit') || '');
+      if (nm && typeof nkQuickEdit === 'function') nkQuickEdit(nm);
+    }, true);
     // Fallback READ: pull nicknames from the GAS/Sheet copy. Applied ONLY when Firebase
     //   isn't the live source (cold start before connect, or a real Firebase outage), so a
     //   possibly-stale Sheet never clobbers live Firebase data.
