@@ -923,6 +923,9 @@
     .swf-leg { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; }
     .swf-leg-dot { width: 10px; height: 10px; border-radius: 50%; flex: none; }
     .swf-leg-owner { flex: 1; min-width: 0; text-align: left; background: var(--surface); border: 1px solid var(--border); border-radius: 8px; padding: 8px 10px; font-size: 13px; font-family: inherit; color: var(--text); cursor: pointer; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .swf-leg-owner-inp { flex: 1; min-width: 0; box-sizing: border-box; background: var(--surface); border: 1px solid var(--border); border-radius: 8px; padding: 8px 10px; font-size: 13px; font-family: inherit; color: var(--text); }
+    .swf-leg-dd-row:last-child { border-bottom: none !important; }
+    .swf-leg-dd-row:hover { background: var(--accent-bg); }
     .swf-leg-until { font-size: 11.5px; color: var(--sub); white-space: nowrap; }
     .swf-leg-time { width: 94px; background: var(--surface); border: 1px solid var(--border); border-radius: 8px; padding: 7px 8px; font-size: 13px; font-family: inherit; color: var(--text); }
     .swf-leg-time-fixed { width: 94px; text-align: center; font-size: 13px; font-weight: 600; color: var(--sub); background: var(--bg); border: 1px solid var(--border); border-radius: 8px; padding: 8px; }
@@ -5857,6 +5860,56 @@ window.allPharmacistNames = [];
       return '<div class="swf-bar">' + segs + '</div>' +
         '<div class="swf-bar-ticks"><span>' + _pbEsc(_swfRelay.start) + '</span><span>' + _pbEsc(_swfRelay.end) + '</span></div>';
     }
+    // v3.45: inline typeahead for a leg owner — a text box + a body-appended dropdown that
+    //   floats ABOVE the confirm dialog (no more picker-behind). Matches real name or nickname;
+    //   picking a suggestion stores the real name, free-typing an unknown name keeps it as-is.
+    function _relayOwnerTypeahead(inp, i) {
+      if (!inp || isNaN(i)) return;
+      var names = (window.allPharmacistNames || []).slice();
+      var dd = null;
+      function closeDD() { if (dd) { dd.remove(); dd = null; } }
+      function openDD() {
+        var q = (inp.value || '').trim();
+        var matched = names.filter(function(n) { return _nkNameMatches(n, q); }).slice(0, 8);
+        if (!matched.length) { closeDD(); return; }
+        if (!dd) {
+          dd = document.createElement('div');
+          dd.style.cssText = 'position:fixed; z-index:10020; background:var(--surface); border:1px solid var(--border); border-radius:8px; box-shadow:0 6px 20px rgba(0,0,0,0.18); max-height:200px; overflow-y:auto;';
+          document.body.appendChild(dd);
+        }
+        var r = inp.getBoundingClientRect();
+        dd.style.left = r.left + 'px';
+        dd.style.top = (r.bottom + 2) + 'px';
+        dd.style.width = r.width + 'px';
+        dd.innerHTML = matched.map(function(n) {
+          var d = displayName(n);
+          var sub = (d && d !== n) ? '<span style="color:var(--sub); font-size:11px; margin-left:5px;">(' + _pbEsc(n) + ')</span>' : '';
+          return '<div class="swf-leg-dd-row" data-nm="' + _pbEsc(n) + '" style="padding:9px 11px; cursor:pointer; font-size:13px; border-bottom:1px solid var(--border);">' + _pbEsc(d) + sub + '</div>';
+        }).join('');
+        Array.prototype.forEach.call(dd.querySelectorAll('.swf-leg-dd-row'), function(row) {
+          row.addEventListener('mousedown', function(e) {          // mousedown fires before blur
+            e.preventDefault();
+            var nm = row.getAttribute('data-nm');
+            if (_swfRelay && _swfRelay.legs[i]) _swfRelay.legs[i].owner = nm;
+            inp.value = displayName(nm);
+            closeDD();
+          });
+        });
+      }
+      inp.addEventListener('input', openDD);
+      inp.addEventListener('focus', openDD);
+      inp.addEventListener('blur', function() {
+        setTimeout(function() {
+          closeDD();
+          if (!_swfRelay || !_swfRelay.legs[i]) return;
+          var t = (inp.value || '').trim();
+          if (!t) { _swfRelay.legs[i].owner = ''; return; }
+          var exact = names.find(function(n) { return n === t || displayName(n) === t; });
+          _swfRelay.legs[i].owner = exact || t;                   // registered → real name; else free-text
+          inp.value = displayName(_swfRelay.legs[i].owner);
+        }, 150);
+      });
+    }
     function _relayRenderLegs() {
       if (!_swfRelay) return;
       var body = document.getElementById('swfRelayBody');
@@ -5868,8 +5921,8 @@ window.allPharmacistNames = [];
         var isLast = (i === legs.length - 1);
         html += '<div class="swf-leg" data-leg="' + i + '">' +
           '<span class="swf-leg-dot" style="background:' + _relayLegColor(i) + ';"></span>' +
-          '<button type="button" class="swf-leg-owner" data-leg-owner="' + i + '">' +
-            (l.owner ? _pbEsc(displayName(l.owner)) : '— เลือกชื่อ —') + ' ▾</button>' +
+          '<input type="text" class="swf-leg-owner-inp" data-leg-owner="' + i + '" autocomplete="off" ' +
+            'placeholder="พิมพ์ชื่อ / ชื่อเล่น" value="' + _pbEsc(l.owner ? displayName(l.owner) : '') + '">' +
           '<span class="swf-leg-until">อยู่ถึง</span>' +
           (isLast
             ? '<span class="swf-leg-time-fixed">' + _pbEsc(_swfRelay.end) + '</span>'
@@ -5879,14 +5932,8 @@ window.allPharmacistNames = [];
       });
       html += '<button type="button" class="swf-leg-add" id="swfLegAdd">+ เพิ่มไม้</button>';
       body.innerHTML = html;
-      Array.prototype.forEach.call(body.querySelectorAll('[data-leg-owner]'), function(btn) {
-        btn.addEventListener('click', function() {
-          var i = parseInt(btn.getAttribute('data-leg-owner'), 10);
-          _lwwNamePicker(_swfRelay.legs[i].owner || '', function(nm) {
-            _swfRelay.legs[i].owner = nm || '';
-            _relayRenderLegs();
-          });
-        });
+      Array.prototype.forEach.call(body.querySelectorAll('.swf-leg-owner-inp'), function(inp) {
+        _relayOwnerTypeahead(inp, parseInt(inp.getAttribute('data-leg-owner'), 10));
       });
       Array.prototype.forEach.call(body.querySelectorAll('[data-leg-time]'), function(inp) {
         inp.addEventListener('change', function() {
