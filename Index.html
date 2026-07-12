@@ -5396,14 +5396,23 @@ window.allPharmacistNames = [];
       box.querySelectorAll('[data-cell-pick-key]').forEach(btn => {
         btn.addEventListener('click', function(ev) {
           ev.stopPropagation();
-          // v3.45 relay: a leg-row → the leg editor, same as the table (commit 7144959). Must
-          //   check this FIRST — the synthetic key still resolves openActionModalForKey down a
-          //   wrong path for ไม้1 (coincides with the real master key → shows "undo the give"
-          //   instead) and silently no-ops for ไม้2+ (key not in rawData at all).
+          // v3.45 relay: a leg-row → the ไม้ menu, same as the table. Must check this FIRST — the
+          //   synthetic key still resolves openActionModalForKey down a wrong path for ไม้1
+          //   (coincides with the real master key → "undo the give") and no-ops for ไม้2+.
+          // v3.45.3: open the leg-level menu (ยกไม้/แลกไม้/แก้ไม้/จัดการทั้งเวร), carrying the ไม้
+          //   identity from the row's data-relay-leg* attrs.
           const raid = btn.getAttribute('data-relay-actid');
-          if (raid && typeof _relayEditLegs === 'function') {
+          if (raid && typeof _relayOpenLegMenu === 'function') {
+            const _rmid = decodeURIComponent(btn.getAttribute('data-relay-mid') || '') || getCurrentMonthId();
+            const _leg = btn.hasAttribute('data-relay-legstart') ? {
+              i: parseInt(btn.getAttribute('data-relay-legi'), 10) || 0,
+              start: decodeURIComponent(btn.getAttribute('data-relay-legstart') || ''),
+              end: decodeURIComponent(btn.getAttribute('data-relay-legend') || ''),
+              clinic: btn.getAttribute('data-relay-legclinic') === '1',
+              owner: decodeURIComponent(btn.getAttribute('data-relay-legowner') || '')
+            } : null;
             closeActionModal();
-            _relayEditLegs(decodeURIComponent(btn.getAttribute('data-relay-mid') || '') || getCurrentMonthId(), decodeURIComponent(raid));
+            _relayOpenLegMenu(_rmid, decodeURIComponent(raid), _leg);
             return;
           }
           const k = decodeURIComponent(btn.getAttribute('data-cell-pick-key'));
