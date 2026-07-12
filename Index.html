@@ -4123,9 +4123,19 @@ window.allPharmacistNames = [];
       try {
         // v3.42.10: use combined map so PB-struck rows (partner's swap → own row) don't count
         const _bUsedMap = _combinedUsedMap(getCurrentMonthId(), target);
-        const _ownActive = (rawData || []).filter(s => s.name === target && !_bUsedMap[makeShiftKey(s)]).length;
-        const _ghostsActive = buildGhostRows(rawData || [], getCurrentMonthId(), target).filter(g => !_bUsedMap[g._ghostKey]).length;
-        total = _ownActive + _ghostsActive;
+        // v3.45 relay 1c: count leg-aware. A shift split into ไม้ credits EACH leg-owner
+        //   (incl. the giver's own KEPT leg — the used-map marks that shift 'given away' so
+        //   the old own+ghost tally silently dropped it). getEffectiveData() already runs
+        //   _relayExpand, so when the relay flag is OFF this reduces EXACTLY to the previous
+        //   (own-active + ghosts-active) count. Clinic legs have no duration → still +1 each
+        //   (per-person presence), matching the table which shows one row per ไม้.
+        const _bEff = (typeof getEffectiveData === 'function') ? getEffectiveData() : (rawData || []);
+        total = _bEff.filter(function(s) {
+          if (!s || s.name !== target) return false;
+          if (s._relayLeg) return true;                        // a ไม้ this person covers → +1
+          const _k = s._ghost ? s._ghostKey : makeShiftKey(s);
+          return !_bUsedMap[_k];                                // whole shift: drop if given/swapped away
+        }).length;
       } catch(e) {
         v10ShowError('renderBanner.count', e);
         total = (rawData || []).filter(s => s.name === target).length;  // fallback
