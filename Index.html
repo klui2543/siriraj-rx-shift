@@ -784,6 +784,12 @@
     .col-name-wrap > .ncw-center { grid-column: 2; text-align: center; }
     .col-name-wrap > .ncw-right { grid-column: 3; text-align: left; display: inline-flex; align-items: center; min-height: 16px; }
     /* When wrapper is absent (no chevron mode), name still centers cleanly */
+    /* v3.45.2: a relay leg row's name cell WRAPS (dot + ไม้N chip + name + ▶ centered together)
+       so the chip never overflows the cramped 20px chevron column into the pos cell and vanish
+       on a narrow phone (Klui: มือถือมองไม่เห็น ไม้ n). On desktop it stays one line. */
+    table tbody td.col-name.col-name--relay { white-space: normal !important; }
+    .col-name-wrap.col-name-wrap--relay { display: inline-flex; flex-wrap: wrap; grid-template-columns: none; justify-content: center; align-items: center; gap: 0 3px; }
+    .col-name-wrap.col-name-wrap--relay > .ncw-right { grid-column: auto; min-height: 0; }
 
     /* v18: settings popup minimal */
     #settingsPopup.settings-wide {
@@ -7888,7 +7894,10 @@ window.allPharmacistNames = [];
         opts: function () { return [['103', 'ห้องยา 103'], ['NM5', 'ห้องยา NM5'], ['IPD', 'ห้องยา IPD'], ['clinic', 'คลินิกพิเศษ']]; },
         match: function (q, v, l) { return v.toLowerCase().indexOf(q) >= 0 || l.toLowerCase().indexOf(q) >= 0; } };
       return { hid: 'posDropdown', inp: 'fltPosInput', pop: 'fltPosPop', all: 'ทุกรหัส',
-        opts: function () { return ((window._fltPoses && window._fltPoses.length) ? window._fltPoses : (window.allPositionCodes || [])).map(function (p) { return [p, p]; }); },
+        // v3.45.2: ALWAYS offer every code in the schedule (Klui: รหัสเวร shouldn't be tied to the
+        //   logged-in user). The old contextual `_fltPoses` (poses of the name-filtered view) meant
+        //   you could only pick your own codes; "ทุกรหัส" now really means all of them.
+        opts: function () { return ((window.allPositionCodes && window.allPositionCodes.length) ? window.allPositionCodes : (window._fltPoses || [])).map(function (p) { return [p, p]; }); },
         match: function (q, v) { return _normCode(v).indexOf(_normCode(q)) >= 0; } };
     }
     function _fltLabelFor(c, val) {
@@ -8028,10 +8037,14 @@ window.allPharmacistNames = [];
       });
 
       const availablePoses = [...new Set(baseData.map(i => i.pos).filter(Boolean))].sort(naturalCompare);
-      window._fltPoses = availablePoses;   // v3.44: contextual options for the รหัสเวร typeahead popup
+      window._fltPoses = availablePoses;   // kept for other readers; no longer gates the pos popup
       const posDropdown = document.getElementById('posDropdown');
-      if (filters.posD && !availablePoses.includes(filters.posD)) {
-        // the chosen code no longer exists in the current view → clear it (hidden value + visible input)
+      // v3.45.2: only drop the chosen รหัสเวร if it doesn't exist ANYWHERE in the schedule (a real
+      //   stale code), NOT merely because the current name-filtered view lacks it — that auto-clear
+      //   was why the code field felt "bound" to the login user (Klui). Picking a code others hold
+      //   now survives; combine with clearing the name to see everyone on that code.
+      const _allPosCodes = window.allPositionCodes || [];
+      if (filters.posD && _allPosCodes.length && !_allPosCodes.includes(filters.posD)) {
         filters.posD = "";
         if (posDropdown) posDropdown.value = "";
         const _fpi = document.getElementById('fltPosInput'); if (_fpi) _fpi.value = "";
@@ -8192,7 +8205,11 @@ window.allPharmacistNames = [];
         //   strike (_isDraftLocal / shift-draft above) so the author can still spot unpublished rows.
         const _pubInline = '';
         const _nameBase = i.isNew ? 'text-orange-600 font-bold leading-none' : 'text-blue-900 font-bold leading-none';
-        const nameDisplay = `<span class="col-name-wrap"><span class="ncw-left"></span><span class="ncw-center"><span class="${_nameBase} ${_strike}">${i.isNew?'⚠️ ':''}${displayName(i.name)}</span>${_pencil}${_pubInline}</span><span class="ncw-right">${_suffix}</span></span>`;
+        // v3.45.2: relay leg rows use a wrap-friendly variant (see .col-name-wrap--relay CSS)
+        const _isRelayLegRow = !!(i._relayLeg && i._relayLeg.actionId);
+        const _cnwCls = _isRelayLegRow ? 'col-name-wrap col-name-wrap--relay' : 'col-name-wrap';
+        const _ncwLeft = _isRelayLegRow ? '' : '<span class="ncw-left"></span>';
+        const nameDisplay = `<span class="${_cnwCls}">${_ncwLeft}<span class="ncw-center"><span class="${_nameBase} ${_strike}">${i.isNew?'⚠️ ':''}${displayName(i.name)}</span>${_pencil}${_pubInline}</span><span class="ncw-right">${_suffix}</span></span>`;
         let _ghostCls = '';
         if (_isGhost) {
           if (i._conflict === 'overlap') _ghostCls = 'shift-ghost-overlap';
@@ -8224,7 +8241,7 @@ window.allPharmacistNames = [];
         }
         return `<tr class="${_rowClasses}" style="font-size: var(--table-font-size);"${_dataAttr}${_relayAttr}>
           <td class="px-0.5 py-1.5 font-semibold text-gray-600 align-middle text-center whitespace-nowrap ${_strike}">${i.date}</td>
-          <td class="px-1 py-1.5 align-middle col-name leading-tight">${nameDisplay}</td>
+          <td class="px-1 py-1.5 align-middle col-name leading-tight${_isRelayLegRow ? ' col-name--relay' : ''}">${nameDisplay}</td>
           <td class="px-0.5 py-1.5 pl-5 text-center font-bold text-gray-800 align-middle whitespace-nowrap ${_strike}"${_posAttrs}>${i.pos}</td>
           <td class="px-0.5 py-1.5 text-center align-middle whitespace-nowrap">
             <div class="inline-flex items-center justify-center ${badge} px-1.5 py-1 rounded font-bold shadow-2xs whitespace-nowrap text-center box-border leading-none ${_strike}">
