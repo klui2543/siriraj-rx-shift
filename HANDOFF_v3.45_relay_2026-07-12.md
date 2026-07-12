@@ -1,11 +1,12 @@
-# HANDOFF — v3.45 relay 1c count + 1e clinic-split (2026-07-12)
+# HANDOFF — v3.45 relay 1c count + 1e clinic-split + 1f live-test fixes (2026-07-12)
 
-Branch **`main`**, base `62d0417` (prior handoff tip). 2 feature commits this session,
-both **pushed to origin/main**. Tip `f30ef01`.
+Branch **`main`**, base `62d0417` (prior handoff tip). 3 feature commits this session,
+all **pushed to origin/main**. Tip `9757a7b`.
 
 Prior handoff: `HANDOFF_v3.45_relay_2026-07-11_cont.md` (closed Stage 1b/1d + calendar
 spillover). **This session closed the two 1c items it parked (count + who-covers display)
-and shipped clinic-split — a NEW design Klui specified mid-session.**
+and shipped clinic-split — a NEW design Klui specified mid-session — then Klui live-tested
+it on GAS mid-session and reported 6 issues; 4 confirmed+fixed same session (§1f below).**
 
 ---
 
@@ -60,6 +61,54 @@ clinic ไม้ stays an **ALL-DAY** VEVENT (head/tail unknown) with a note per
 แล้วมีคนมาต่อ" (middle). Title gets a "· ไม้ N/M" tag. Timed (non-clinic) legs export as their
 sub-window automatically. **Flag OFF → export is byte-for-byte unchanged.**
 
+### 5. Live-test bugfix round — 1f (`9757a7b`)
+Klui deployed, ran `setRelayLegs(true)`, split a real clinic shift end-to-end (split → publish →
+export .ics — see the exported "103(3)\*\*L คลินิกพิเศษ · ไม้ 1/2" event with the "จะมีคนมาต่อ
+เวลา 01:13" note, confirming §4 worked) and reported 6 issues. **4 confirmed as real bugs and
+fixed same session:**
+
+- **Calendar day-picker leg-blind (items 1+6).** `openCellShiftPicker`/`_renderPickRow` (the
+  "เลือกเวรในวันนี้" popup, edit mode) never got the leg-tap fix the table got in commit
+  `7144959`. A leg's synthetic key isn't in `rawData`, so tapping it either silently did nothing
+  (recipient's ไม้2+) or — worse, for the giver's own KEPT ไม้1, whose key happens to still
+  resolve to the real master row — opened the wrong modal ("ยกเลิกการยกเวร", undo-the-give)
+  instead of the leg editor. Fixed: `_renderPickRow` now stamps `data-relay-actid`/`mid` and
+  shows the ไม้ tag + handoff window; the click handler checks that FIRST and routes to
+  `_relayEditLegs`. `openCellViewPicker` (view mode) gets the ไม้ tag for display parity only
+  (no edit routing needed there).
+- **Relay entry removed from mid-`add` (item 2).** Klui: "ต้องรับมาเป็นของเราจริงๆ ก่อน" — a
+  shift must already be truly yours before you split it; mid-receive isn't settled. Turns out
+  this wasn't just a UX call — it was covering a **real bug**: `swfOpenConfirm`'s "เสร็จสิ้น ·
+  เผยแพร่" handler only ever called `_relaySaveLegs` for `kind==='give'`, so legs configured
+  while receiving (`add`) were silently discarded on publish anyway. Restricted all 4 relay
+  entry points in `swfOpenConfirm` (relayHtml render, `_relayInit` call, `swfKeep`, `swfDone`) to
+  `kind === 'give'` only. Post-hoc `_relayEditLegs` (🏃✎ / table-tap) is untouched — by the time
+  that's reachable an add is already a committed action, i.e. "already yours."
+- **ICS export cross-month spillover (item 3a).** `_ecmBuildClientICS` always dated every shift
+  under the currently-selected SHEET's year/month, never reading a shift's own month from
+  `s.date` — so Klui's Jan-2 shift (stored in a December sheet) exported as Dec-2, or effectively
+  "didn't know about 2 มกราคม." Same root cause the calendar grid already handles (commit
+  `72f0b27`/`44098c5`) — mirrored that exact rule (immediately-following-month only, Dec→Jan
+  rolls the year; unparseable/same-month falls back to the sheet's own), applied BEFORE the
+  existing Round3 +1-day adjustment so the two compose correctly.
+- **Table display decluttered (item 5).** A clinic ไม้'s handoff time was inline text appended
+  right next to the clickable "ตรวจสอบ" badge — read as one run-on chip (Klui: "แปลก"). Moved
+  the same text into a `title` tooltip on the ไม้ tag (hover/long-press) instead — info still
+  there, row reads clean.
+
+**2 items held — Klui's explicit choice, NOT code fixes:**
+- **(3b) An older legged action doesn't appear in `.ics` export.** Traced to: this session's
+  export code IS leg-aware and generic (would pick up ANY action with `legs.length>=2`) — the
+  likely explanation is the action was published BEFORE the Stage-1b server-propagation fix
+  (07-11, commit `c0f9e5e`), so the server's stored copy may still be legs-less from back then (a
+  stale-data problem, not a gap in this session's code). **Klui's call: troubleshoot by reopening
+  🏃✎ on that action and re-saving** (re-mirrors legs into `pathBOverlays` + resyncs) rather than
+  a code change. If that DOESN'T fix it, that's new information — worth a fresh look.
+- **(4) PDF/table-combined export (`_exportCalendarPDF_v2`, `_exportCalendarPNG_v2`) is still
+  leg-blind AND cross-month-blind** — separate functions, untouched this session (only the `.ics`
+  path got fixed). **Klui's call: parked** until after this round's live-test (no new GAS deploy
+  version exists yet to test against regardless).
+
 ---
 
 ## 🧪 VERIFIED
@@ -71,17 +120,26 @@ harnesses (session scratchpad, extract-and-run against the REAL shipped function
   `_relayExpand` clinic marker (range preserved, `isSpecialClinic` stays true, open head/tail).
 - `export_clinic_harness` **11** — leg-aware `shifts` (kept-ไม้ survives used-map) + all 3 note
   branches, guarded against export-source drift.
+- `export_spillover_harness` **6** — Klui's exact Dec-sheet+Jan-2 case, non-December wraparound
+  (no year rollover), unparseable-date fallback, spillover+Round3 composition, and a Round3-alone
+  regression guard.
 
 Harnesses live in the session scratchpad (not committed) — each extracts real function bodies
 from `Index.html` (brace-matched, comment-aware) and runs them, so they test shipped code.
 
-**Klui has NOT live-tested clinic-split yet** — no GAS session this run. The loop next time:
-new deploy version → `setRelayLegs(true)` → real clinic split (split → publish → both people
-export .ics) → confirm all-day + "จะมีคนมาต่อ".
+**Klui live-tested §1-4 on GAS this session** (real clinic split, publish, .ics export all
+confirmed working) and reported the 6 issues that drove §5. **The §5 fixes are NOT yet
+live-tested** — need a new GAS deployment version (or `/dev`) next round.
 
 ---
 
-## ⏳ NEXT — parked (Klui's call)
+## ⏳ NEXT
+- **Live-test the 1f fixes**: calendar day-picker tap-to-edit on a leg (both giver/recipient
+  sides), confirm the relay toggle no longer appears mid-`add`, re-export December .ics and
+  check the Jan-2 shift dates correctly, eyeball the decluttered table row (hover the ไม้ tag).
+- **(3b)** troubleshoot the old-leg .ics gap: reopen 🏃✎ on that action and re-save; report back
+  if that does NOT fix it.
+- **(4)** PDF/table-combined export leg+cross-month awareness — parked, revisit after live-test.
 - **Swap-a-leg** (แลก partial ↔ whole) — genuinely complex; recommend swap the WHOLE shift
   first, then split. Klui said relay only needs give/add for now.
 - **1a fuller name source** — `allPharmacistNames` still misses `_registeredUsers` + other months.
