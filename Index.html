@@ -5268,7 +5268,7 @@ window.allPharmacistNames = [];
         }
         let row = '<button class="pick-result" data-cell-pick-key="' + enc + '"' + relayAttr + ' style="' + btnStyle + '">';
         row += '<div style="flex:1;">';
-        row += '<div class="pick-result-name" style="' + strikeStyle + '">' + legTag + s.pos + ghostTag + statusTag + '</div>';
+        row += '<div class="pick-result-name" style="' + strikeStyle + '">' + s.pos + ' ' + legTag + ghostTag + statusTag + '</div>';
         row += '</div>';
         if (isSpecialClinic(s)) {
           row += '<span class="pick-result-badge ' + bcls + '" data-phx-note-trigger="1" data-phx-note-date="' + encodeURIComponent(s.date || '') + '" data-phx-note-pos="' + encodeURIComponent(s.pos || '') + '" style="cursor:pointer;' + strikeStyle + '">ตรวจสอบ ↗</span>';
@@ -5363,7 +5363,7 @@ window.allPharmacistNames = [];
           : 'data-cv-pos="' + encodeURIComponent(s.pos || '') + '"';
         html += '<button class="pick-result" ' + detailAttrs + ' style="margin-bottom:6px;">';
         html += '<div style="flex:1; text-align:left;">';
-        html += '<div class="pick-result-name">' + legTag + (s.pos || '') + ghostTag + '</div>';
+        html += '<div class="pick-result-name">' + (s.pos || '') + ' ' + legTag + ghostTag + '</div>';
         html += '</div>';
         if (isClinic) {
           html += '<span class="pick-result-badge ' + bcls + '">คลินิกพิเศษ</span>';
@@ -8652,10 +8652,11 @@ window.allPharmacistNames = [];
         const dowClass = dow === 0 ? 'cal-dow-sun' : dow === 6 ? 'cal-dow-sat' : '';
         const todayClass = (day === _todayD && cell.mon === _todayMon && cell.yr === _todayYr) ? 'cal-today' : '';
         const dayNumClasses = `cal-day-num ${dowClass} ${todayClass}`.trim();
-        // v3.45: spillover cells carry the next month → tag the cell + small month label so the
-        //   viewer sees the month changed; carry data-cal-month so a tap resolves to the right date.
+        // v3.45: spillover cells carry the next month → tint the cell (.cal-spill) so it reads as
+        //   the following month; the small month label is dropped (Klui: ไม่ต้องมีเดือนกำกับ).
+        //   data-cal-month still carries the real month so a tap resolves to the right date.
         const _spillCls = cell.spill ? ' cal-spill' : '';
-        const _monTag = cell.spill ? `<span class="cal-spill-mon">${thaiMonths[cell.mon - 1].slice(0, 3)}</span>` : '';
+        const _monTag = '';
 
         // v7: cell-level data-cal-day for any cell in edit mode
         // Patch ZZ3-B: VIEW mode cells with 2+ shifts → multi-shift picker
