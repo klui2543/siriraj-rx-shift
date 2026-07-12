@@ -2908,6 +2908,7 @@ window.allPharmacistNames = [];
           id: id, actor: String(a.viewerName || ''), createdAt: String(a.createdAt || ''),
           masterId: String(pay.masterId), legStart: String(pay.legStart || ''),
           legEnd: String(pay.legEnd || ''), legClinic: !!pay.legClinic, kind: String(pay.kind || 'give'),
+          gotPos: String(pay.gotPos || ''),
           fromOwner: String(a.originalOwner || ''), toOwner: String(a.partnerName || ''),
           _visibility: a._visibility || 'public'
         });
@@ -4594,6 +4595,23 @@ window.allPharmacistNames = [];
           html += '<div class="tl-inline-num">' + (idx + 1) + '</div>';
           html += '<div class="tl-inline-body">' + desc + '</div></div>';
         });
+        // v3.45.3: leg handoffs (ยก/แลกไม้) render as their OWN numbered history steps (Klui:
+        //   ควรแยกประวัติเป็นอีกรายการ — ไม่ใช่เขียนทับเงียบ ๆ). A relayleg note isn't in the _g_ chain,
+        //   so pull the notes for this master by masterId and append them in createdAt order.
+        var _tlRelay = (targetAction && targetAction.action === 'relay') ? targetAction
+                     : chain.find(function(a){ return a && a.action === 'relay'; });
+        if (window._relayEnabled && _tlRelay && typeof _relayLegOverrides === 'function') {
+          var _tlMid = String(_tlRelay.id || '');
+          var _tlHops = _relayLegOverrides(monthId).filter(function(o){ return o.masterId === _tlMid; })
+            .sort(function(x, y){ return String(x.createdAt || '').localeCompare(String(y.createdAt || '')); });
+          _tlHops.forEach(function(o, j){
+            var _lk = (o.kind === 'swap') ? 'swap' : 'give';
+            var _d = _relayLegStepDesc(o);
+            var _ts = o.createdAt ? new Date(o.createdAt).toLocaleString('th-TH', {dateStyle:'short', timeStyle:'short'}) : '';
+            if (_ts) _d += ' <span class="tl-inline-ts">· ' + _ts + '</span>';
+            html += '<div class="tl-inline-step tl-' + _lk + '"><div class="tl-inline-num">' + (chain.length + j + 1) + '</div><div class="tl-inline-body">' + _d + '</div></div>';
+          });
+        }
         const lastAct = chain[chain.length - 1];
         // v3.41: unified end message — match PB format so all viewers see the same
         let _curHolder;
@@ -4615,9 +4633,12 @@ window.allPharmacistNames = [];
           const _legAct = (targetAction && targetAction.action === 'relay' && Array.isArray(targetAction.legs) && targetAction.legs.length >= 2) ? targetAction
                         : (lastAct && lastAct.action === 'relay' && Array.isArray(lastAct.legs) && lastAct.legs.length >= 2) ? lastAct : null;
           if (window._relayEnabled && _legAct) {
-            _relayIsClin = _legAct.legs.some(l => l && l.clinic);
+            // v3.45.3: resolve sticky-note handoffs so the holder line shows the CURRENT ไม้ owners
+            //   (was raw _legAct.legs → a handed-off ไม้ still credited its original owner).
+            const _rLegs = (typeof _relayLegsFor === 'function') ? _relayLegsFor(monthId, _legAct) : _legAct.legs;
+            _relayIsClin = _rLegs.some(l => l && l.clinic);
             const _seen = {}, _names = [];
-            _legAct.legs.forEach(l => { const nm = displayName((l && l.owner) || '?'); if (!_seen[nm]) { _seen[nm] = 1; _names.push(nm); } });
+            _rLegs.forEach(l => { const nm = displayName((l && l.owner) || '?'); if (!_seen[nm]) { _seen[nm] = 1; _names.push(nm); } });
             _relayHolders = _names;
           }
         } catch (e) {}
@@ -4736,6 +4757,21 @@ window.allPharmacistNames = [];
           html += '<div class="tl-inline-num">' + (idx + 1) + '</div>';
           html += '<div class="tl-inline-body">' + desc + '</div></div>';
         });
+        // v3.45.3: leg handoffs (ยก/แลกไม้) as their own numbered steps here too, so a non-author
+        //   viewer sees the swap/give story, not a silent owner change (Klui: ประวัติต้องครบ).
+        var _pbRelay = chain.find(function(o){ return o && String(o.action || '') === 'relay'; });
+        if (window._relayEnabled && _pbRelay && typeof _relayLegOverrides === 'function') {
+          var _pbMid = String(_pbRelay.actionId || _pbRelay.id || '');
+          var _pbHops = _relayLegOverrides(getCurrentMonthId()).filter(function(o){ return o.masterId === _pbMid; })
+            .sort(function(x, y){ return String(x.createdAt || '').localeCompare(String(y.createdAt || '')); });
+          _pbHops.forEach(function(o, j){
+            var _lk = (o.kind === 'swap') ? 'swap' : 'give';
+            var _d = _relayLegStepDesc(o);
+            var _ts = o.createdAt ? new Date(o.createdAt).toLocaleString('th-TH', {dateStyle:'short', timeStyle:'short'}) : '';
+            if (_ts) _d += ' <span class="tl-inline-ts">· ' + _ts + '</span>';
+            html += '<div class="tl-inline-step tl-' + _lk + '"><div class="tl-inline-num">' + (chain.length + j + 1) + '</div><div class="tl-inline-body">' + _d + '</div></div>';
+          });
+        }
         const ep = PBOverlays.getChainEndpoints(chain, pbSide);   // v3.42.9: pbSide picks correct holder for swap
         const _pinnedPB = chain.some(o => o && o._retroFinal);
         // v3.45.2: a relay tail never moves ownership — holder = the relay's own author, plus
@@ -4745,9 +4781,11 @@ window.allPharmacistNames = [];
         //   builder. legs ride on pathBOverlays (server passthrough) so non-authors see the names too.
         let _pbRelayHolders = null, _pbRelayClin = false;
         if (_tailPB && String(_tailPB.action || '') === 'relay' && Array.isArray(_tailPB.legs) && _tailPB.legs.length >= 2) {
-          _pbRelayClin = _tailPB.legs.some(function(l) { return l && l.clinic; });
+          // v3.45.3: resolve sticky-note handoffs → current ไม้ owners (was raw → stale owner lingers).
+          const _rLegsPB = (typeof _relayLegsFor === 'function') ? _relayLegsFor(getCurrentMonthId(), _tailPB) : _tailPB.legs;
+          _pbRelayClin = _rLegsPB.some(function(l) { return l && l.clinic; });
           const _seenPB = {}, _namesPB = [];
-          _tailPB.legs.forEach(function(l) { const nm = displayName((l && l.owner) || '?'); if (!_seenPB[nm]) { _seenPB[nm] = 1; _namesPB.push(nm); } });
+          _rLegsPB.forEach(function(l) { const nm = displayName((l && l.owner) || '?'); if (!_seenPB[nm]) { _seenPB[nm] = 1; _namesPB.push(nm); } });
           _pbRelayHolders = _namesPB;
         }
         if (_pbRelayHolders && _pbRelayHolders.length) {
@@ -5637,17 +5675,31 @@ window.allPharmacistNames = [];
     // Author one "sticky note" (relayleg) — the identity of WHICH ไม้ rides in legs[0]; everything
     //   else on standard, server-whitelisted fields. viewerName = the actor so phxPushActions pushes
     //   it under their own name (sync-legal even when the actor isn't the master's author).
-    function _relayAuthorOverride(mid, master, leg, fromOwner, toOwner, kind) {
+    function _relayAuthorOverride(mid, master, leg, fromOwner, toOwner, kind, extra) {
       var mId = String((master && (master.id || master.actionId)) || '');
       if (!mId) return null;
+      var pay = { __relayleg: 1, masterId: mId, legStart: String(leg.start || ''), legEnd: String(leg.end || ''), legClinic: !!leg.clinic, kind: String(kind || 'give') };
+      if (extra && typeof extra === 'object') { for (var k in extra) { if (Object.prototype.hasOwnProperty.call(extra, k)) pay[k] = extra[k]; } }  // e.g. gotPos for a swap
       return OverlayManager.addAction(mid, {
         action: 'relayleg',
         viewerName: _relayActorName(),
         shiftKey: String((master && master.shiftKey) || ''),
         originalOwner: String(fromOwner || ''),
         partnerName: String(toOwner || ''),
-        legs: [{ __relayleg: 1, masterId: mId, legStart: String(leg.start || ''), legEnd: String(leg.end || ''), legClinic: !!leg.clinic, kind: String(kind || 'give') }]
+        legs: [pay]
       });
+    }
+    // Render a leg-handoff (ยก/แลกไม้) as a timeline-step description — same voice as a whole give/swap.
+    function _relayLegStepDesc(o) {
+      var win = (typeof _relayLegWindowText === 'function') ? _relayLegWindowText({ start: o.legStart, end: o.legEnd, clinic: o.legClinic }) : '';
+      var by = _pbEsc(displayName(o.actor || o.fromOwner || '?'));
+      var to = _pbEsc(displayName(o.toOwner || '?'));
+      var winTxt = win ? ' (' + _pbEsc(win) + ')' : '';
+      if (o.kind === 'swap') {
+        var got = o.gotPos ? ' — ได้ <b>' + _pbEsc(o.gotPos) + '</b> มา' : '';
+        return '<b>' + by + '</b> แลกไม้' + winTxt + ' กับ <b>' + to + '</b>' + got;
+      }
+      return '<b>' + by + '</b> ยกไม้' + winTxt + ' ให้ <b>' + to + '</b>';
     }
     // v3.45.2→3: tapping a ไม้ row → a leg-level menu (ยกไม้ / แลกไม้ / แก้ไม้ทั้งหมด / จัดการทั้งเวร).
     //   `leg` = {i,start,end,clinic,owner}. Missing (old row) → fall back to the whole-shift menu.
@@ -5742,7 +5794,7 @@ window.allPharmacistNames = [];
       if (!partner) partner = targetShift.name || '';
       if (String(partner) === String(_actor)) { if (typeof _p2bShowToast === 'function') _p2bShowToast('เลือกเวรของคนอื่น (ไม่ใช่ของคุณเอง)', 'warn'); return; }
       actionState.legSwap = null;
-      var ovr = a ? _relayAuthorOverride(mid, a, ls.leg, ls.fromOwner, partner, 'swap') : null;   // my ไม้ → partner
+      var ovr = a ? _relayAuthorOverride(mid, a, ls.leg, ls.fromOwner, partner, 'swap', { gotPos: String(targetShift.pos || '') }) : null;   // my ไม้ → partner
       var add = OverlayManager.addAction(mid, { action: 'add', viewerName: _actor, shiftKey: targetKey, partnerName: partner });  // their shift → me
       if (typeof closeActionModal === 'function') closeActionModal();
       if (typeof triggerUpdate === 'function') triggerUpdate();
