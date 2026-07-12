@@ -693,9 +693,9 @@
       font-size: 10px; font-weight: 600; text-align: center;
     }
     .tl-leg-note { font-size: 11px; font-weight: 600; opacity: 0.85; }
-    /* v3.45.2: per-ไม้ breakdown inside a ต่อเวร timeline step */
-    .tl-relay-legs { margin-top: 5px; display: flex; flex-direction: column; gap: 3px; }
-    .tl-relay-leg { font-size: 12px; line-height: 1.5; }
+    /* v3.45.2: per-ไม้ breakdown inside a ต่อเวร timeline step — one lean inline run */
+    .tl-relay-legs { font-size: 12px; }
+    .tl-relay-leg { white-space: nowrap; margin-right: 12px; line-height: 1.9; }
     .tl-inline-end.ended { background: #fee2e2; color: #991b1b; }
     .tl-inline-end.active { background: #dcfce7; color: #166534; }
     body.dark-theme .tl-inline-end.ended { background: #450a0a; color: #fca5a5; }
@@ -4403,8 +4403,9 @@ window.allPharmacistNames = [];
               if (sx) srcStr = '<b>' + sx.pos + '</b> ';
             }
             kind = 'relay';
-            const _rlN = Array.isArray(act.legs) ? act.legs.length : 0;
-            desc = '🏃 ต่อเวร ' + srcStr + '— แบ่งเป็น <b>' + _rlN + ' ไม้</b>' + _relayLegsSummaryHtml(act.legs);
+            // v3.45.2: lean — just the inline ไม้ list (teal border + holder line already say
+            //   "ต่อเวร"). srcStr keeps the pos so a multi-shift timeline stays scannable.
+            desc = (srcStr ? srcStr : '') + _relayLegsSummaryHtml(act.legs);
           }
           // v3.44: inline ✎ right after the name → edit the counterpart (B) in place. Shown on a
           //   DRAFT (to its author) or on any record when the viewer is Admin (published = final,
@@ -4414,10 +4415,11 @@ window.allPharmacistNames = [];
               (act._visibility === 'draft' || (typeof phxAuthIsAdmin === 'function' && phxAuthIsAdmin()))) {
             desc += ' <span class="tl-edit-recipient" data-tl-edit="' + act.id + '" data-tl-mid="' + monthId + '" title="แก้ชื่อ" role="button" aria-label="แก้ชื่อ">✎</span>';
           }
-          // v3.45.2: 🏃✎ to edit the legs — the first-class ต่อเวร action only (give/add no
-          //   longer carry legs). The AUTHOR may edit their own split even after publish;
-          //   the save re-syncs so every viewer's rows update. Admin may edit anyone's.
-          if (window._relayEnabled && act.action === 'relay') {
+          // v3.45.2: 🏃✎ to edit the legs — the first-class ต่อเวร action only. Gated by
+          //   editModeActive so it follows the same "กดดินสอ (แก้ไข) ก่อน" gesture as tapping a
+          //   shift row (Klui). The AUTHOR may edit their own split even after publish; the save
+          //   re-syncs so every viewer's rows update. Admin may edit anyone's.
+          if (window._relayEnabled && act.action === 'relay' && (typeof editModeActive === 'undefined' || editModeActive)) {
             var _rlBnd = (typeof _pbGetLoggedInName === 'function') ? _pbGetLoggedInName() : null;
             var _rlMine = _rlBnd && String(act.viewerName || '') === String(_rlBnd);
             if (_rlMine || (typeof phxAuthIsAdmin === 'function' && phxAuthIsAdmin())) {
@@ -4545,12 +4547,13 @@ window.allPharmacistNames = [];
               if (sp) srcStr = '<b>' + sp + '</b> ';
             }
             kind = 'relay';
-            const _rlN = Array.isArray(ov.legs) ? ov.legs.length : 0;
-            desc = '<b>' + actor + '</b> 🏃 ต่อเวร ' + srcStr + '— แบ่งเป็น <b>' + _rlN + ' ไม้</b>' + _relayLegsSummaryHtml(ov.legs);
+            // v3.45.2: actor prefix stays (cross-user view needs "who"); legs inline + lean.
+            desc = '<b>' + actor + '</b> 🏃 ' + srcStr + _relayLegsSummaryHtml(ov.legs);
             // author's own 🏃✎ (the action IS in their local OverlayManager even when this PB
             //   builder renders — e.g. anonymous-mode view); admin uses the ✕ cancel below instead.
+            //   Edit-mode gated like the author builder (กดดินสอก่อน).
             var _rlBndPB = (typeof _pbGetLoggedInName === 'function') ? _pbGetLoggedInName() : null;
-            if (window._relayEnabled && _rlBndPB && String(ov.viewerName || '') === String(_rlBndPB)) {
+            if (window._relayEnabled && (typeof editModeActive === 'undefined' || editModeActive) && _rlBndPB && String(ov.viewerName || '') === String(_rlBndPB)) {
               desc += ' <span class="tl-edit-relay" data-tl-relayedit="' + _pbEsc(ov.actionId) + '" data-tl-mid="' + _pbEsc(getCurrentMonthId()) + '" title="แก้ไม้ (ต่อเวร)" role="button" aria-label="แก้ไม้">🏃✎</span>';
             }
           }
@@ -6033,20 +6036,20 @@ window.allPharmacistNames = [];
     var _swfRelay = null;
     var _RELAY_COLORS = ['#0d9488', '#ea580c', '#7c3aed', '#db2777', '#0891b2'];   // teal · orange · violet · pink · cyan
     function _relayLegColor(i) { return _RELAY_COLORS[i % _RELAY_COLORS.length]; }
-    // v3.45.2: per-ไม้ breakdown for the timeline — "who covers until when", tinted per leg.
-    //   Works for both timed legs (start-end) and clinic legs (open head/tail).
+    // v3.45.2: per-ไม้ breakdown for the timeline — "ไม้ N <คน> อยู่ <ช่วง>", one lean inline
+    //   run (Klui: the multi-line block read "ตลก" — nothing but the legs, joined inline).
+    //   Timed legs → "อยู่ 16:30-19:00"; clinic open head → "อยู่ถึง 11:00"; open tail → "ตั้งแต่ 11:00".
     function _relayLegsSummaryHtml(legs) {
       if (!Array.isArray(legs) || legs.length < 2) return '';
-      var rows = legs.map(function(l, i) {
+      return '<span class="tl-relay-legs">' + legs.map(function(l, i) {
         var s = String(l.start || ''), e = String(l.end || '');
-        var when = (!s && e) ? ('ถึง ' + e)
-                 : (s && !e) ? (e === '' && !l.clinic ? (s + '-?') : (s + ' เป็นต้นไป'))
-                 : (s && e) ? (s + '-' + e) : '';
+        var when = (!s && e) ? ('อยู่ถึง ' + e)
+                 : (s && !e) ? ('ตั้งแต่ ' + s)
+                 : (s && e) ? ('อยู่ ' + s + '-' + e) : '';
         var c = _relayLegColor(i);
-        return '<div class="tl-relay-leg"><span class="relay-leg-tag" style="color:' + c + '; border-color:' + c + ';">ไม้ ' + (i + 1) + '</span> ' +
-               '<b>' + _pbEsc(displayName(l.owner || '?')) + '</b>' + (when ? ' <span style="color:var(--sub);">· ' + _pbEsc(when) + '</span>' : '') + '</div>';
-      });
-      return '<div class="tl-relay-legs">' + rows.join('') + '</div>';
+        return '<span class="tl-relay-leg"><span class="relay-leg-tag" style="color:' + c + '; border-color:' + c + ';">ไม้ ' + (i + 1) + '</span> ' +
+               '<b>' + _pbEsc(displayName(l.owner || '?')) + '</b>' + (when ? ' ' + _pbEsc(when) : '') + '</span>';
+      }).join(' ') + '</span>';
     }
     function _relayRangeParts(rangeStr) {
       var m = String(rangeStr || '').replace(/\s/g, '').match(/^(\d{1,2}:\d{2})-(\d{1,2}:\d{2})$/);
