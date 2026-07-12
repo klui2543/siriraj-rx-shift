@@ -117,8 +117,21 @@ wrap-safe, ellipsizing header (designed to avoid the 375px h-scroll class of bug
 - HEAD-detached hazard: always verify `## main...origin/main` after a push.
 - `docs/DATA_MAP.md` still untracked (pre-existing, left alone).
 
+## Live-test round 1 (Klui, on GAS) — FIXED (`2acf2ab`)
+Klui ran **แลกไม้** with แฮรี่พอตโตะ and reported: (1) his name still showed in the holder line
+after handing his ไม้ off; (2) the swap "overwrote silently" instead of appearing as a separate,
+complete history entry. Both fixed:
+- **Holder line** ("ปัจจุบันเวรนี้อยู่กับ") in BOTH timeline builders read raw `act.legs` → showed the
+  ORIGINAL owner. Now resolved via `_relayLegsFor` → shows the current ไม้ holder (his name drops off).
+- **Leg handoff is now its own numbered timeline step** in both builders (a `relayleg` note isn't in
+  the `_g_` chain, so it's pulled by masterId, createdAt-ordered): "B ยกไม้ (12:00-16:00) ให้ C" /
+  "B แลกไม้ (…) กับ C — ได้ 103(2) มา". The swap stores `gotPos` in `legs[0]` so the step names what
+  you got back (Klui: ประวัติต้องครบ). The ไม้ breakdown already showed the "current ← original" hop.
+- Resolver harness extended to **23/23** (adds gotPos propagation + give/swap/clinic step wording).
+
 ## Commits this session
 ```
 21731a6 v3.45.3 leg handoff — ยก/แลก ระดับไม้ (sticky-note override)
 10febe2 v3.45.3 leg handoff pt2 — cell-picker ไม้ → leg menu (was: leg editor)
+2acf2ab v3.45.3 leg handoff pt3 — แลก/ยกไม้ = ประวัติแยกเป็นขั้น + holder line ถูกต้อง
 ```
