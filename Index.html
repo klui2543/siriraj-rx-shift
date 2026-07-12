@@ -1989,6 +1989,12 @@
                   <span>ซ่อนเวรที่ขีดฆ่า</span>
                   <input type="checkbox" id="hideStruckToggle" onchange="toggleHideStruck(this.checked)" style="width:36px;height:20px;cursor:pointer;">
                 </label>
+                <!-- v3.45.2: ต่อเวร (relay) display toggle — the flag is per-device, so this lets you
+                     enable it on a phone (no console). Off by default; flipping it re-renders. -->
+                <label style="display:flex;align-items:center;justify-content:space-between;font-size:11px;color:var(--text);font-weight:600;margin-bottom:5px;cursor:pointer;">
+                  <span>🏃 โหมดต่อเวร (แบ่งไม้)</span>
+                  <input type="checkbox" id="relayModeToggle" onchange="setRelayLegs(this.checked)" style="width:36px;height:20px;cursor:pointer;">
+                </label>
                 <div id="overlayCountText" style="text-align:center; font-size:10px; color:var(--sub); margin-bottom:4px;">ยังไม่มีการแก้ไข</div>
                 <button id="resetOverlayBtn" onclick="clearOverlaysConfirm()" class="pill-btn" style="width:100%; justify-content:center; padding:5px 0; font-size:10px; gap:4px; opacity:0.5; cursor:not-allowed;" disabled>
                   รีเซ็ตการแก้ไขทั้งหมด
@@ -2764,6 +2770,9 @@ window.allPharmacistNames = [];
     window.setRelayLegs = function(on) {
       window._relayEnabled = !!on;
       try { localStorage.setItem('relay_legs', on ? '1' : '0'); } catch (e) {}
+      // v3.45.2: keep the Settings toggle in step whether flipped from the UI or the console
+      //   (the flag is per-device — this is how you enable it on a phone without a console).
+      var _rt = document.getElementById('relayModeToggle'); if (_rt) _rt.checked = !!on;
       if (typeof invalidateGhostCache === 'function') invalidateGhostCache();
       if (typeof triggerUpdate === 'function') triggerUpdate();
       console.log('[relay legs] ' + (on ? 'ON (persisted)' : 'OFF'));
@@ -9446,6 +9455,8 @@ async function _exportCalendarPDF_v2(personList) {
       var cal = document.getElementById('fontSizeDisplay');
       if (tbl) tbl.innerText = currentTableFontSize.toFixed(1);
       if (cal) cal.innerText = currentFontSize.toFixed(1);
+      // v3.45.2: reflect the current (per-device) relay flag on the toggle each time it opens
+      var _rt = document.getElementById('relayModeToggle'); if (_rt) _rt.checked = !!window._relayEnabled;
       // B2: load backup email when popup opens
       if (!p.classList.contains('hidden') && typeof phxLoadBackupEmail === 'function') {
         phxLoadBackupEmail();
