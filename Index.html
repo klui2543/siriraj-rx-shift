@@ -700,12 +700,13 @@
        on .tl-inline-body is what widened the table, so relax it for the relay step only. */
     .tl-inline-step.tl-relay { align-items: flex-start; }
     .tl-inline-step.tl-relay .tl-inline-body { white-space: normal; overflow: visible; text-overflow: clip; }
-    /* v3.45.2: 2 ไม้ per row, centered (Klui — 2-up so it's not sparse). minmax(0,1fr) lets a
-       column shrink below its content so a long last-ไม้ ("ตั้งแต่ … เป็นต้นไป") WRAPS inside its
-       cell instead of forcing the grid wider than the table (which would h-scroll). */
-    .tl-relay-legs { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 2px 10px; font-size: 12px; justify-items: center; margin-top: 3px; }
-    .tl-relay-leg { white-space: normal; line-height: 1.7; text-align: center; }
-    .tl-relay-cont { display: block; margin-top: 1px; }   /* "ต่อจาก <owner>: <the rest>" summary line */
+    /* v3.45.2: one ไม้ per row — the whole list sits CENTERED as a block, but the rows share a
+       LEFT edge (Klui: อยู่ตรงกลางแต่ indent ชิดขอบซ้าย). justify-content centers the single
+       column; justify-items lines the rows up left within it. minmax(0,auto) still lets a long
+       row shrink-wrap on a narrow phone instead of h-scrolling. */
+    .tl-relay-legs { display: grid; grid-template-columns: minmax(0, auto); justify-content: center; justify-items: start; gap: 2px 0; font-size: 12px; margin-top: 3px; }
+    .tl-relay-leg { white-space: normal; line-height: 1.7; text-align: left; }
+    .tl-relay-cont { display: block; margin-top: 1px; }   /* "<the rest> ต่อเวรจาก <owner>" summary line */
     .tl-inline-end.ended { background: #fee2e2; color: #991b1b; }
     .tl-inline-end.active { background: #dcfce7; color: #166534; }
     body.dark-theme .tl-inline-end.ended { background: #450a0a; color: #fca5a5; }
@@ -788,12 +789,14 @@
     .col-name-wrap > .ncw-center { grid-column: 2; text-align: center; }
     .col-name-wrap > .ncw-right { grid-column: 3; text-align: left; display: inline-flex; align-items: center; min-height: 16px; }
     /* When wrapper is absent (no chevron mode), name still centers cleanly */
-    /* v3.45.2: a relay leg row's name cell WRAPS (dot + ไม้N chip + name + ▶ centered together)
-       so the chip never overflows the cramped 20px chevron column into the pos cell and vanish
-       on a narrow phone (Klui: มือถือมองไม่เห็น ไม้ n). On desktop it stays one line. */
-    table tbody td.col-name.col-name--relay { white-space: normal !important; }
-    .col-name-wrap.col-name-wrap--relay { display: inline-flex; flex-wrap: wrap; grid-template-columns: none; justify-content: center; align-items: center; gap: 0 3px; }
-    .col-name-wrap.col-name-wrap--relay > .ncw-right { grid-column: auto; min-height: 0; }
+    /* v3.45.2: a relay leg row's name cell = ONE inline unit (name + ไม้N chip + ▶), sized to
+       content and centered by the td — no fixed 20px chevron track to clip the chip (the old
+       vanish bug) and NO wrapping to a second line (Klui: ไม้ 1 ตกแถวบนมือถือ). The unit is only
+       ~45px wider than the name, comparable to a normal row's reserved 20px+20px side tracks. */
+    .col-name-wrap.col-name-wrap--relay { display: inline-flex; flex-wrap: nowrap; white-space: nowrap; grid-template-columns: none; justify-content: center; align-items: center; gap: 0 3px; width: auto; }
+    .col-name-wrap.col-name-wrap--relay > .ncw-right { grid-column: auto; min-height: 0; flex: none; }
+    .col-name-wrap.col-name-wrap--relay .relay-leg-tag { margin-right: 0; }
+    .col-name-wrap.col-name-wrap--relay .tl-chevron { margin-left: 1px; }
 
     /* v18: settings popup minimal */
     #settingsPopup.settings-wide {
@@ -6070,16 +6073,16 @@ window.allPharmacistNames = [];
                '<b>' + _pbEsc(displayName(l.owner || '?')) + '</b>' + (when ? ' ' + _pbEsc(when) : '') + '</span>';
       }).join(' ') + '</span>';
     }
-    // v3.45.2: one-line summary at the top of a ต่อเวร step — "ต่อจาก <owner>: <the rest>"
-    //   (Klui: อยากรู้ทันทีว่าใครต่อเวรจากเจ้าของ). owner = ไม้1's owner; others = the distinct
-    //   remaining leg owners, in ไม้ order.
+    // v3.45.2: one-line summary at the top of a ต่อเวร step — "<the rest> ต่อเวรจาก <owner>"
+    //   (Klui's wording). owner = ไม้1's owner; others = the distinct remaining leg owners,
+    //   in ไม้ order.
     function _relayHandoffSummary(legs) {
       if (!Array.isArray(legs) || legs.length < 2) return '';
       var owner = displayName((legs[0] && legs[0].owner) || '?');
       var seen = {}; seen[owner] = 1; var others = [];
       legs.forEach(function(l) { var nm = displayName((l && l.owner) || '?'); if (!seen[nm]) { seen[nm] = 1; others.push(nm); } });
       if (!others.length) return '';
-      return '<span class="tl-relay-cont">ต่อจาก <b>' + _pbEsc(owner) + '</b>: <b>' + _pbEsc(others.join(', ')) + '</b></span>';
+      return '<span class="tl-relay-cont"><b>' + _pbEsc(others.join(', ')) + '</b> ต่อเวรจาก <b>' + _pbEsc(owner) + '</b></span>';
     }
     function _relayRangeParts(rangeStr) {
       var m = String(rangeStr || '').replace(/\s/g, '').match(/^(\d{1,2}:\d{2})-(\d{1,2}:\d{2})$/);
