@@ -943,10 +943,9 @@
     .swf-leg-time-fixed { width: 94px; text-align: center; font-size: 13px; font-weight: 600; color: var(--sub); background: var(--bg); border: 1px solid var(--border); border-radius: 8px; padding: 8px; }
     .swf-leg-del { border: none; background: none; color: #dc2626; font-size: 15px; cursor: pointer; padding: 2px 4px; flex: none; }
     .swf-leg-add { width: 100%; margin-top: 2px; padding: 8px; border: 1px dashed var(--border); border-radius: 8px; background: transparent; color: var(--accent); font-size: 12.5px; font-weight: 600; font-family: inherit; cursor: pointer; }
-    /* v3.45 relay: 'ไม้ N' chip on a split leg-row — colour set inline per leg */
-    .relay-leg-tag { display: inline-block; font-size: 8.5px; font-weight: 700; background: transparent; border: 1px solid currentColor; border-radius: 4px; padding: 0 4px; margin-right: 3px; vertical-align: middle; line-height: 1.5; }
-    /* v3.45 clinic-split: handoff window shown next to a clinic ไม้ (ถึง / เป็นต้นไป / ช่วง) */
-    .relay-clinic-when { font-size: 10px; font-weight: 700; white-space: nowrap; }
+    /* v3.45 relay: 'ไม้ N' chip on a split leg-row — colour set inline per leg. Clinic handoff
+       window rides in a title tooltip (not inline text — see the renderTable comment). */
+    .relay-leg-tag { display: inline-block; font-size: 8.5px; font-weight: 700; background: transparent; border: 1px solid currentColor; border-radius: 4px; padding: 0 4px; margin-right: 3px; vertical-align: middle; line-height: 1.5; cursor: help; }
     .swf-relay-clinic-hint { font-size: 11.5px; color: var(--sub); background: rgba(124,58,237,0.08); border-radius: 8px; padding: 7px 9px; margin: 2px 0 8px; line-height: 1.5; }
     .swf-btns { display: flex; gap: 8px; margin-top: 16px; }
     .swf-btn {
@@ -5125,9 +5124,26 @@ window.allPharmacistNames = [];
         else if (sl.indexOf('รอบ 3') >= 0 || sl.indexOf('รอบ3') >= 0) bcls = 'badge-s3';
         const btnStyle = isStruck ? 'margin-bottom:6px; opacity:0.6;' : 'margin-bottom:6px;';
         const strikeStyle = isStruck ? 'text-decoration:line-through;' : '';
-        let row = '<button class="pick-result" data-cell-pick-key="' + enc + '" style="' + btnStyle + '">';
+        // v3.45 relay: a leg-row's synthetic sub-range key isn't in rawData (same issue the
+        //   table hit — commit 7144959) — stamp actionId so the click handler below can route to
+        //   the leg editor INSTEAD of data-cell-pick-key → openActionModalForKey (silent no-op /
+        //   wrong modal). Also show the ไม้ tag + handoff window so a split isn't indistinguishable.
+        let legTag = '';
+        const relayAttr = (s._relayLeg && s._relayLeg.actionId)
+          ? ' data-relay-actid="' + encodeURIComponent(s._relayLeg.actionId) + '" data-relay-mid="' + encodeURIComponent(_pickerMid) + '"'
+          : '';
+        if (s._relayLeg) {
+          const _legC = (typeof _relayLegColor === 'function') ? _relayLegColor(s._relayLeg.i - 1) : '#0d9488';
+          let _legWhen = '';
+          if (s._relayLeg.clinic) {
+            const _cs = s._relayLeg.start, _ce = s._relayLeg.end;
+            _legWhen = (!_cs && _ce) ? (' · ถึง ' + _ce) : (_cs && !_ce) ? (' · ' + _cs + ' เป็นต้นไป') : (_cs && _ce) ? (' · ' + _cs + '–' + _ce) : '';
+          }
+          legTag = '<span class="relay-leg-tag" style="color:' + _legC + '; border-color:' + _legC + ';">ไม้ ' + s._relayLeg.i + _legWhen + '</span> ';
+        }
+        let row = '<button class="pick-result" data-cell-pick-key="' + enc + '"' + relayAttr + ' style="' + btnStyle + '">';
         row += '<div style="flex:1;">';
-        row += '<div class="pick-result-name" style="' + strikeStyle + '">' + s.pos + ghostTag + statusTag + '</div>';
+        row += '<div class="pick-result-name" style="' + strikeStyle + '">' + legTag + s.pos + ghostTag + statusTag + '</div>';
         row += '</div>';
         if (isSpecialClinic(s)) {
           row += '<span class="pick-result-badge ' + bcls + '" data-phx-note-trigger="1" data-phx-note-date="' + encodeURIComponent(s.date || '') + '" data-phx-note-pos="' + encodeURIComponent(s.pos || '') + '" style="cursor:pointer;' + strikeStyle + '">ตรวจสอบ ↗</span>';
@@ -5162,6 +5178,16 @@ window.allPharmacistNames = [];
       box.querySelectorAll('[data-cell-pick-key]').forEach(btn => {
         btn.addEventListener('click', function(ev) {
           ev.stopPropagation();
+          // v3.45 relay: a leg-row → the leg editor, same as the table (commit 7144959). Must
+          //   check this FIRST — the synthetic key still resolves openActionModalForKey down a
+          //   wrong path for ไม้1 (coincides with the real master key → shows "undo the give"
+          //   instead) and silently no-ops for ไม้2+ (key not in rawData at all).
+          const raid = btn.getAttribute('data-relay-actid');
+          if (raid && typeof _relayEditLegs === 'function') {
+            closeActionModal();
+            _relayEditLegs(decodeURIComponent(btn.getAttribute('data-relay-mid') || '') || getCurrentMonthId(), decodeURIComponent(raid));
+            return;
+          }
           const k = decodeURIComponent(btn.getAttribute('data-cell-pick-key'));
           openActionModalForKey(k);
         });
@@ -5195,12 +5221,24 @@ window.allPharmacistNames = [];
         else if (sl.indexOf('รอบ 2') >= 0 || sl.indexOf('รอบ2') >= 0) bcls = 'badge-s2';
         else if (sl.indexOf('รอบ 3') >= 0 || sl.indexOf('รอบ3') >= 0) bcls = 'badge-s3';
         const ghostTag = s._ghost ? ' <span style="color:#16a34a; font-size:10px; font-weight:600;">' + (s._ghostLabel || '(เวรที่รับมา)') + '</span>' : '';
+        // v3.45 relay: display-only ไม้ tag (view mode has no edit routing — just parity with
+        //   the table/edit-mode picker so a split shift isn't shown as if it were a whole one).
+        let legTag = '';
+        if (s._relayLeg) {
+          const _legC = (typeof _relayLegColor === 'function') ? _relayLegColor(s._relayLeg.i - 1) : '#0d9488';
+          let _legWhen = '';
+          if (s._relayLeg.clinic) {
+            const _cs = s._relayLeg.start, _ce = s._relayLeg.end;
+            _legWhen = (!_cs && _ce) ? (' · ถึง ' + _ce) : (_cs && !_ce) ? (' · ' + _cs + ' เป็นต้นไป') : (_cs && _ce) ? (' · ' + _cs + '–' + _ce) : '';
+          }
+          legTag = '<span class="relay-leg-tag" style="color:' + _legC + '; border-color:' + _legC + ';">ไม้ ' + s._relayLeg.i + _legWhen + '</span> ';
+        }
         const detailAttrs = isClinic
           ? 'data-cv-clinic="1" data-cv-date="' + encodeURIComponent(s.date || '') + '" data-cv-pos="' + encodeURIComponent(s.pos || '') + '"'
           : 'data-cv-pos="' + encodeURIComponent(s.pos || '') + '"';
         html += '<button class="pick-result" ' + detailAttrs + ' style="margin-bottom:6px;">';
         html += '<div style="flex:1; text-align:left;">';
-        html += '<div class="pick-result-name">' + (s.pos || '') + ghostTag + '</div>';
+        html += '<div class="pick-result-name">' + legTag + (s.pos || '') + ghostTag + '</div>';
         html += '</div>';
         if (isClinic) {
           html += '<span class="pick-result-badge ' + bcls + '">คลินิกพิเศษ</span>';
@@ -6270,8 +6308,10 @@ window.allPharmacistNames = [];
           '<thead><tr><th>วันที่</th><th>ชื่อเภสัชกร</th><th>ตำแหน่ง</th><th>รอบเวลา</th></tr></thead>' +
           '<tbody>' + rowsHtml + '</tbody></table></div>'
         : '';
-      // v3.45: relay-baton time split — give or add (รับเวร), only when the flag is on
-      var relayHtml = (window._relayEnabled && (kind === 'give' || kind === 'add')) ? _relaySectionShellHtml() : '';
+      // v3.45: relay-baton time split — GIVE only. A shift must already be truly yours to split
+      //   it; mid-receive (add) / mid-swap it isn't settled yet (Klui: "ต้องรับมาเป็นของเราจริงๆ
+      //   ก่อน") — split an add/swap's result AFTER the fact via the timeline 🏃✎ (_relayEditLegs).
+      var relayHtml = (window._relayEnabled && kind === 'give') ? _relaySectionShellHtml() : '';
       var ov = document.createElement('div');
       ov.id = 'swfConfirmOverlay';
       ov.style.cssText = 'position:fixed; inset:0; background:rgba(0,0,0,0.5); z-index:10005; display:flex; align-items:center; justify-content:center; padding:16px;';
@@ -6290,9 +6330,9 @@ window.allPharmacistNames = [];
         '<button type="button" id="swfDiscard" class="swf-link-cancel">ยกเลิกรายการนี้ (ทิ้งร่าง)</button>' +
         '</div>';
       document.body.appendChild(ov);
-      // v3.45: wire the relay-legs editor (give/add + flag only) after the dialog is in the DOM
-      if (window._relayEnabled && (kind === 'give' || kind === 'add')) {
-        try { _relayInit(action, (kind === 'give' ? myShift : tgtShift), viewer); } catch (e) { console.warn('[relay] init', e); _swfRelay = null; }
+      // v3.45: wire the relay-legs editor (give only + flag on) after the dialog is in the DOM
+      if (window._relayEnabled && kind === 'give') {
+        try { _relayInit(action, myShift, viewer); } catch (e) { console.warn('[relay] init', e); _swfRelay = null; }
       } else { _swfRelay = null; }
       // ✕ / tap outside / "เก็บร่างไว้ก่อน" — draft stays (already saved); the
       //   pending-drafts popup reminds on the next edit-mode entry.
@@ -6301,7 +6341,7 @@ window.allPharmacistNames = [];
       document.getElementById('swfKeep').addEventListener('click', function() {
         // Keeping a draft is meant to be friction-free: valid legs are saved, an
         //   incomplete relay is dropped to a plain whole-shift draft (not blocked).
-        if (window._relayEnabled && (kind === 'give' || kind === 'add')) {
+        if (window._relayEnabled && kind === 'give') {
           var rc = _relayCollect();
           if (rc.error) {
             _relaySaveLegs(mid, action.id, null);
@@ -6317,7 +6357,7 @@ window.allPharmacistNames = [];
       document.getElementById('swfDone').addEventListener('click', function() {
         // Publishing requires a complete relay — read it BEFORE closing (needs the DOM).
         var relayLegs = null;
-        if (window._relayEnabled && (kind === 'give' || kind === 'add')) {
+        if (window._relayEnabled && kind === 'give') {
           var rc = _relayCollect();
           if (rc.error) { if (typeof _p2bShowToast === 'function') _p2bShowToast(rc.error, 'warn'); return; }
           relayLegs = rc.legs;
@@ -7941,19 +7981,20 @@ window.allPharmacistNames = [];
         } else {
           displayFormat = "-";
         }
-        // v3.45 relay: tag a leg-row with its ไม้ number, tinted with that leg's own colour
+        // v3.45 relay: tag a leg-row with its ไม้ number, tinted with that leg's own colour.
+        //   v3.45.1: clinic handoff-time moved from inline text into a title tooltip — jammed
+        //   next to the clickable "ตรวจสอบ" badge it read as one run-on chip (Klui: "แปลก").
         if (i._relayLeg) {
           const _legC = _relayLegColor(i._relayLeg.i - 1);
-          displayFormat = '<span class="relay-leg-tag" style="color:' + _legC + '; border-color:' + _legC + ';">ไม้ ' + i._relayLeg.i + '</span>' + displayFormat;
-          // clinic ไม้ keep the "ตรวจสอบ" badge (no fixed range) — append the handoff window so
-          //   the two rows aren't indistinguishable: ถึง 11:00 / 11:00 เป็นต้นไป / 11:00–14:00
+          let _legTitle = '';
           if (i._relayLeg.clinic) {
             const _cs = i._relayLeg.start, _ce = i._relayLeg.end;
             const _cw = (!_cs && _ce) ? ('ถึง ' + _ce)
                       : (_cs && !_ce) ? (_cs + ' เป็นต้นไป')
                       : (_cs && _ce) ? (_cs + '–' + _ce) : '';
-            if (_cw) displayFormat += '<span class="relay-clinic-when" style="color:' + _legC + ';"> · ' + _cw + '</span>';
+            if (_cw) _legTitle = ' title="' + _cw + '"';
           }
+          displayFormat = '<span class="relay-leg-tag"' + _legTitle + ' style="color:' + _legC + '; border-color:' + _legC + ';">ไม้ ' + i._relayLeg.i + '</span>' + displayFormat;
         }
 
         let _suffix = '';
@@ -12061,11 +12102,26 @@ table.exp-tbl .tm{margin-left:3px;opacity:0.75;}
           const day = parseInt(dayMatch[1], 10);
           if (!day || day < 1 || day > 31) return;
 
+          // v3.45: cross-month spillover — s.date carries the shift's OWN month (e.g. a Jan-2
+          //   shift stored in a December sheet, same case the calendar grid handles — commit
+          //   72f0b27/44098c5). Resolve it here too, or every spillover shift silently exports
+          //   under the SHEET's month/year instead of its own (Klui: "ยังไม่รู้จัก 2 มกราคม").
+          //   Only "immediately following month" is a real case (matches renderCalendar); an
+          //   unparseable/mismatched-otherwise month falls back to the sheet's own (safe no-op
+          //   for ordinary single-month schedules).
+          const _dm = String(s.date).split('/')[1];
+          const _shiftMonth = _dm ? parseInt(_dm, 10) : NaN;
+          let baseYear = year, baseMonth = month;
+          if (!isNaN(_shiftMonth) && _shiftMonth >= 1 && _shiftMonth <= 12 && _shiftMonth !== month) {
+            baseMonth = _shiftMonth;
+            baseYear = (_shiftMonth < month) ? year + 1 : year;
+          }
+
           // v3.36: If Round 3 export toggle ON + shift is Round 3 → display day +1
           // (UID still uses original day so re-export updates event, not duplicates)
-          let effYear = year, effMonth = month, effDay = day;
+          let effYear = baseYear, effMonth = baseMonth, effDay = day;
           if (_shiftRound3 && typeof _isRound3Shift === 'function' && _isRound3Shift(s)) {
-            const _d = new Date(year, month - 1, day);
+            const _d = new Date(baseYear, baseMonth - 1, day);
             _d.setDate(_d.getDate() + 1);
             effYear = _d.getFullYear();
             effMonth = _d.getMonth() + 1;
