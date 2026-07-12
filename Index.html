@@ -4535,9 +4535,10 @@ window.allPharmacistNames = [];
             kind = 'relay';
             // v3.45.2: top summary line "<the rest> ต่อเวรจาก <owner>" then the ไม้ list (no 🏃 —
             //   the teal border + number already mark the step; Klui: เอา 🏃 ออก).
-            // v3.45.3: resolve sticky-note leg handoffs so the timeline shows the CURRENT ไม้ holder.
-            var _rlegs = _relayLegsFor(monthId, act);
-            desc = (srcStr ? srcStr : '') + _relayHandoffSummary(_rlegs) + _relayLegsSummaryHtml(_rlegs);
+            // v3.45.3 pt4: this step is the RECORD OF THE ORIGINAL SPLIT → show the legs AS AUTHORED
+            //   (raw act.legs). A ไม้ that later changed hands is its OWN step below + the holder line
+            //   reflects it (Klui: ไม้1 ควรเป็น "ขลุ่ย" เพราะแยกส่วนแลกออกเป็นอีกขั้นแล้ว).
+            desc = (srcStr ? srcStr : '') + _relayHandoffSummary(act.legs) + _relayLegsSummaryHtml(act.legs);
           }
           // v3.44: inline ✎ right after the name → edit the counterpart (B) in place. Shown on a
           //   DRAFT (to its author) or on any record when the viewer is Admin (published = final,
@@ -4712,9 +4713,9 @@ window.allPharmacistNames = [];
             }
             kind = 'relay';
             // v3.45.2: summary already names the owner, so no separate actor prefix; no 🏃 (Klui).
-            // v3.45.3: resolve sticky-note leg handoffs so non-author viewers see the CURRENT holder.
-            var _rlegsPB = _relayLegsFor((typeof getCurrentMonthId === 'function') ? getCurrentMonthId() : '', ov);
-            desc = srcStr + _relayHandoffSummary(_rlegsPB) + _relayLegsSummaryHtml(_rlegsPB);
+            // v3.45.3 pt4: original-split record → raw ov.legs (handoffs are separate steps below +
+            //   the holder line shows the current holder).
+            desc = srcStr + _relayHandoffSummary(ov.legs) + _relayLegsSummaryHtml(ov.legs);
             // author's own 🏃✎ (the action IS in their local OverlayManager even when this PB
             //   builder renders — e.g. anonymous-mode view); admin uses the ✕ cancel below instead.
             //   Edit-mode gated like the author builder (กดดินสอก่อน).
@@ -6484,13 +6485,10 @@ window.allPharmacistNames = [];
                  : (s && !e) ? (s + ' น. เป็นต้นไป')
                  : (s && e) ? (s + '-' + e) : '';
         var c = _relayLegColor(i);
-        // v3.45.3: a ไม้ that was handed on (sticky note) reads "<current> ← <original>" so the
-        //   hop is visible in history without a separate step. _baseOwner set only when it moved.
-        var _base = String(l._baseOwner || '');
-        var _handed = _base && _base !== String(l.owner || '');
-        var _hop = _handed ? '<span class="tl-relay-hop" style="opacity:.72;"> ← ' + _pbEsc(displayName(_base)) + '</span>' : '';
+        // v3.45.3 pt4: NO "← original" hop here — this list is the original-split record (raw legs);
+        //   a ไม้ that changed hands shows as its own step + the holder line (Klui: ไม้1 ต้องเป็นชื่อเดิม).
         return '<span class="tl-relay-leg"><span class="relay-leg-tag" style="color:' + c + '; border-color:' + c + ';">ไม้ ' + (i + 1) + '</span> ' +
-               '<b>' + _pbEsc(displayName(l.owner || '?')) + '</b>' + _hop + (when ? ' ' + _pbEsc(when) : '') + '</span>';
+               '<b>' + _pbEsc(displayName(l.owner || '?')) + '</b>' + (when ? ' ' + _pbEsc(when) : '') + '</span>';
       }).join(' ') + '</span>';
     }
     // v3.45.2: one-line summary at the top of a ต่อเวร step — "<the rest> ต่อเวรจาก <owner>"
