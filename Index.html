@@ -244,6 +244,8 @@
       white-space: nowrap; text-overflow: clip;
       text-align: center; width: 100%; letter-spacing: -0.04em;
     }
+    /* v3.45 relay: small ไม้-number superscript on a split leg badge (colour set inline) */
+    .cal-leg-tag { font-size: 7px; font-weight: 800; vertical-align: super; line-height: 1; margin-right: 1px; }
     #calendarGrid {
       display: grid; grid-template-columns: repeat(7, minmax(0, 1fr));
       gap: 0; background: var(--surface);
@@ -688,6 +690,7 @@
       margin-top: 4px; padding: 3px 8px; border-radius: 4px;
       font-size: 10px; font-weight: 600; text-align: center;
     }
+    .tl-leg-note { font-size: 11px; font-weight: 600; opacity: 0.85; }
     .tl-inline-end.ended { background: #fee2e2; color: #991b1b; }
     .tl-inline-end.active { background: #dcfce7; color: #166534; }
     body.dark-theme .tl-inline-end.ended { background: #450a0a; color: #fca5a5; }
@@ -942,6 +945,9 @@
     .swf-leg-add { width: 100%; margin-top: 2px; padding: 8px; border: 1px dashed var(--border); border-radius: 8px; background: transparent; color: var(--accent); font-size: 12.5px; font-weight: 600; font-family: inherit; cursor: pointer; }
     /* v3.45 relay: 'ไม้ N' chip on a split leg-row — colour set inline per leg */
     .relay-leg-tag { display: inline-block; font-size: 8.5px; font-weight: 700; background: transparent; border: 1px solid currentColor; border-radius: 4px; padding: 0 4px; margin-right: 3px; vertical-align: middle; line-height: 1.5; }
+    /* v3.45 clinic-split: handoff window shown next to a clinic ไม้ (ถึง / เป็นต้นไป / ช่วง) */
+    .relay-clinic-when { font-size: 10px; font-weight: 700; white-space: nowrap; }
+    .swf-relay-clinic-hint { font-size: 11.5px; color: var(--sub); background: rgba(124,58,237,0.08); border-radius: 8px; padding: 7px 9px; margin: 2px 0 8px; line-height: 1.5; }
     .swf-btns { display: flex; gap: 8px; margin-top: 16px; }
     .swf-btn {
       flex: 1; padding: 11px; border-radius: 9px; font-family: inherit;
@@ -2909,8 +2915,15 @@ window.allPharmacistNames = [];
         rel.legs.forEach(function(leg, i) {
           var lr = Object.assign({}, t);
           lr.name = leg.owner;
-          lr.range = String(leg.start || '') + '-' + String(leg.end || '');
-          lr._relayLeg = { i: i + 1, of: rel.legs.length, actionId: id, from: t.name };
+          if (leg.clinic) {
+            // clinic ไม้ (handoff-time-only): KEEP the shift's own (clinic) range so isSpecialClinic
+            //   stays true — badge + all-day .ics export path. The seam window rides on _relayLeg.
+            lr._relayLeg = { i: i + 1, of: rel.legs.length, actionId: id, from: t.name,
+                             clinic: true, start: String(leg.start || ''), end: String(leg.end || '') };
+          } else {
+            lr.range = String(leg.start || '') + '-' + String(leg.end || '');
+            lr._relayLeg = { i: i + 1, of: rel.legs.length, actionId: id, from: t.name };
+          }
           // a leg is a first-class own-row, not a ghost — strip inherited ghost markers
           lr._ghost = undefined; lr._ghostKey = undefined; lr._ghostActionId = undefined;
           lr._ghostType = undefined; lr._ghostLabel = undefined; lr._conflict = undefined;
@@ -4426,8 +4439,19 @@ window.allPharmacistNames = [];
           _curHolder = viewer;
         }
         const _pinnedSrc = chain.some(a => a && a._retroFinal);
+        // v3.45 relay: flag that this shift is time-split into ไม้ (per-ไม้ detail is in the
+        //   table/calendar) — otherwise "อยู่กับ: <recipient>" hides that the giver kept a ไม้.
+        let _legNote = '';
+        try {
+          const _legAct = (targetAction && Array.isArray(targetAction.legs) && targetAction.legs.length >= 2) ? targetAction
+                        : (lastAct && Array.isArray(lastAct.legs) && lastAct.legs.length >= 2) ? lastAct : null;
+          if (window._relayEnabled && _legAct) {
+            const _isClin = _legAct.legs.some(l => l && l.clinic);
+            _legNote = ' <span class="tl-leg-note">· แบ่งเป็น ' + _legAct.legs.length + ' ไม้' + (_isClin ? ' (คลินิก · ส่งไม้ต่อเวลา)' : '') + '</span>';
+          }
+        } catch (e) {}
         html += '<div class="tl-inline-end active">ปัจจุบันเวรนี้อยู่กับ: <b>' + displayName(_curHolder || '?') + '</b>' +
-                (_pinnedSrc ? ' <span title="ปักหมุดจากการบันทึกย้อนหลัง (ข้ามช่วงที่ไม่ทราบ)">🔒</span>' : '') + '</div>';
+                (_pinnedSrc ? ' <span title="ปักหมุดจากการบันทึกย้อนหลัง (ข้ามช่วงที่ไม่ทราบ)">🔒</span>' : '') + _legNote + '</div>';
         // v3.44: publish/unpublish moved OUT of the timeline into the single "🌐 เผยแพร่"
         //   FAB modal (openPublishModal). The timeline is now read-only history.
         return html;
@@ -5906,7 +5930,7 @@ window.allPharmacistNames = [];
       '</div>';
     }
     function _relayBarHtml() {
-      if (!_swfRelay) return '';
+      if (!_swfRelay || _swfRelay.clinic) return '';   // clinic split has no time horizon → no proportion bar
       var total = _swfRelay.endMin - _swfRelay.startMin;
       if (total <= 0) return '';
       var segs = '', prev = _swfRelay.startMin;
@@ -5976,17 +6000,21 @@ window.allPharmacistNames = [];
       var body = document.getElementById('swfRelayBody');
       if (!body) return;
       var legs = _swfRelay.legs;
-      legs[legs.length - 1].end = _swfRelay.end;   // last leg always ends at the shift end
-      var html = _relayBarHtml();
+      var clinic = !!_swfRelay.clinic;
+      if (!clinic) legs[legs.length - 1].end = _swfRelay.end;   // timed: last leg always ends at the shift end
+      // clinic (idea C): no time horizon — capture ONLY the handoff time(s); last ไม้ runs "จนจบ" (open)
+      var html = clinic
+        ? '<div class="swf-relay-clinic-hint">🕐 คลินิกพิเศษ — ใส่เฉพาะ<b>เวลาที่คนถัดไปมารับช่วง</b> ไม่ต้องรู้เวลาเริ่ม/จบ</div>'
+        : _relayBarHtml();
       legs.forEach(function(l, i) {
         var isLast = (i === legs.length - 1);
         html += '<div class="swf-leg" data-leg="' + i + '">' +
           '<span class="swf-leg-dot" style="background:' + _relayLegColor(i) + ';"></span>' +
           '<input type="text" class="swf-leg-owner-inp" data-leg-owner="' + i + '" autocomplete="off" ' +
             'placeholder="พิมพ์ชื่อ / ชื่อเล่น" value="' + _pbEsc(l.owner ? displayName(l.owner) : '') + '">' +
-          '<span class="swf-leg-until">อยู่ถึง</span>' +
+          '<span class="swf-leg-until">' + ((clinic && isLast) ? 'อยู่ต่อ' : 'อยู่ถึง') + '</span>' +
           (isLast
-            ? '<span class="swf-leg-time-fixed">' + _pbEsc(_swfRelay.end) + '</span>'
+            ? '<span class="swf-leg-time-fixed">' + (clinic ? 'จนจบ' : _pbEsc(_swfRelay.end)) + '</span>'
             : '<input type="time" class="swf-leg-time" data-leg-time="' + i + '" value="' + _pbEsc(l.end || '') + '">') +
           (legs.length > 2 && !isLast ? '<button type="button" class="swf-leg-del" data-leg-del="' + i + '" aria-label="ลบไม้นี้">✕</button>' : '') +
           '</div>';
@@ -6005,9 +6033,13 @@ window.allPharmacistNames = [];
       });
       var addBtn = document.getElementById('swfLegAdd');
       if (addBtn) addBtn.addEventListener('click', function() {
-        var ls = (legs.length >= 2) ? _relayMin(legs[legs.length - 2].end) : _swfRelay.startMin;
-        var mid = _relayFmt(_relayMid(ls, _swfRelay.endMin));
-        legs.splice(legs.length - 1, 0, { owner: '', end: mid });
+        // clinic: new ไม้ starts with a blank handoff time (user fills it — no range to interpolate)
+        var newEnd = '';
+        if (!clinic) {
+          var ls = (legs.length >= 2) ? _relayMin(legs[legs.length - 2].end) : _swfRelay.startMin;
+          newEnd = _relayFmt(_relayMid(ls, _swfRelay.endMin));
+        }
+        legs.splice(legs.length - 1, 0, { owner: '', end: newEnd });
         _relayRenderLegs();
       });
       Array.prototype.forEach.call(body.querySelectorAll('[data-leg-del]'), function(btn) {
@@ -6026,7 +6058,12 @@ window.allPharmacistNames = [];
       var startMin = parts ? _relayMin(parts.start) : NaN;
       var endMin = parts ? _relayMin(parts.end) : NaN;
       if (parts && !isNaN(startMin) && !isNaN(endMin) && endMin <= startMin) endMin += 1440;   // cross-midnight (e.g. 16:30-0:00)
-      if (!parts || isNaN(startMin) || isNaN(endMin) || (endMin - startMin) < 2) {
+      var timed = !!parts && !isNaN(startMin) && !isNaN(endMin) && (endMin - startMin) >= 2;
+      // idea C: a clinic (ตรวจสอบ / ⚠️) shift has no clear head/tail. Instead of disabling the
+      //   toggle, allow a handoff-time-only split — capture just the seam time(s); the first
+      //   ไม้'s head and the last ไม้'s tail stay OPEN.
+      var clinic = !timed && !!shift && (typeof isSpecialClinic === 'function') && isSpecialClinic(shift);
+      if (!timed && !clinic) {
         var sub = document.getElementById('swfRelaySub');
         if (sub) sub.innerHTML = 'เวรนี้ยังแบ่งเวลาไม่ได้ (เวลาไม่ชัดเจน)';
         var tg = document.getElementById('swfRelayToggle');
@@ -6038,13 +6075,24 @@ window.allPharmacistNames = [];
       var seed;
       if (hasLegs) {
         seed = action.legs.map(function(l) { return { owner: l.owner || '', end: l.end || '' }; });
+      } else if (clinic) {
+        // give: giver = ไม้1, recipient picks up "จนจบ". add/other: actor = ไม้1, ไม้2 blank.
+        //   end='' on every seed leg → the user fills the seam time; last ไม้ stays open.
+        var secondOwnerC = (String(action.action || '') === 'give') ? (action.partnerName || '') : '';
+        seed = [{ owner: viewer || '', end: '' }, { owner: secondOwnerC, end: '' }];
       } else {
         var mid = _relayFmt(_relayMid(startMin, endMin));
         // give: giver keeps ไม้1, recipient = ไม้2. add/other: actor = ไม้1, ไม้2 blank (pick who covers the rest).
         var secondOwner = (String(action.action || '') === 'give') ? (action.partnerName || '') : '';
         seed = [{ owner: viewer || '', end: mid }, { owner: secondOwner, end: parts.end }];
       }
-      _swfRelay = { on: hasLegs, legs: seed, start: parts.start, end: parts.end, startMin: startMin, endMin: endMin };
+      _swfRelay = clinic
+        ? { on: hasLegs, clinic: true, legs: seed, start: null, end: null, startMin: null, endMin: null }
+        : { on: hasLegs, legs: seed, start: parts.start, end: parts.end, startMin: startMin, endMin: endMin };
+      if (clinic) {
+        var subC = document.getElementById('swfRelaySub');
+        if (subC) subC.innerHTML = 'คลินิกพิเศษ — แบ่งเวรได้โดยใส่<b>เวลาส่งไม้</b>เท่านั้น';
+      }
       var toggle = document.getElementById('swfRelayToggle');
       var bodyEl = document.getElementById('swfRelayBody');
       function paint() {
@@ -6066,6 +6114,29 @@ window.allPharmacistNames = [];
       if (!_swfRelay || !_swfRelay.on) return { legs: null };
       var legs = _swfRelay.legs;
       if (!legs || legs.length < 2) return { error: 'ต้องมีอย่างน้อย 2 ไม้' };
+      if (_swfRelay.clinic) {
+        // idea C — handoff-time-only. Each ไม้ stores {start,end} where the seam times chain;
+        //   the FIRST ไม้'s start and the LAST ไม้'s end stay '' (open head/tail). Seams must be
+        //   present and strictly increasing. clinic:true rides along for display + all-day export.
+        var outC = [], prevC = '', prevMinC = -1;
+        for (var j = 0; j < legs.length; j++) {
+          var ownerC = (legs[j].owner || '').trim();
+          if (!ownerC) return { error: 'ไม้ ' + (j + 1) + ' ยังไม่ได้เลือกชื่อ' };
+          var lastC = (j === legs.length - 1);
+          var seam = lastC ? '' : (legs[j].end || '');
+          if (!lastC) {
+            var seamMin = _relayMin(seam);
+            if (isNaN(seamMin)) return { error: 'ไม้ ' + (j + 1) + ' ยังไม่ได้ใส่เวลาส่งไม้' };
+            if (seamMin <= prevMinC) return { error: 'เวลาส่งไม้ต้องเรียงจากน้อยไปมาก' };
+            prevMinC = seamMin;
+          }
+          outC.push({ owner: ownerC, start: prevC, end: seam, clinic: true });
+          prevC = seam;
+        }
+        var distinctC = {}; outC.forEach(function(l) { distinctC[l.owner] = 1; });
+        if (Object.keys(distinctC).length < 2) return { error: 'ต้องมีอย่างน้อย 2 คนที่ต่างกัน' };
+        return { legs: outC };
+      }
       var prevMin = _swfRelay.startMin, out = [];
       for (var i = 0; i < legs.length; i++) {
         var owner = (legs[i].owner || '').trim();
@@ -7874,6 +7945,15 @@ window.allPharmacistNames = [];
         if (i._relayLeg) {
           const _legC = _relayLegColor(i._relayLeg.i - 1);
           displayFormat = '<span class="relay-leg-tag" style="color:' + _legC + '; border-color:' + _legC + ';">ไม้ ' + i._relayLeg.i + '</span>' + displayFormat;
+          // clinic ไม้ keep the "ตรวจสอบ" badge (no fixed range) — append the handoff window so
+          //   the two rows aren't indistinguishable: ถึง 11:00 / 11:00 เป็นต้นไป / 11:00–14:00
+          if (i._relayLeg.clinic) {
+            const _cs = i._relayLeg.start, _ce = i._relayLeg.end;
+            const _cw = (!_cs && _ce) ? ('ถึง ' + _ce)
+                      : (_cs && !_ce) ? (_cs + ' เป็นต้นไป')
+                      : (_cs && _ce) ? (_cs + '–' + _ce) : '';
+            if (_cw) displayFormat += '<span class="relay-clinic-when" style="color:' + _legC + ';"> · ' + _cw + '</span>';
+          }
         }
 
         let _suffix = '';
@@ -8224,7 +8304,13 @@ window.allPharmacistNames = [];
           } else if (_isClinicBadge) {
             _badgeAttrs = ` data-phx-note-trigger="1" data-phx-note-date="${encodeURIComponent(s.date || '')}" data-phx-note-pos="${encodeURIComponent(s.pos || '')}" style="cursor:pointer;"`;
           }
-          return `<div class="cal-badge ${bc}${_calExtraCls}"${_badgeAttrs}>${_calDot}<span class="cal-text">${s.pos}</span></div>`;
+          // v3.45 relay: mark a ไม้ (relay leg) badge with its number, tinted with the leg colour —
+          //   so a split shift (incl. a clinic handoff) is distinguishable from a whole-shift badge.
+          let _calLegTag = '';
+          if (s._relayLeg && typeof _relayLegColor === 'function') {
+            _calLegTag = `<span class="cal-leg-tag" style="color:${_relayLegColor(s._relayLeg.i - 1)}" title="ไม้ ${s._relayLeg.i}/${s._relayLeg.of}">${s._relayLeg.i}</span>`;
+          }
+          return `<div class="cal-badge ${bc}${_calExtraCls}"${_badgeAttrs}>${_calDot}${_calLegTag}<span class="cal-text">${s.pos}</span></div>`;
         }).join('');
 
         const dow = new Date(cell.yr, cell.mon - 1, day).getDay();
@@ -11841,6 +11927,21 @@ table.exp-tbl .tm{margin-left:3px;opacity:0.75;}
         ? buildGhostRows(rawData || [], mid, person).filter(function(g) { return !usedMap[g._ghostKey]; })
         : [];
       let shifts = ownShifts.concat(ghosts);
+      // v3.45 relay: export ไม้ too. _relayExpand replaces a legged shift's anchor with per-ไม้
+      //   rows — incl. the giver's KEPT ไม้ that usedMap dropped from ownShifts. Re-expand the
+      //   FULL picture (rawData + this person's ghosts) and keep only THIS person's rows/legs.
+      //   Same formula as the leg-aware banner count. Flag OFF → _relayExpand is a no-op → shifts
+      //   stays exactly ownShifts+ghosts (zero change to the default export).
+      try {
+        if (window._relayEnabled && typeof _relayExpand === 'function') {
+          shifts = _relayExpand((rawData || []).concat(ghosts), mid).filter(function(s) {
+            if (!s || s.name !== person) return false;
+            if (s._relayLeg) return true;
+            var _k = s._ghost ? s._ghostKey : makeShiftKey(s);
+            return !usedMap[_k];
+          });
+        }
+      } catch (e) { console.warn('[ICS] relay leg-expand skipped', e); }
 
       // Patch ZZ2: filter by selected shift keys (per-shift selection)
       if (selectedShifts && selectedShifts.size > 0) {
@@ -11986,10 +12087,22 @@ table.exp-tbl .tm{margin-left:3px;opacity:0.75;}
             if (s._ghost && s._ghostPartnerName) {
               summary += ' จาก ' + stripPrefix(s._ghostPartnerName);
             }
+            // v3.45 clinic-split (idea C): a clinic ไม้ stays all-day (no clear head/tail) but
+            //   carries a note about the handoff seam — "จะมีคนมาต่อ [เวลา]" / "มารับต่อจากคนก่อน".
+            let _rlNote = null;
+            if (s._relayLeg && s._relayLeg.clinic) {
+              summary += ' · ไม้ ' + s._relayLeg.i + '/' + s._relayLeg.of;
+              const _rs = s._relayLeg.start, _re = s._relayLeg.end;
+              _rlNote = (!_rs && _re) ? ('แบ่งเวร — อยู่ช่วงแรก จะมีคนมาต่อเวลา ' + _re)
+                      : (_rs && !_re) ? ('แบ่งเวร — มารับต่อจากคนก่อนเวลา ' + _rs + ' แล้วอยู่จนจบ')
+                      : (_rs && _re) ? ('แบ่งเวร — อยู่ช่วง ' + _rs + '–' + _re + ' แล้วมีคนมาต่อ')
+                      : null;
+            }
             let descLines = [
               'เภสัชกร: ' + cleanPerson,
               'ตำแหน่ง: ' + (s.pos || ''),
-              'หมายเหตุ: เวรคลินิกพิเศษ — โปรดตรวจสอบเวลาทำงานในระบบ'
+              _rlNote ? ('หมายเหตุ: ' + _rlNote + ' — โปรดตรวจสอบเวลาทำงานในระบบ')
+                      : 'หมายเหตุ: เวรคลินิกพิเศษ — โปรดตรวจสอบเวลาทำงานในระบบ'
             ];
             if (s._ghost) {
               if (s._ghostType === 'swap' && s._ghostPartnerName) {
