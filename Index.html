@@ -2924,14 +2924,27 @@ window.allPharmacistNames = [];
       if (!window._relayEnabled || !Array.isArray(rows)) return rows;
       var relays = _relayGather(mid);
       if (!relays.length) return rows;
-      var byAct = {}, bySlot = {};
-      relays.forEach(function(r) { byAct[r.actionId] = r; if (r.slotKey) bySlot[r.slotKey] = r; });
+      var byAct = {}, bySlot = {}, bySlotDPR = {};
+      relays.forEach(function(r) {
+        byAct[r.actionId] = r;
+        if (r.slotKey) {
+          bySlot[r.slotKey] = r;
+          // v3.45.2: also index by date|pos|range (drop the name) — the recipient's own WHOLE-shift
+          //   ghost of a split shift has the SAME date/pos/range as the master slot, differing only
+          //   in the name; matching it here folds it into the legs so it isn't shown ALONGSIDE the
+          //   ไม้ rows (Klui: I-18/103(1)* ซ้อนกับเวรเต็มในวันเดียว).
+          var _sp = String(r.slotKey).split('|');
+          if (_sp.length >= 4) bySlotDPR[_sp[0] + '|' + _sp[1] + '|' + _sp[3]] = r;
+        }
+      });
       var mk = (typeof makeShiftKey === 'function') ? makeShiftKey : function () { return null; };
-      // Which relay action does a row anchor? A give's master row matches slotKey; an add's
-      //   receiver only sees the whole-shift GHOST (the master is another person's, hidden by
-      //   the name filter) — so a ghost tagged with the action id anchors too. Prefer the master.
+      // Which relay action does a row anchor? A give's master row matches slotKey; the receiver's
+      //   whole-shift GHOST of the same slot (date|pos|range) is a DUPLICATE of the legs → also
+      //   folded in. Prefer the master as the leg template.
       function anchorActId(r) {
         if (!r._ghost) { var k = mk(r); return (k && bySlot[k]) ? bySlot[k].actionId : null; }
+        var gk = mk(r), gp = String(gk).split('|');
+        if (gp.length >= 4 && bySlotDPR[gp[0] + '|' + gp[1] + '|' + gp[3]]) return bySlotDPR[gp[0] + '|' + gp[1] + '|' + gp[3]].actionId;
         return (r._ghostActionId && byAct[r._ghostActionId]) ? r._ghostActionId : null;
       }
       var tmpl = {};
@@ -4268,7 +4281,10 @@ window.allPharmacistNames = [];
         e.stopPropagation();
         const _raid = decodeURIComponent(relayTr.getAttribute('data-relay-actid'));
         const _rmid = decodeURIComponent(relayTr.getAttribute('data-relay-mid') || '') || getCurrentMonthId();
-        if (_raid && typeof _relayEditLegs === 'function') _relayEditLegs(_rmid, _raid);
+        // v3.45.2: open the action menu for the underlying shift (สลับ/ยก/แก้ไม้) — a split shift
+        //   is still one shift (Klui). Falls back to the leg editor if the menu can't open.
+        if (_raid && typeof _relayOpenLegMenu === 'function') _relayOpenLegMenu(_rmid, _raid);
+        else if (_raid && typeof _relayEditLegs === 'function') _relayEditLegs(_rmid, _raid);
         return;
       }
       // 1) Table row click (data-shift-key directly on tr)
@@ -4431,8 +4447,9 @@ window.allPharmacistNames = [];
               if (sx) srcStr = '<b>' + sx.pos + '</b> ';
             }
             kind = 'relay';
-            // v3.45.2: top summary line "ต่อจาก <owner>: <the rest>" (Klui) then the 2-up ไม้ grid.
-            desc = '🏃 ' + (srcStr ? srcStr : '') + _relayHandoffSummary(act.legs) + _relayLegsSummaryHtml(act.legs);
+            // v3.45.2: top summary line "<the rest> ต่อเวรจาก <owner>" then the ไม้ list (no 🏃 —
+            //   the teal border + number already mark the step; Klui: เอา 🏃 ออก).
+            desc = (srcStr ? srcStr : '') + _relayHandoffSummary(act.legs) + _relayLegsSummaryHtml(act.legs);
           }
           // v3.44: inline ✎ right after the name → edit the counterpart (B) in place. Shown on a
           //   DRAFT (to its author) or on any record when the viewer is Admin (published = final,
@@ -4586,9 +4603,8 @@ window.allPharmacistNames = [];
               if (sp) srcStr = '<b>' + sp + '</b> ';
             }
             kind = 'relay';
-            // v3.45.2: "ต่อจาก <owner>: <the rest>" summary already names the owner, so no separate
-            //   actor prefix — then the 2-up ไม้ grid.
-            desc = '🏃 ' + srcStr + _relayHandoffSummary(ov.legs) + _relayLegsSummaryHtml(ov.legs);
+            // v3.45.2: summary already names the owner, so no separate actor prefix; no 🏃 (Klui).
+            desc = srcStr + _relayHandoffSummary(ov.legs) + _relayLegsSummaryHtml(ov.legs);
             // author's own 🏃✎ (the action IS in their local OverlayManager even when this PB
             //   builder renders — e.g. anonymous-mode view); admin uses the ✕ cancel below instead.
             //   Edit-mode gated like the author builder (กดดินสอก่อน).
@@ -5461,12 +5477,65 @@ window.allPharmacistNames = [];
       }
     }
 
-    // v3.45.2: ต่อเวร is offered only on a shift that can actually be split — a parseable
-    //   time range OR a clinic shift (handoff-time-only mode). Flag-gated like all relay UI.
+    // v3.45.2: find this user's own relay (ต่อเวร) action on a shiftKey → {id, action} or null.
+    //   local-only (their OverlayManager); a shift you can act on is one you hold, so the relay
+    //   that split it is your own.
+    function _relayActionForKey(mid, key) {
+      if (!window._relayEnabled || !key) return null;
+      var sk = String(key);
+      try {
+        OverlayManager.load();
+        var acts = (OverlayManager._data && OverlayManager._data[mid] && OverlayManager._data[mid].actions) || [];
+        var f = acts.find(function(a) { return a && String(a.action || '') === 'relay' && Array.isArray(a.legs) && a.legs.length >= 2 && String(a.shiftKey || '') === sk; });
+        if (f) return { id: f.id, action: f };
+      } catch (e) {}
+      return null;
+    }
+    function _relayActionById(mid, id) {
+      try {
+        OverlayManager.load();
+        var acts = (OverlayManager._data && OverlayManager._data[mid] && OverlayManager._data[mid].actions) || [];
+        var f = acts.find(function(a) { return a && a.id === id; });
+        if (f) return f;
+      } catch (e) {}
+      try {
+        var pb = (typeof pathBOverlays !== 'undefined' && Array.isArray(pathBOverlays)) ? pathBOverlays : [];
+        var f2 = pb.find(function(o) { return o && String(o.actionId) === String(id); });
+        if (f2) return f2;
+      } catch (e) {}
+      return null;
+    }
+    // v3.45.2: tapping a ไม้ row → open the action menu for the UNDERLYING shift (สลับ/ยก/แก้ไม้).
+    //   A split shift is still one shift (Klui), so it stays fully actionable — สลับ/ยก act on
+    //   the whole shift and clear the split (see _relayClearForShift).
+    function _relayOpenLegMenu(mid, actionId) {
+      var a = _relayActionById(mid, actionId);
+      if (!a || !a.shiftKey) { if (typeof _relayEditLegs === 'function') _relayEditLegs(mid, actionId); return; }
+      if (typeof openActionModalForKey === 'function') openActionModalForKey(String(a.shiftKey));
+      else if (typeof _relayEditLegs === 'function') _relayEditLegs(mid, actionId);
+    }
+    // v3.45.2: giving/swapping a split shift WHOLE supersedes the split — drop the relay action
+    //   (draft → gone; published → removeAction hook pushes phxRemoveAction) so it can't linger as
+    //   stale legs on a shift that just changed hands.
+    function _relayClearForShift(mid, key) {
+      var found = _relayActionForKey(mid, key);
+      if (!found) return false;
+      OverlayManager.removeAction(mid, found.id);
+      if (typeof invalidateGhostCache === 'function') invalidateGhostCache();
+      if (typeof _p2bShowToast === 'function') _p2bShowToast('ยกเลิกการแบ่งไม้ (ยก/สลับทั้งเวร)', 'ok');
+      return true;
+    }
+    // v3.45.2: ต่อเวร is offered only on a shift that can actually be split — a parseable time
+    //   range OR a clinic shift. When the shift is ALREADY split, the button edits the ไม้ instead.
     function _relayMenuBtnHtml() {
       if (!window._relayEnabled) return '';
       const shift = actionState.shiftKey ? findShiftByKey(actionState.shiftKey) : null;
       if (!shift) return '';
+      const mid = getCurrentMonthId();
+      const existing = _relayActionForKey(mid, actionState.shiftKey);
+      if (existing) {
+        return '<button class="act-btn" style="background:#f0fdfa; color:#0f766e; border-color:#99f6e4;" onclick="closeActionModal(); _relayEditLegs(\'' + mid + '\',\'' + existing.id + '\')">🏃 แก้ไม้ (ต่อเวร)</button>';
+      }
       const splittable = !!_relayRangeParts(shift.range) || isSpecialClinic(shift);
       if (!splittable) return '';
       return '<button class="act-btn" style="background:#f0fdfa; color:#0f766e; border-color:#99f6e4;" onclick="_relayStartFromMenu()">🏃 ต่อเวร — แบ่งช่วงเวลา</button>';
@@ -5847,6 +5916,8 @@ window.allPharmacistNames = [];
         _lwwTransferConfirm({ kind: 'swap', targetKey: targetKey, targetShift: targetShift, defaultFrom: _curHolder,
           onConfirm: function(fromName) {
             var stored = OverlayManager.addAction(mid, { action: 'swap', shiftKey: myKey, partnerShiftKey: targetKey, partnerName: fromName, originalOwner: mineName });
+            // v3.45.2: swapping the WHOLE shift supersedes any ต่อเวร split on it → drop the relay.
+            if (window._relayEnabled && typeof _relayClearForShift === 'function') _relayClearForShift(mid, myKey);
             closeActionModal(); triggerUpdate();
             // v3.45: transaction confirm — draft saved; เสร็จสิ้น = publish now, or keep draft
             if (stored && typeof swfOpenConfirm === 'function') swfOpenConfirm(mid, stored);
@@ -5869,11 +5940,14 @@ window.allPharmacistNames = [];
     function confirmPickName(partnerName) {
       if (actionState.step === 'give' && actionState.shiftKey) {
         const mid = getCurrentMonthId();
+        const _giveKey = actionState.shiftKey;
         const stored = OverlayManager.addAction(mid, {
           action: 'give',
-          shiftKey: actionState.shiftKey,
+          shiftKey: _giveKey,
           partnerName: partnerName
         });
+        // v3.45.2: giving the WHOLE shift supersedes any ต่อเวร split on it → drop the relay.
+        if (window._relayEnabled && typeof _relayClearForShift === 'function') _relayClearForShift(mid, _giveKey);
         closeActionModal();
         triggerUpdate();
         // v3.45: transaction confirm — draft saved; เสร็จสิ้น = publish now, or keep draft
