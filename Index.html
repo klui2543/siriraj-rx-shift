@@ -2665,7 +2665,10 @@ window.allPharmacistNames = [];
             _ghost: 'received',
             _ghostType: 'add',
             _ghostActionId: act.id,
-            _ghostPartnerName: act.partnerName
+            _ghostPartnerName: act.partnerName,
+            // v3.45.3: received-via-ไม้-swap marker rides in legs[0] (survives the server round-trip)
+            _legSwapDot: (Array.isArray(act.legs) && act.legs[0] && act.legs[0].__legswap) ? (act.legs[0].dot || null) : null,
+            _legSwapFrom: (Array.isArray(act.legs) && act.legs[0] && act.legs[0].__legswap) ? (act.legs[0].from || '') : ''
           });
         }
         // v3.42.11: guard against duplicate if bilateral already covered same actionId
@@ -5796,7 +5799,13 @@ window.allPharmacistNames = [];
       if (String(partner) === String(_actor)) { if (typeof _p2bShowToast === 'function') _p2bShowToast('เลือกเวรของคนอื่น (ไม่ใช่ของคุณเอง)', 'warn'); return; }
       actionState.legSwap = null;
       var ovr = a ? _relayAuthorOverride(mid, a, ls.leg, ls.fromOwner, partner, 'swap', { gotPos: String(targetShift.pos || '') }) : null;   // my ไม้ → partner
-      var add = OverlayManager.addAction(mid, { action: 'add', viewerName: _actor, shiftKey: targetKey, partnerName: partner });  // their shift → me
+      // their shift → me (a plain `add`). v3.45.3 pt5: tag it so the received row shows a swap-style
+      //   colour dot (tinted to the ไม้ traded) — a leg-swap isn't a real `swap` action so it'd
+      //   otherwise render dot-less and be hard to spot (Klui: หายาก). The marker rides in `legs[0]`
+      //   (whitelisted server passthrough, ignored by relay gather since action!=='relay') so it
+      //   SURVIVES the 30s pull that overwrites local actions with the server copy.
+      var _swDot = (typeof _relayLegColor === 'function') ? _relayLegColor(((ls.leg && ls.leg.i) || 1) - 1) : '#0d9488';
+      var add = OverlayManager.addAction(mid, { action: 'add', viewerName: _actor, shiftKey: targetKey, partnerName: partner, legs: [{ __legswap: 1, dot: _swDot, from: String(partner || '') }] });  // their shift → me
       if (typeof closeActionModal === 'function') closeActionModal();
       if (typeof triggerUpdate === 'function') triggerUpdate();
       var ids = []; if (ovr) ids.push(ovr.id); if (add) ids.push(add.id);
@@ -8647,6 +8656,10 @@ window.allPharmacistNames = [];
             const gc = OverlayManager.getSwapColor(_mid, _curUser, i._ghostActionId)
                     || (typeof PBOverlays !== 'undefined' ? PBOverlays.getSwapColor(i._ghostActionId) : null);
             if (gc) ghostDot = `<span class="swap-pair-dot" style="background:${gc}"></span>`;
+          } else if (i._legSwapDot) {
+            // v3.45.3: a whole shift received by TRADING A ไม้ (leg-swap) — dot it like a normal swap
+            //   so it's findable (Klui: หายาก). Tinted to the ไม้ traded; title names the counterpart.
+            ghostDot = `<span class="swap-pair-dot" style="background:${i._legSwapDot}" title="ได้มาจากการแลกไม้${i._legSwapFrom ? ' กับ ' + i._legSwapFrom : ''}"></span>`;
           }
           _overlayActionId = i._ghostActionId;
           const chev = i._ghostActionId
@@ -8977,6 +8990,7 @@ window.allPharmacistNames = [];
             _pairColor = OverlayManager.getSwapColor(_calMid, getCurrentUser(), s._ghostActionId)
                       || (typeof PBOverlays !== 'undefined' ? PBOverlays.getSwapColor(s._ghostActionId) : null);
           }
+          else if (_isGhostBadge && s._legSwapDot) _pairColor = s._legSwapDot;   // v3.45.3: leg-swap receive → dot
           if (_pairColor) _calDot = `<span class="cal-pair-dot" style="background:${_pairColor}"></span>`;
           // Patch ZZ3: VIEW mode trigger — hospital → Phase J, clinic → clinic note
           const _isHospitalBadge = s.room && s.room !== 'clinic';
