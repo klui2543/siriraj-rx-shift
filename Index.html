@@ -2941,7 +2941,9 @@ window.allPharmacistNames = [];
         if (idx < 0) return;                               // leg window changed (แก้ไม้) → note inert
         if (o.fromOwner && String(legs[idx].owner || '') !== o.fromOwner) return;  // stale/dup → skip
         legs[idx].owner = o.toOwner;
-        legs[idx]._chain.push({ from: o.fromOwner, to: o.toOwner, by: o.actor, kind: o.kind, at: o.createdAt });
+        // v3.45.3 pt8: carry dot + gotPos on the hop so _relayExpand can emit a swap-symmetric
+        //   STRUCK row for the giver (the ไม้ they handed off) matching the received row's colour.
+        legs[idx]._chain.push({ from: o.fromOwner, to: o.toOwner, by: o.actor, kind: o.kind, at: o.createdAt, dot: String(o.dot || ''), gotPos: String(o.gotPos || ''), actionId: o.id });
         // v3.45.3 pt6: a ไม้ received via แลกไม้ carries the swap pair-dot colour so the recipient's
         //   leg row shows the SAME golden dot as the giver's received whole shift (a matched pair).
         legs[idx]._swapDot = (o.kind === 'swap' && o.dot) ? o.dot : '';
@@ -3062,6 +3064,22 @@ window.allPharmacistNames = [];
           lr._ghost = undefined; lr._ghostKey = undefined; lr._ghostActionId = undefined;
           lr._ghostType = undefined; lr._ghostLabel = undefined; lr._conflict = undefined;
           out.push(lr);
+          // v3.45.3 pt8: SYMMETRY — for each handoff hop, emit a STRUCK ไม้ row for the giver
+          //   (hop.from), exactly like a normal ยก/แลกเวร shows the source struck. Renders on the
+          //   giver's own name-filtered view; ownership still never moves (this is display-only).
+          _chain.forEach(function(hop) {
+            if (!hop || !hop.from) return;
+            var sr = Object.assign({}, t);
+            sr.name = hop.from;
+            if (!leg.clinic) sr.range = String(leg.start || '') + '-' + String(leg.end || '');
+            sr._relayStruck = { i: i + 1, actionId: id, kind: String(hop.kind || 'give'), to: String(hop.to || ''),
+                                dot: (hop.kind === 'swap' ? String(hop.dot || '') : ''), gotPos: String(hop.gotPos || ''),
+                                clinic: !!leg.clinic, start: String(leg.start || ''), end: String(leg.end || '') };
+            sr._ghost = undefined; sr._ghostKey = undefined; sr._ghostActionId = undefined;
+            sr._ghostType = undefined; sr._ghostLabel = undefined; sr._conflict = undefined;
+            sr._relayLeg = undefined; sr._swapDot = undefined;
+            out.push(sr);
+          });
         });
       });
       return out;
@@ -8645,7 +8663,9 @@ window.allPharmacistNames = [];
         const _shiftKey = _isGhost ? i._ghostKey : makeShiftKey(i);
         const _used = _usedMap[_shiftKey] || _pbUsedMap[_shiftKey];  // v13/v3.41
         const _isOwn = !_isGhost && i.name === _curUser;
-        const _tappable = editModeActive && (_isOwn || _isGhost || !!_used);
+        // pt8: a struck ไม้ row has a synthetic (sub-window) key not in rawData → NOT tappable as a
+        //   shift (its ▶ chevron opens the relay timeline, where the hop can be cancelled instead).
+        const _tappable = editModeActive && !i._relayStruck && (_isOwn || _isGhost || !!_used);
         let badge = "badge-other"; let s = i.shift.toLowerCase();
         if (s.includes("⚠️")) badge = "badge-purple";
         else if (s.includes("กลางวัน") || s.includes("เช้า")) badge = "badge-day";
@@ -8698,6 +8718,15 @@ window.allPharmacistNames = [];
           const _legSwapDot = i._relayLeg.swapDot ? `<span class="swap-pair-dot" style="background:${i._relayLeg.swapDot}" title="ได้ไม้นี้จากการแลกเวร"></span>` : '';
           _suffix = `${_legSwapDot}<span class="relay-leg-tag" style="color:${_legC}; border-color:${_legC};">ไม้ ${i._relayLeg.i}</span>` +
                     `<span class="tl-chevron" data-tl-toggle="${i._relayLeg.actionId}__src_${_legUniq}" title="ดูประวัติ">▶</span>`;
+        } else if (i._relayStruck && i._relayStruck.actionId) {
+          // v3.45.3 pt8: the giver's STRUCK ไม้ row — mirrors a normal ยก/แลกเวร source row (strike
+          //   + swap pair-dot for แลก). ไม้ chip + ▶ open the same relay timeline.
+          const _rsC = _relayLegColor(i._relayStruck.i - 1);
+          const _rsUniq = _rowAidHash(_shiftKey, i.name + '#ไม้x' + i._relayStruck.i);
+          _overlayActionId = i._relayStruck.actionId;
+          const _rsDot = i._relayStruck.dot ? `<span class="swap-pair-dot" style="background:${i._relayStruck.dot}" title="แลกไม้นี้ไป"></span>` : '';
+          _suffix = `${_rsDot}<span class="relay-leg-tag" style="color:${_rsC}; border-color:${_rsC};">ไม้ ${i._relayStruck.i}</span>` +
+                    `<span class="tl-chevron" data-tl-toggle="${i._relayStruck.actionId}__src_${_rsUniq}" title="ดูประวัติ">▶</span>`;
         } else if (_used) {
           const dot = _used.color ? `<span class="swap-pair-dot" style="background:${_used.color}"></span>` : '';
           _overlayActionId = _used.actionId;
@@ -8726,16 +8755,16 @@ window.allPharmacistNames = [];
         const _pencil = (editModeActive && _isOwn && !_used) ? '<span class="inline-pencil">✎</span>' : '';
         // v3.43: dashed strike when the action behind this strikethrough is still a draft.
         //   Only the author's OverlayManager holds drafts, so _isActionDraft returns true only in their session.
-        const _strikeActionId = _used ? _used.actionId : (_isGhost ? i._ghostActionId : null);
+        const _strikeActionId = _used ? _used.actionId : (i._relayStruck ? i._relayStruck.actionId : (_isGhost ? i._ghostActionId : null));
         const _isDraftLocal = _strikeActionId ? _isActionDraft(_strikeActionId) : false;
-        const _strike = _used ? (_isDraftLocal ? 'shift-line-through-draft' : 'shift-line-through') : '';
+        const _strike = (_used || i._relayStruck) ? (_isDraftLocal ? 'shift-line-through-draft' : 'shift-line-through') : '';   // pt8: struck ไม้ row
         // v3.44: inline publish button removed — publishing is centralized in the single
         //   "🌐 เผยแพร่" FAB modal (openPublishModal). Draft rows still render with the dashed
         //   strike (_isDraftLocal / shift-draft above) so the author can still spot unpublished rows.
         const _pubInline = '';
         const _nameBase = i.isNew ? 'text-orange-600 font-bold leading-none' : 'text-blue-900 font-bold leading-none';
         // v3.45.2: relay leg rows use a wrap-friendly variant (see .col-name-wrap--relay CSS)
-        const _isRelayLegRow = !!(i._relayLeg && i._relayLeg.actionId);
+        const _isRelayLegRow = !!(i._relayLeg && i._relayLeg.actionId) || !!(i._relayStruck && i._relayStruck.actionId);   // pt8: struck ไม้ row wraps like a leg row
         const _cnwCls = _isRelayLegRow ? 'col-name-wrap col-name-wrap--relay' : 'col-name-wrap';
         const _ncwLeft = _isRelayLegRow ? '' : '<span class="ncw-left"></span>';
         const nameDisplay = `<span class="${_cnwCls}">${_ncwLeft}<span class="ncw-center"><span class="${_nameBase} ${_strike}">${i.isNew?'⚠️ ':''}${displayName(i.name)}</span>${_pencil}${_pubInline}</span><span class="ncw-right">${_suffix}</span></span>`;
@@ -8749,7 +8778,7 @@ window.allPharmacistNames = [];
         if (_isGhost && _isDraftLocal) _ghostCls += ' shift-draft';
         const _rowClasses = [
           'bg-white hover:bg-gray-50 border-b border-gray-100 transition-all',
-          _used ? 'shift-used' : '',
+          (_used || i._relayStruck) ? 'shift-used' : '',
           _ghostCls,
           _tappable ? 'shift-row-tappable' : ''
         ].filter(Boolean).join(' ');
@@ -9028,7 +9057,7 @@ window.allPharmacistNames = [];
           const _calKey = _isGhostBadge ? s._ghostKey : makeShiftKey(s);
           const _calUsed = _calUsedMap[_calKey] || _calPBUsedMap[_calKey];  // v13/v3.41
           let _calExtraCls = '';
-          if (_calUsed) _calExtraCls = ' cal-badge-used';
+          if (_calUsed || s._relayStruck) _calExtraCls = ' cal-badge-used';   // pt8: giver's struck ไม้ badge
           else if (_isGhostBadge) {
             if (s._conflict === 'overlap') _calExtraCls = ' cal-badge-overlap';
             else if (s._conflict === 'adjacent') _calExtraCls = ' cal-badge-adjacent';
@@ -9048,6 +9077,7 @@ window.allPharmacistNames = [];
           }
           else if (_isGhostBadge && s._legSwapDot) _pairColor = s._legSwapDot;   // v3.45.3: leg-swap receive → dot
           else if (s._relayLeg && s._relayLeg.swapDot) _pairColor = s._relayLeg.swapDot;   // v3.45.3 pt6: ไม้ received via แลกไม้
+          else if (s._relayStruck && s._relayStruck.dot) _pairColor = s._relayStruck.dot;   // v3.45.3 pt8: giver's struck ไม้ (แลก)
           if (_pairColor) _calDot = `<span class="cal-pair-dot" style="background:${_pairColor}"></span>`;
           // Patch ZZ3: VIEW mode trigger — hospital → Phase J, clinic → clinic note
           const _isHospitalBadge = s.room && s.room !== 'clinic';
