@@ -2911,7 +2911,7 @@ window.allPharmacistNames = [];
           id: id, actor: String(a.viewerName || ''), createdAt: String(a.createdAt || ''),
           masterId: String(pay.masterId), legStart: String(pay.legStart || ''),
           legEnd: String(pay.legEnd || ''), legClinic: !!pay.legClinic, kind: String(pay.kind || 'give'),
-          gotPos: String(pay.gotPos || ''),
+          gotPos: String(pay.gotPos || ''), dot: String(pay.dot || ''),
           fromOwner: String(a.originalOwner || ''), toOwner: String(a.partnerName || ''),
           _visibility: a._visibility || 'public'
         });
@@ -2942,6 +2942,9 @@ window.allPharmacistNames = [];
         if (o.fromOwner && String(legs[idx].owner || '') !== o.fromOwner) return;  // stale/dup → skip
         legs[idx].owner = o.toOwner;
         legs[idx]._chain.push({ from: o.fromOwner, to: o.toOwner, by: o.actor, kind: o.kind, at: o.createdAt });
+        // v3.45.3 pt6: a ไม้ received via แลกไม้ carries the swap pair-dot colour so the recipient's
+        //   leg row shows the SAME golden dot as the giver's received whole shift (a matched pair).
+        legs[idx]._swapDot = (o.kind === 'swap' && o.dot) ? o.dot : '';
       });
       return legs;
     }
@@ -3040,19 +3043,20 @@ window.allPharmacistNames = [];
           //   lets the tap-menu decide who may ยก/แลก this ไม้ (the CURRENT holder or admin).
           var _chain = Array.isArray(leg._chain) ? leg._chain : [];
           var _legFrom = _chain.length ? String(_chain[_chain.length - 1].from || '') : '';
+          var _swapDot = String(leg._swapDot || '');   // v3.45.3 pt6: golden pair-dot if received via แลกไม้
           if (leg.clinic) {
             // clinic ไม้ (handoff-time-only): KEEP the shift's own (clinic) range so isSpecialClinic
             //   stays true — badge + all-day .ics export path. The seam window rides on _relayLeg.
             lr._relayLeg = { i: i + 1, of: rel.legs.length, actionId: id, from: t.name,
                              clinic: true, start: String(leg.start || ''), end: String(leg.end || ''),
                              prevOwner: _prevO, nextOwner: _nextO,
-                             baseOwner: String(leg._baseOwner || ''), legFrom: _legFrom, chain: _chain };
+                             baseOwner: String(leg._baseOwner || ''), legFrom: _legFrom, chain: _chain, swapDot: _swapDot };
           } else {
             lr.range = String(leg.start || '') + '-' + String(leg.end || '');
             lr._relayLeg = { i: i + 1, of: rel.legs.length, actionId: id, from: t.name,
                              start: String(leg.start || ''), end: String(leg.end || ''),
                              prevOwner: _prevO, nextOwner: _nextO,
-                             baseOwner: String(leg._baseOwner || ''), legFrom: _legFrom, chain: _chain };
+                             baseOwner: String(leg._baseOwner || ''), legFrom: _legFrom, chain: _chain, swapDot: _swapDot };
           }
           // a leg is a first-class own-row, not a ghost — strip inherited ghost markers
           lr._ghost = undefined; lr._ghostKey = undefined; lr._ghostActionId = undefined;
@@ -5798,13 +5802,14 @@ window.allPharmacistNames = [];
       if (!partner) partner = targetShift.name || '';
       if (String(partner) === String(_actor)) { if (typeof _p2bShowToast === 'function') _p2bShowToast('เลือกเวรของคนอื่น (ไม่ใช่ของคุณเอง)', 'warn'); return; }
       actionState.legSwap = null;
-      var ovr = a ? _relayAuthorOverride(mid, a, ls.leg, ls.fromOwner, partner, 'swap', { gotPos: String(targetShift.pos || '') }) : null;   // my ไม้ → partner
-      // their shift → me (a plain `add`). v3.45.3 pt5: tag it so the received row shows a swap-style
-      //   colour dot (tinted to the ไม้ traded) — a leg-swap isn't a real `swap` action so it'd
-      //   otherwise render dot-less and be hard to spot (Klui: หายาก). The marker rides in `legs[0]`
-      //   (whitelisted server passthrough, ignored by relay gather since action!=='relay') so it
-      //   SURVIVES the 30s pull that overwrites local actions with the server copy.
-      var _swDot = (typeof _relayLegColor === 'function') ? _relayLegColor(((ls.leg && ls.leg.i) || 1) - 1) : '#0d9488';
+      // v3.45.3 pt6: ONE golden-ratio pair colour (same palette as a normal แลกเวร) stamped on BOTH
+      //   sides so the swap reads as a pair: my received whole shift AND the ไม้ the partner receives.
+      var _swDot = _legSwapColor(mid);
+      var ovr = a ? _relayAuthorOverride(mid, a, ls.leg, ls.fromOwner, partner, 'swap', { gotPos: String(targetShift.pos || ''), dot: _swDot }) : null;   // my ไม้ → partner
+      // their shift → me (a plain `add`). The pair-dot marker rides in `legs[0]` (whitelisted server
+      //   passthrough, ignored by relay gather since action!=='relay') so it SURVIVES the 30s pull
+      //   that overwrites local actions with the server copy. A leg-swap isn't a real `swap` action
+      //   so without this the received row would be dot-less and hard to spot (Klui: หายาก).
       var add = OverlayManager.addAction(mid, { action: 'add', viewerName: _actor, shiftKey: targetKey, partnerName: partner, legs: [{ __legswap: 1, dot: _swDot, from: String(partner || '') }] });  // their shift → me
       if (typeof closeActionModal === 'function') closeActionModal();
       if (typeof triggerUpdate === 'function') triggerUpdate();
@@ -6483,6 +6488,23 @@ window.allPharmacistNames = [];
     var _swfRelay = null;
     var _RELAY_COLORS = ['#0d9488', '#ea580c', '#7c3aed', '#db2777', '#0891b2'];   // teal · orange · violet · pink · cyan
     function _relayLegColor(i) { return _RELAY_COLORS[i % _RELAY_COLORS.length]; }
+    // v3.45.3 pt6: a แลกไม้ pair-dot uses the SAME golden-ratio palette as a normal แลกเวร
+    //   (Klui: ทำให้เหมือนแลกเวรปกติ) — index = the count of existing swap-like actions this month,
+    //   so leg-swaps colour-cycle alongside real swaps. The resulting hex is STORED on both the
+    //   note and the add so every viewer/side reads the identical colour without recomputing.
+    function _legSwapColor(mid) {
+      var n = 0;
+      try {
+        OverlayManager.load();
+        var acts = (OverlayManager._data && OverlayManager._data[mid] && OverlayManager._data[mid].actions) || [];
+        acts.forEach(function (a) {
+          if (!a) return;
+          if (a.action === 'swap') n++;
+          else if (a.action === 'relayleg' && a.legs && a.legs[0] && a.legs[0].kind === 'swap') n++;
+        });
+      } catch (e) {}
+      return (typeof swapPairColor === 'function') ? swapPairColor(n) : '#3b82f6';
+    }
     // v3.45.2: per-ไม้ breakdown for the timeline — "ไม้ N <คน> <ช่วง>", 2-up grid. Kept lean
     //   (Klui: มือถือเบียด) — no "อยู่"/"ตั้งแต่" filler. Timed → "16:30-19:00"; clinic open head →
     //   "ถึง 11:00"; open tail → "11:00 น. เป็นต้นไป".
@@ -8640,7 +8662,10 @@ window.allPharmacistNames = [];
           _overlayActionId = i._relayLeg.actionId;
           // v3.45.2: no color dot — the ไม้ chip is already colour-coded (Klui: ไม่ต้องมีตุ่มสี),
           //   which also relieves the crowding on mobile.
-          _suffix = `<span class="relay-leg-tag" style="color:${_legC}; border-color:${_legC};">ไม้ ${i._relayLeg.i}</span>` +
+          // v3.45.3 pt6: EXCEPTION — a ไม้ received via แลกไม้ shows the golden swap pair-dot (same
+          //   as the giver's received whole shift) so both halves of the trade are visibly a pair.
+          const _legSwapDot = i._relayLeg.swapDot ? `<span class="swap-pair-dot" style="background:${i._relayLeg.swapDot}" title="ได้ไม้นี้จากการแลกเวร"></span>` : '';
+          _suffix = `${_legSwapDot}<span class="relay-leg-tag" style="color:${_legC}; border-color:${_legC};">ไม้ ${i._relayLeg.i}</span>` +
                     `<span class="tl-chevron" data-tl-toggle="${i._relayLeg.actionId}__src_${_legUniq}" title="ดูประวัติ">▶</span>`;
         } else if (_used) {
           const dot = _used.color ? `<span class="swap-pair-dot" style="background:${_used.color}"></span>` : '';
@@ -8991,6 +9016,7 @@ window.allPharmacistNames = [];
                       || (typeof PBOverlays !== 'undefined' ? PBOverlays.getSwapColor(s._ghostActionId) : null);
           }
           else if (_isGhostBadge && s._legSwapDot) _pairColor = s._legSwapDot;   // v3.45.3: leg-swap receive → dot
+          else if (s._relayLeg && s._relayLeg.swapDot) _pairColor = s._relayLeg.swapDot;   // v3.45.3 pt6: ไม้ received via แลกไม้
           if (_pairColor) _calDot = `<span class="cal-pair-dot" style="background:${_pairColor}"></span>`;
           // Patch ZZ3: VIEW mode trigger — hospital → Phase J, clinic → clinic note
           const _isHospitalBadge = s.room && s.room !== 'clinic';
