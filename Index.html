@@ -2388,7 +2388,7 @@ window.allPharmacistNames = [];
     // (avoids collisions from substring(0,15) truncation)
     // ==========================================
     let editModeActive = false;
-    const actionState = { shiftKey: null, step: 'menu', pickerQuery: '', pickerPerson: '', pickerDate: '', usedInfo: null };
+    const actionState = { shiftKey: null, step: 'menu', pickerQuery: '', pickerPerson: '', pickerDate: '', usedInfo: null, legSwap: null };
     const OVERLAY_KEY = 'siriraj_shift_overlay_v4';  // v14: bumped — user-scoped actions
 
     // Composite key — unique within a month's data
@@ -2883,6 +2883,68 @@ window.allPharmacistNames = [];
       });
     }
 
+    // ═══ v3.45.3 relay leg handoff ("sticky note") — leg-level ยก/แลก ═══
+    //   A `relayleg` action is a first-class "sticky note" that rewrites the owner of ONE ไม้ of a
+    //   master `relay`, WITHOUT moving the shift's ownership (no strike/no ghost — all used-map +
+    //   ghost engines ignore an unknown action, same as `relay` itself). Whoever holds a ไม้ can
+    //   author their own note to pass it on (viewerName = the actor → phxPushActions pushes it under
+    //   their own name → sync-legal), so B can hand ไม้2 to C without touching A's master sheet.
+    //   ZERO server change: the note rides entirely on already-whitelisted overlay fields —
+    //     action='relayleg', viewerName=actor, originalOwner=fromOwner, partnerName=toOwner,
+    //     shiftKey=masterKey (unused by any engine), and the leg IDENTITY inside legs[0]
+    //     ({__relayleg, masterId, legStart, legEnd, legClinic, kind}) which passes through as an
+    //     arbitrary array. Notes are matched to a master by masterId and to a ไม้ by its (start,end,
+    //     clinic) window (stable across แก้ไม้ reorders), replayed in createdAt order with a
+    //     fromOwner guard so a stale/duplicate note can't hijack a ไม้ that already moved on.
+    function _relayLegOverrides(mid) {
+      var out = [], seen = {};
+      function consider(a) {
+        if (!a || String(a.action || '') !== 'relayleg') return;
+        var id = a.id || a.actionId; if (!id || seen[id]) return;
+        var pay = (Array.isArray(a.legs) && a.legs[0]) ? a.legs[0] : null;
+        if (!pay || !pay.masterId) return;                 // identity rides in legs[0]
+        seen[id] = 1;
+        out.push({
+          id: id, actor: String(a.viewerName || ''), createdAt: String(a.createdAt || ''),
+          masterId: String(pay.masterId), legStart: String(pay.legStart || ''),
+          legEnd: String(pay.legEnd || ''), legClinic: !!pay.legClinic, kind: String(pay.kind || 'give'),
+          fromOwner: String(a.originalOwner || ''), toOwner: String(a.partnerName || ''),
+          _visibility: a._visibility || 'public'
+        });
+      }
+      try { OverlayManager.load(); ((OverlayManager._data && OverlayManager._data[mid] && OverlayManager._data[mid].actions) || []).forEach(consider); } catch (e) {}
+      try { (typeof pathBOverlays !== 'undefined' && Array.isArray(pathBOverlays) ? pathBOverlays : []).forEach(consider); } catch (e) {}
+      return out;
+    }
+    // Replay the sticky notes for ONE master onto a fresh copy of its legs. Pure; `ovs` is the
+    //   pre-fetched _relayLegOverrides(mid) so gathering many masters doesn't rescan per master.
+    //   Each returned leg carries _baseOwner (the original author's assignment) + _chain (the hop
+    //   history) so displays/exports can show "รับต่อจาก X" without re-resolving.
+    function _relayApplyOverrides(master, ovs) {
+      var baseLegs = (master && Array.isArray(master.legs)) ? master.legs : [];
+      var mId = String((master && (master.id || master.actionId)) || '');
+      var legs = baseLegs.map(function (l) {
+        return { owner: l.owner, start: l.start, end: l.end, clinic: !!l.clinic, _baseOwner: l.owner, _chain: [] };
+      });
+      if (!ovs || !ovs.length || !mId) return legs;
+      var mine = ovs.filter(function (o) { return o.masterId === mId; })
+        .sort(function (a, b) { return a.createdAt < b.createdAt ? -1 : (a.createdAt > b.createdAt ? 1 : 0); });
+      mine.forEach(function (o) {
+        var idx = -1;
+        for (var i = 0; i < legs.length; i++) {
+          if (String(legs[i].start || '') === o.legStart && String(legs[i].end || '') === o.legEnd && !!legs[i].clinic === !!o.legClinic) { idx = i; break; }
+        }
+        if (idx < 0) return;                               // leg window changed (แก้ไม้) → note inert
+        if (o.fromOwner && String(legs[idx].owner || '') !== o.fromOwner) return;  // stale/dup → skip
+        legs[idx].owner = o.toOwner;
+        legs[idx]._chain.push({ from: o.fromOwner, to: o.toOwner, by: o.actor, kind: o.kind, at: o.createdAt });
+      });
+      return legs;
+    }
+    // Resolve a single master action's CURRENT legs (base + sticky notes) — used by the timeline
+    //   builders which hold the raw action but not the gathered relay.
+    function _relayLegsFor(mid, master) { return _relayApplyOverrides(master, _relayLegOverrides(mid)); }
+
     /** Combined rawData + ghost rows for current viewer */
     // ═══ v3.45 relay Stage 1b — fan a legged shift into per-leg rows in the effective data ═══
     //   A give/add carrying action.legs replaces its master row with one row per leg (owner +
@@ -2890,6 +2952,7 @@ window.allPharmacistNames = [];
     //   already cover everyone). Flag-gated: window._relayEnabled OFF → untouched pass-through.
     function _relayGather(mid) {
       var out = [], seen = {};
+      var _ovs = _relayLegOverrides(mid);                  // v3.45.3: fetch leg handoffs once
       function consider(a) {
         // v3.45.2: legs live ONLY on the first-class 'relay' (ต่อเวร) action — no longer on
         //   give/add (Klui: cancelling a give-ridden split stranded the whole shift with the
@@ -2908,7 +2971,7 @@ window.allPharmacistNames = [];
         }
         if (!sk || typeof findShiftByKey !== 'function' || !findShiftByKey(sk)) return;  // must be a real master row
         seen[id] = 1;
-        out.push({ slotKey: sk, legs: a.legs, actionId: id });
+        out.push({ slotKey: sk, legs: _relayApplyOverrides(a, _ovs), actionId: id });   // v3.45.3: current owners
       }
       try {
         OverlayManager.load();
@@ -2968,17 +3031,24 @@ window.allPharmacistNames = [];
           //   (ใครมาต่อเรา / เราไปต่อใคร) without re-resolving the action.
           var _prevO = (i > 0 && rel.legs[i - 1]) ? String(rel.legs[i - 1].owner || '') : '';
           var _nextO = (rel.legs[i + 1]) ? String(rel.legs[i + 1].owner || '') : '';
+          // v3.45.3: a ไม้ may have been handed on (sticky notes) — _baseOwner is who the author
+          //   first assigned, _chain the hop list, legFrom the immediate previous holder. legOwn'd
+          //   lets the tap-menu decide who may ยก/แลก this ไม้ (the CURRENT holder or admin).
+          var _chain = Array.isArray(leg._chain) ? leg._chain : [];
+          var _legFrom = _chain.length ? String(_chain[_chain.length - 1].from || '') : '';
           if (leg.clinic) {
             // clinic ไม้ (handoff-time-only): KEEP the shift's own (clinic) range so isSpecialClinic
             //   stays true — badge + all-day .ics export path. The seam window rides on _relayLeg.
             lr._relayLeg = { i: i + 1, of: rel.legs.length, actionId: id, from: t.name,
                              clinic: true, start: String(leg.start || ''), end: String(leg.end || ''),
-                             prevOwner: _prevO, nextOwner: _nextO };
+                             prevOwner: _prevO, nextOwner: _nextO,
+                             baseOwner: String(leg._baseOwner || ''), legFrom: _legFrom, chain: _chain };
           } else {
             lr.range = String(leg.start || '') + '-' + String(leg.end || '');
             lr._relayLeg = { i: i + 1, of: rel.legs.length, actionId: id, from: t.name,
                              start: String(leg.start || ''), end: String(leg.end || ''),
-                             prevOwner: _prevO, nextOwner: _nextO };
+                             prevOwner: _prevO, nextOwner: _nextO,
+                             baseOwner: String(leg._baseOwner || ''), legFrom: _legFrom, chain: _chain };
           }
           // a leg is a first-class own-row, not a ghost — strip inherited ghost markers
           lr._ghost = undefined; lr._ghostKey = undefined; lr._ghostActionId = undefined;
@@ -3688,10 +3758,17 @@ window.allPharmacistNames = [];
 
       function typeText(a) {
         var act = String(a.action || '');
+        // v3.45.3: a leg handoff (sticky note) reads ยกไม้/แลกไม้ per its kind (rides in legs[0]).
+        if (act === 'relayleg') { var k = (Array.isArray(a.legs) && a.legs[0] && a.legs[0].kind) || 'give'; return k === 'swap' ? 'แลกไม้' : 'ยกไม้'; }
         return act === 'swap' ? 'แลกเวร' : (act === 'give' ? 'ยกเวร' : (act === 'relay' ? 'ต่อเวร' : 'รับเวร'));
       }
       function relText(a) {
-        var act = String(a.action || ''), who = _pbEsc(a.partnerName || '?');
+        var act = String(a.action || ''), who = _pbEsc(displayName(a.partnerName || '?'));
+        if (act === 'relayleg') {
+          var p = (Array.isArray(a.legs) && a.legs[0]) ? a.legs[0] : {};
+          var win = (typeof _relayLegWindowText === 'function') ? _relayLegWindowText({ start: p.legStart, end: p.legEnd, clinic: p.legClinic }) : '';
+          return 'ไม้ ' + (win ? '(' + _pbEsc(win) + ') ' : '') + '→ ' + who;
+        }
         if (act === 'swap') return 'แลกกับ ' + who;
         if (act === 'give') return 'ยกให้ ' + who;
         if (act === 'relay') {
@@ -4281,9 +4358,17 @@ window.allPharmacistNames = [];
         e.stopPropagation();
         const _raid = decodeURIComponent(relayTr.getAttribute('data-relay-actid'));
         const _rmid = decodeURIComponent(relayTr.getAttribute('data-relay-mid') || '') || getCurrentMonthId();
-        // v3.45.2: open the action menu for the underlying shift (สลับ/ยก/แก้ไม้) — a split shift
-        //   is still one shift (Klui). Falls back to the leg editor if the menu can't open.
-        if (_raid && typeof _relayOpenLegMenu === 'function') _relayOpenLegMenu(_rmid, _raid);
+        // v3.45.3: carry the tapped ไม้'s identity so the menu offers leg-level ยก/แลก for THIS
+        //   ไม้ (not the whole shift). Older rows without leg attrs → leg = null → menu falls back
+        //   to whole-shift actions (แก้ไม้ / จัดการทั้งเวร) only.
+        const _leg = relayTr.hasAttribute('data-relay-legstart') ? {
+          i: parseInt(relayTr.getAttribute('data-relay-legi'), 10) || 0,
+          start: decodeURIComponent(relayTr.getAttribute('data-relay-legstart') || ''),
+          end: decodeURIComponent(relayTr.getAttribute('data-relay-legend') || ''),
+          clinic: relayTr.getAttribute('data-relay-legclinic') === '1',
+          owner: decodeURIComponent(relayTr.getAttribute('data-relay-legowner') || '')
+        } : null;
+        if (_raid && typeof _relayOpenLegMenu === 'function') _relayOpenLegMenu(_rmid, _raid, _leg);
         else if (_raid && typeof _relayEditLegs === 'function') _relayEditLegs(_rmid, _raid);
         return;
       }
@@ -4449,7 +4534,9 @@ window.allPharmacistNames = [];
             kind = 'relay';
             // v3.45.2: top summary line "<the rest> ต่อเวรจาก <owner>" then the ไม้ list (no 🏃 —
             //   the teal border + number already mark the step; Klui: เอา 🏃 ออก).
-            desc = (srcStr ? srcStr : '') + _relayHandoffSummary(act.legs) + _relayLegsSummaryHtml(act.legs);
+            // v3.45.3: resolve sticky-note leg handoffs so the timeline shows the CURRENT ไม้ holder.
+            var _rlegs = _relayLegsFor(monthId, act);
+            desc = (srcStr ? srcStr : '') + _relayHandoffSummary(_rlegs) + _relayLegsSummaryHtml(_rlegs);
           }
           // v3.44: inline ✎ right after the name → edit the counterpart (B) in place. Shown on a
           //   DRAFT (to its author) or on any record when the viewer is Admin (published = final,
@@ -4604,7 +4691,9 @@ window.allPharmacistNames = [];
             }
             kind = 'relay';
             // v3.45.2: summary already names the owner, so no separate actor prefix; no 🏃 (Klui).
-            desc = srcStr + _relayHandoffSummary(ov.legs) + _relayLegsSummaryHtml(ov.legs);
+            // v3.45.3: resolve sticky-note leg handoffs so non-author viewers see the CURRENT holder.
+            var _rlegsPB = _relayLegsFor((typeof getCurrentMonthId === 'function') ? getCurrentMonthId() : '', ov);
+            desc = srcStr + _relayHandoffSummary(_rlegsPB) + _relayLegsSummaryHtml(_rlegsPB);
             // author's own 🏃✎ (the action IS in their local OverlayManager even when this PB
             //   builder renders — e.g. anonymous-mode view); admin uses the ✕ cancel below instead.
             //   Edit-mode gated like the author builder (กดดินสอก่อน).
@@ -5192,6 +5281,7 @@ window.allPharmacistNames = [];
       actionState.pickerQuery = '';
       actionState.pickerPerson = '';
       actionState.pickerDate = '';
+      actionState.legSwap = null;   // v3.45.3: a normal shift tap is never a leg-swap
 
       if (isUsedAsSource) {
         // Already swapped/given → show undo (works for both real and chained-ghost)
@@ -5255,7 +5345,10 @@ window.allPharmacistNames = [];
         //   wrong modal). Also show the ไม้ tag + handoff window so a split isn't indistinguishable.
         let legTag = '';
         const relayAttr = (s._relayLeg && s._relayLeg.actionId)
-          ? ' data-relay-actid="' + encodeURIComponent(s._relayLeg.actionId) + '" data-relay-mid="' + encodeURIComponent(_pickerMid) + '"'
+          ? ' data-relay-actid="' + encodeURIComponent(s._relayLeg.actionId) + '" data-relay-mid="' + encodeURIComponent(_pickerMid) + '"' +
+            ' data-relay-legi="' + s._relayLeg.i + '" data-relay-legstart="' + encodeURIComponent(s._relayLeg.start||'') + '"' +
+            ' data-relay-legend="' + encodeURIComponent(s._relayLeg.end||'') + '" data-relay-legclinic="' + (s._relayLeg.clinic?1:0) + '"' +
+            ' data-relay-legowner="' + encodeURIComponent(s.name||'') + '"'
           : '';
         if (s._relayLeg) {
           const _legC = (typeof _relayLegColor === 'function') ? _relayLegColor(s._relayLeg.i - 1) : '#0d9488';
@@ -5412,6 +5505,7 @@ window.allPharmacistNames = [];
       actionState.pickerQuery = '';
       actionState.pickerPerson = '';
       actionState.pickerDate = '';
+      actionState.legSwap = null;   // v3.45.3: cancelling the picker discards a pending leg-swap
     }
 
     function actionGoTo(step) {
@@ -5437,7 +5531,16 @@ window.allPharmacistNames = [];
                  '<button class="act-modal-close" onclick="closeActionModal()">✕</button></div>';
       html += '<div class="act-modal-body">';
 
-      if (actionState.shiftKey) {
+      if (actionState.legSwap && actionState.legSwap.leg) {
+        // v3.45.3: leg-swap — the thing being offered is MY ไม้, not the whole shift. Label it so.
+        const _lg = actionState.legSwap.leg;
+        const _shp = findShiftByKey(actionState.shiftKey);
+        const _win = (typeof _relayLegWindowText === 'function') ? _relayLegWindowText(_lg) : '';
+        html += '<div class="act-shift-info">' +
+                  '<div class="act-shift-info-lbl">ไม้ของคุณ (ที่จะยกให้อีกฝ่าย)</div>' +
+                  '<div class="act-shift-info-val">ไม้ ' + (_lg.i || '') + ' • ' + _pbEsc(_win) + (_shp ? ' • ' + _pbEsc(_shp.pos || '') : '') + '</div>' +
+                '</div>';
+      } else if (actionState.shiftKey) {
         const shift = findShiftByKey(actionState.shiftKey);
         if (shift) {
           html += '<div class="act-shift-info">' +
@@ -5505,14 +5608,177 @@ window.allPharmacistNames = [];
       } catch (e) {}
       return null;
     }
-    // v3.45.2: tapping a ไม้ row → open the action menu for the UNDERLYING shift (สลับ/ยก/แก้ไม้).
-    //   A split shift is still one shift (Klui), so it stays fully actionable — สลับ/ยก act on
-    //   the whole shift and clear the split (see _relayClearForShift).
-    function _relayOpenLegMenu(mid, actionId) {
+    // ─── v3.45.3: leg-level ยก/แลก — the tap-menu for ONE ไม้ ───────────────────────────────
+    //   Klui: "ควรมีเมนูแลกเวร ยกเวร แม้กรณีที่เป็นไม้ต่อ — สลับเอาชื่อคนอื่นแทนตำแหน่งของเรา".
+    //   Whoever CURRENTLY holds a ไม้ (or an admin) may hand just that ไม้ to someone else (ยก) or
+    //   trade it for another whole shift (แลก). Ownership of the master shift never moves.
+    function _relayActorName() {
+      try { if (typeof _pbGetLoggedInName === 'function') { var n = _pbGetLoggedInName(); if (n) return String(n); } } catch (e) {}
+      try { if (typeof phxAuthGetUser === 'function') { var u = phxAuthGetUser(); if (u && u.name) return String(u.name); } } catch (e) {}
+      try { if (typeof getCurrentUser === 'function') { var g = getCurrentUser(); if (g) return String(g); } } catch (e) {}
+      return '';
+    }
+    function _relayLegWindowText(leg) {
+      if (!leg) return '';
+      var s = String(leg.start || ''), e = String(leg.end || '');
+      if (leg.clinic) return (!s && e) ? ('ถึง ' + e) : (s && !e) ? (s + ' น. เป็นต้นไป') : (s && e) ? (s + '–' + e) : 'ตรวจสอบ';
+      return (s && e) ? (s + '-' + e) : (s || e || '');
+    }
+    function _relayCloseLegMenu() { var e = document.getElementById('relayLegMenuOverlay'); if (e) e.remove(); }
+    // Author one "sticky note" (relayleg) — the identity of WHICH ไม้ rides in legs[0]; everything
+    //   else on standard, server-whitelisted fields. viewerName = the actor so phxPushActions pushes
+    //   it under their own name (sync-legal even when the actor isn't the master's author).
+    function _relayAuthorOverride(mid, master, leg, fromOwner, toOwner, kind) {
+      var mId = String((master && (master.id || master.actionId)) || '');
+      if (!mId) return null;
+      return OverlayManager.addAction(mid, {
+        action: 'relayleg',
+        viewerName: _relayActorName(),
+        shiftKey: String((master && master.shiftKey) || ''),
+        originalOwner: String(fromOwner || ''),
+        partnerName: String(toOwner || ''),
+        legs: [{ __relayleg: 1, masterId: mId, legStart: String(leg.start || ''), legEnd: String(leg.end || ''), legClinic: !!leg.clinic, kind: String(kind || 'give') }]
+      });
+    }
+    // v3.45.2→3: tapping a ไม้ row → a leg-level menu (ยกไม้ / แลกไม้ / แก้ไม้ทั้งหมด / จัดการทั้งเวร).
+    //   `leg` = {i,start,end,clinic,owner}. Missing (old row) → fall back to the whole-shift menu.
+    function _relayOpenLegMenu(mid, actionId, leg) {
       var a = _relayActionById(mid, actionId);
-      if (!a || !a.shiftKey) { if (typeof _relayEditLegs === 'function') _relayEditLegs(mid, actionId); return; }
-      if (typeof openActionModalForKey === 'function') openActionModalForKey(String(a.shiftKey));
-      else if (typeof _relayEditLegs === 'function') _relayEditLegs(mid, actionId);
+      if (!leg) {
+        if (a && a.shiftKey && typeof openActionModalForKey === 'function') openActionModalForKey(String(a.shiftKey));
+        else if (typeof _relayEditLegs === 'function') _relayEditLegs(mid, actionId);
+        return;
+      }
+      var _actor = _relayActorName();
+      var isAdmin = (typeof phxAuthIsAdmin === 'function' && phxAuthIsAdmin());
+      var isLegOwner = _actor && String(_actor) === String(leg.owner || '');
+      var isAuthor = a && _actor && String(a.viewerName || '') === String(_actor);
+      var legC = (typeof _relayLegColor === 'function') ? _relayLegColor((leg.i || 1) - 1) : '#0d9488';
+      var winTxt = _relayLegWindowText(leg);
+      _relayCloseLegMenu();
+      var ov = document.createElement('div');
+      ov.id = 'relayLegMenuOverlay';
+      ov.style.cssText = 'position:fixed; inset:0; background:rgba(0,0,0,0.5); z-index:10008; display:flex; align-items:flex-end; justify-content:center; padding:0;';
+      var btns = '';
+      if (isLegOwner || isAdmin) {
+        btns += '<button type="button" class="act-btn act-btn-danger" id="relayLegGive">🎁 ยกไม้ ' + (leg.i || '') + ' ให้คนอื่น</button>';
+        btns += '<button type="button" class="act-btn act-btn-primary" id="relayLegSwap">🔄 แลกไม้ ' + (leg.i || '') + ' กับเวรคนอื่น</button>';
+      }
+      if (isAuthor || isAdmin) {
+        btns += '<button type="button" class="act-btn" id="relayLegEditAll" style="background:#f0fdfa; color:#0f766e; border-color:#99f6e4;">🏃 แก้ไม้ทั้งหมด (ต่อเวร)</button>';
+        btns += '<button type="button" class="act-btn" id="relayLegWhole" style="background:#fff7ed; color:#9a3412; border-color:#fed7aa;">⚙️ จัดการทั้งเวร (ยก/สลับ/ยกเลิกแบ่ง)</button>';
+      }
+      if (!btns) btns = '<div style="font-size:12.5px; color:var(--sub); text-align:center; padding:10px 0;">ไม้นี้เป็นของ <b>' + _pbEsc(displayName(leg.owner || '?')) + '</b><br>ยก/แลกได้เฉพาะเจ้าของไม้หรือแอดมิน</div>';
+      ov.innerHTML = '<div style="background:var(--surface); width:100%; max-width:460px; border-radius:16px 16px 0 0; padding:16px 16px 20px; font-family:inherit; box-shadow:0 -8px 30px rgba(0,0,0,0.2); box-sizing:border-box;">' +
+        '<div style="display:flex; align-items:center; gap:8px; margin-bottom:4px; flex-wrap:wrap;">' +
+          '<span class="relay-leg-tag" style="color:' + legC + '; border-color:' + legC + '; flex:0 0 auto;">ไม้ ' + (leg.i || '') + '</span>' +
+          '<b style="font-size:15px; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; max-width:60%;">' + _pbEsc(displayName(leg.owner || '?')) + '</b>' +
+          '<span style="margin-left:auto; font-size:12px; color:var(--sub); flex:0 0 auto;">' + _pbEsc(winTxt) + '</span>' +
+        '</div>' +
+        '<div style="font-size:11.5px; color:var(--sub); margin-bottom:12px;">ทำเฉพาะ<b>ไม้นี้</b> — ไม้อื่นไม่กระทบ เวรยังเป็นของเจ้าของเดิม</div>' +
+        '<div style="display:flex; flex-direction:column; gap:8px;">' + btns +
+          '<button type="button" class="act-btn act-btn-cancel" id="relayLegCancel">ยกเลิก</button>' +
+        '</div></div>';
+      document.body.appendChild(ov);
+      ov.addEventListener('click', function (e) { if (e.target === ov) _relayCloseLegMenu(); });
+      var _bind = function (id, fn) { var el = document.getElementById(id); if (el) el.addEventListener('click', fn); };
+      _bind('relayLegCancel', _relayCloseLegMenu);
+      _bind('relayLegGive', function () { _relayCloseLegMenu(); _relayLegGive(mid, actionId, leg); });
+      _bind('relayLegSwap', function () { _relayCloseLegMenu(); _relayLegSwap(mid, actionId, leg); });
+      _bind('relayLegEditAll', function () { _relayCloseLegMenu(); if (typeof _relayEditLegs === 'function') _relayEditLegs(mid, actionId); });
+      _bind('relayLegWhole', function () { _relayCloseLegMenu(); if (a && a.shiftKey && typeof openActionModalForKey === 'function') openActionModalForKey(String(a.shiftKey)); });
+    }
+    // 🎁 ยกไม้ — hand this ONE ไม้ to another known name (a sticky note, no shift ownership change).
+    function _relayLegGive(mid, actionId, leg) {
+      var a = _relayActionById(mid, actionId);
+      if (!a) { if (typeof _p2bShowToast === 'function') _p2bShowToast('ไม่พบการต่อเวร', 'warn'); return; }
+      var _actor = _relayActorName();
+      var isAdmin = (typeof phxAuthIsAdmin === 'function' && phxAuthIsAdmin());
+      if (!_actor) { if (typeof _p2bShowToast === 'function') _p2bShowToast('ต้อง login ก่อนจึงจะยกไม้ได้', 'warn'); return; }
+      if (!isAdmin && String(_actor) !== String(leg.owner || '')) { if (typeof _p2bShowToast === 'function') _p2bShowToast('ยกไม้ได้เฉพาะเจ้าของไม้', 'warn'); return; }
+      if (typeof _lwwNamePicker !== 'function') return;
+      _lwwNamePicker('', function (nm) {
+        if (!nm) return;
+        if (String(nm) === String(leg.owner || '')) { if (typeof _p2bShowToast === 'function') _p2bShowToast('เป็นเจ้าของไม้นี้อยู่แล้ว', 'warn'); return; }
+        var stored = _relayAuthorOverride(mid, a, leg, leg.owner, nm, 'give');
+        if (!stored) { if (typeof _p2bShowToast === 'function') _p2bShowToast('ยกไม้ไม่สำเร็จ', 'warn'); return; }
+        if (typeof triggerUpdate === 'function') triggerUpdate();
+        _relayLegConfirm(mid, [stored.id], '🎁 ยกไม้ ' + (leg.i || '') + ' (' + _pbEsc(_relayLegWindowText(leg)) + ') ให้ <b>' + _pbEsc(displayName(nm)) + '</b>', String(a.id || a.actionId || ''));
+      });
+    }
+    // 🔄 แลกไม้ — trade this ไม้ for another whole shift: my ไม้ → them (sticky note), their shift →
+    //   me (a standard `add`, reusing the existing รับเวร machinery). Reuses the swap picker UI by
+    //   flagging actionState.legSwap so confirmPickShift routes into _relayLegSwapCommit.
+    function _relayLegSwap(mid, actionId, leg) {
+      var a = _relayActionById(mid, actionId);
+      if (!a) { if (typeof _p2bShowToast === 'function') _p2bShowToast('ไม่พบการต่อเวร', 'warn'); return; }
+      var _actor = _relayActorName();
+      var isAdmin = (typeof phxAuthIsAdmin === 'function' && phxAuthIsAdmin());
+      if (!_actor) { if (typeof _p2bShowToast === 'function') _p2bShowToast('ต้อง login ก่อนจึงจะแลกไม้ได้', 'warn'); return; }
+      if (!isAdmin && String(_actor) !== String(leg.owner || '')) { if (typeof _p2bShowToast === 'function') _p2bShowToast('แลกไม้ได้เฉพาะเจ้าของไม้', 'warn'); return; }
+      actionState.shiftKey = String(a.shiftKey || '');
+      actionState.usedInfo = null;
+      actionState.legSwap = { mid: mid, actionId: actionId, leg: leg, fromOwner: leg.owner };
+      if (typeof actionGoTo === 'function') actionGoTo('swap');
+      var modal = document.getElementById('actionModal'); if (modal) modal.style.display = 'flex';
+    }
+    function _relayLegSwapCommit(targetKey, targetShift) {
+      var ls = actionState.legSwap; if (!ls) { if (typeof closeActionModal === 'function') closeActionModal(); return; }
+      var mid = ls.mid;
+      var a = _relayActionById(mid, ls.actionId);
+      var _actor = _relayActorName();
+      var partner = (typeof _pbHolderOf === 'function')
+        ? _pbHolderOf(targetShift, _combinedUsedMap(mid, getCurrentUser()))
+        : (targetShift.name || '');
+      if (!partner) partner = targetShift.name || '';
+      if (String(partner) === String(_actor)) { if (typeof _p2bShowToast === 'function') _p2bShowToast('เลือกเวรของคนอื่น (ไม่ใช่ของคุณเอง)', 'warn'); return; }
+      actionState.legSwap = null;
+      var ovr = a ? _relayAuthorOverride(mid, a, ls.leg, ls.fromOwner, partner, 'swap') : null;   // my ไม้ → partner
+      var add = OverlayManager.addAction(mid, { action: 'add', viewerName: _actor, shiftKey: targetKey, partnerName: partner });  // their shift → me
+      if (typeof closeActionModal === 'function') closeActionModal();
+      if (typeof triggerUpdate === 'function') triggerUpdate();
+      var ids = []; if (ovr) ids.push(ovr.id); if (add) ids.push(add.id);
+      _relayLegConfirm(mid, ids,
+        '🔄 แลกไม้ ' + (ls.leg.i || '') + ' (' + _pbEsc(_relayLegWindowText(ls.leg)) + ') กับ <b>' + _pbEsc(displayName(partner)) + '</b>' +
+        '<br><span style="font-size:11.5px; color:var(--sub);">ไม้ของคุณ → ' + _pbEsc(displayName(partner)) + ' · เวร <b>' + _pbEsc(targetShift.pos || '') + '</b> ของ ' + _pbEsc(displayName(partner)) + ' → คุณ</span>',
+        String((a && (a.id || a.actionId)) || ''));
+    }
+    // Draft saved → keep-draft or publish-now (publishes all just-authored actions together).
+    //   masterId (optional): if the underlying ต่อเวร split is still a LOCAL draft, publish it too —
+    //   else a published note would orphan (no master to match on other devices).
+    function _relayLegConfirm(mid, ids, summaryHtml, masterId) {
+      ids = (ids || []).filter(Boolean);
+      var ov = document.createElement('div');
+      ov.id = 'relayLegConfirmOverlay';
+      ov.style.cssText = 'position:fixed; inset:0; background:rgba(0,0,0,0.55); z-index:10010; display:flex; align-items:center; justify-content:center; padding:16px;';
+      ov.innerHTML = '<div style="background:var(--surface); width:100%; max-width:420px; border-radius:16px; padding:18px; font-family:inherit;">' +
+        '<div style="font-weight:700; font-size:16px; margin-bottom:6px;">✓ บันทึกแบบร่างแล้ว</div>' +
+        '<div style="font-size:13px; color:var(--text); line-height:1.5; margin-bottom:12px;">' + summaryHtml + '</div>' +
+        '<div style="font-size:11.5px; color:var(--sub); margin-bottom:14px;">แบบร่างเห็นเฉพาะคุณ — กด<b>เผยแพร่</b>ให้ทุกคนเห็น (หรือเผยแพร่ทีหลังผ่านปุ่ม 🌐)</div>' +
+        '<div style="display:flex; gap:8px;">' +
+          '<button type="button" id="relayLegKeepDraft" style="flex:1; padding:11px; border:1px solid var(--border); border-radius:9px; background:var(--surface); color:var(--text); font-family:inherit; font-weight:600; cursor:pointer;">เก็บเป็นร่าง</button>' +
+          '<button type="button" id="relayLegPublish" style="flex:1; padding:11px; border:1px solid #0d9488; border-radius:9px; background:#0d9488; color:#fff; font-family:inherit; font-weight:700; cursor:pointer;">🌐 เผยแพร่เลย</button>' +
+        '</div></div>';
+      document.body.appendChild(ov);
+      function close() { var e = document.getElementById('relayLegConfirmOverlay'); if (e) e.remove(); }
+      ov.addEventListener('click', function (e) { if (e.target === ov) close(); });
+      document.getElementById('relayLegKeepDraft').addEventListener('click', function () { close(); if (typeof _p2bShowToast === 'function') _p2bShowToast('เก็บเป็นร่างแล้ว — กด 🌐 เพื่อเผยแพร่', 'ok'); });
+      document.getElementById('relayLegPublish').addEventListener('click', function () {
+        close();
+        // if the ต่อเวร split itself is still a local draft, publish it FIRST so the note isn't orphaned
+        if (masterId) {
+          try {
+            OverlayManager.load();
+            var bucket = OverlayManager._data && OverlayManager._data[mid];
+            var mAct = (bucket && bucket.actions) ? bucket.actions.find(function (a) { return a && a.id === masterId; }) : null;
+            if (mAct && mAct._visibility === 'draft') OverlayManager.publishAction(mid, masterId);
+          } catch (e) {}
+        }
+        ids.forEach(function (id) { try { OverlayManager.publishAction(mid, id); } catch (e) {} });
+        if (typeof invalidateGhostCache === 'function') invalidateGhostCache();
+        if (typeof triggerUpdate === 'function') triggerUpdate();
+        if (typeof _p2bShowToast === 'function') _p2bShowToast('เผยแพร่แล้ว', 'ok');
+      });
     }
     // v3.45.2: giving/swapping a split shift WHOLE supersedes the split — drop the relay action
     //   (draft → gone; published → removeAction hook pushes phxRemoveAction) so it can't linger as
@@ -5520,7 +5786,19 @@ window.allPharmacistNames = [];
     function _relayClearForShift(mid, key) {
       var found = _relayActionForKey(mid, key);
       if (!found) return false;
+      var mId = String(found.id);
       OverlayManager.removeAction(mid, found.id);
+      // v3.45.3: also drop this device's OWN leg handoffs for that master — else they'd orphan.
+      //   (Others' published notes go inert on their own once the master is gone: no master to match.)
+      try {
+        OverlayManager.load();
+        var acts = (OverlayManager._data && OverlayManager._data[mid] && OverlayManager._data[mid].actions) || [];
+        acts.slice().forEach(function (a) {
+          if (a && String(a.action || '') === 'relayleg' && Array.isArray(a.legs) && a.legs[0] && String(a.legs[0].masterId) === mId) {
+            OverlayManager.removeAction(mid, a.id);
+          }
+        });
+      } catch (e) {}
       if (typeof invalidateGhostCache === 'function') invalidateGhostCache();
       if (typeof _p2bShowToast === 'function') _p2bShowToast('ยกเลิกการแบ่งไม้ (ยก/สลับทั้งเวร)', 'ok');
       return true;
@@ -5901,6 +6179,8 @@ window.allPharmacistNames = [];
         console.error('[overlay] target not found:', targetKey);
         return;
       }
+      // v3.45.3: leg-swap reuses this picker — commit MY ไม้ ↔ THEIR whole shift, not a whole swap.
+      if (actionState.legSwap && typeof _relayLegSwapCommit === 'function') { _relayLegSwapCommit(targetKey, targetShift); return; }
       const mid = getCurrentMonthId();
       // v3.44: default "รับจาก/แลกกับ" = the shift's CURRENT holder (after gives/swaps), not the
       //   master owner — so a re-transferred shift records the real chain. Still editable in the dialog.
@@ -6143,8 +6423,13 @@ window.allPharmacistNames = [];
                  : (s && !e) ? (s + ' น. เป็นต้นไป')
                  : (s && e) ? (s + '-' + e) : '';
         var c = _relayLegColor(i);
+        // v3.45.3: a ไม้ that was handed on (sticky note) reads "<current> ← <original>" so the
+        //   hop is visible in history without a separate step. _baseOwner set only when it moved.
+        var _base = String(l._baseOwner || '');
+        var _handed = _base && _base !== String(l.owner || '');
+        var _hop = _handed ? '<span class="tl-relay-hop" style="opacity:.72;"> ← ' + _pbEsc(displayName(_base)) + '</span>' : '';
         return '<span class="tl-relay-leg"><span class="relay-leg-tag" style="color:' + c + '; border-color:' + c + ';">ไม้ ' + (i + 1) + '</span> ' +
-               '<b>' + _pbEsc(displayName(l.owner || '?')) + '</b>' + (when ? ' ' + _pbEsc(when) : '') + '</span>';
+               '<b>' + _pbEsc(displayName(l.owner || '?')) + '</b>' + _hop + (when ? ' ' + _pbEsc(when) : '') + '</span>';
       }).join(' ') + '</span>';
     }
     // v3.45.2: one-line summary at the top of a ต่อเวร step — "<the rest> ต่อเวรจาก <owner>"
@@ -8343,8 +8628,13 @@ window.allPharmacistNames = [];
         const _dataAttr = _tappable ? ` data-shift-key="${encodeURIComponent(_shiftKey)}"` : '';
         // v3.45: a relay leg-row has no real master shift key (its range is a sub-window), so the
         //   normal tap path can't resolve it — carry the action id so a tap opens the leg editor.
+        // v3.45.3: also carry the ไม้ identity (index + window + current owner) so the tap can open
+        //   the leg-level ยก/แลก menu for THIS ไม้ (not the whole shift).
         const _relayAttr = (editModeActive && i._relayLeg && i._relayLeg.actionId)
-          ? ` data-relay-actid="${encodeURIComponent(i._relayLeg.actionId)}" data-relay-mid="${encodeURIComponent(_mid)}"`
+          ? ` data-relay-actid="${encodeURIComponent(i._relayLeg.actionId)}" data-relay-mid="${encodeURIComponent(_mid)}"` +
+            ` data-relay-legi="${i._relayLeg.i}" data-relay-legstart="${encodeURIComponent(i._relayLeg.start||'')}"` +
+            ` data-relay-legend="${encodeURIComponent(i._relayLeg.end||'')}" data-relay-legclinic="${i._relayLeg.clinic?1:0}"` +
+            ` data-relay-legowner="${encodeURIComponent(i.name||'')}"`
           : '';
         // Patch ZZ3 / PB-1b: VIEW mode trigger ATTACHED to POS cell only — avoids covering chevron timeline
         const _isHospital = i.room && i.room !== 'clinic';
