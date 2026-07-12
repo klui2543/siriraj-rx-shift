@@ -1,0 +1,132 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<base target="_top">
+<title>PHX-Assistant · Admin</title>
+<link href="https://fonts.googleapis.com/css2?family=Kanit:wght@300;400;500;600&display=swap" rel="stylesheet">
+<style>
+body{margin:0;font-family:"Kanit",system-ui,sans-serif;background:#f4f6fb;color:#1e293b;font-size:15px}
+.wrap{max-width:760px;margin:0 auto;padding:20px}
+h1{font-size:20px;font-weight:600;display:flex;align-items:center;gap:8px}
+.card{background:#fff;border:1px solid #e2e8f0;border-radius:14px;padding:18px;margin-bottom:16px;box-shadow:0 1px 3px rgba(15,23,42,.06)}
+.card h2{font-size:15px;margin:0 0 12px;font-weight:600}
+.drop{border:2px dashed #cbd5e1;border-radius:12px;padding:26px;text-align:center;color:#64748b;cursor:pointer;transition:.15s}
+.drop:hover,.drop.over{border-color:#2563eb;background:#eff6ff;color:#1e40af}
+button{font-family:inherit;font-size:14px;background:#2563eb;color:#fff;border:0;border-radius:9px;padding:9px 16px;cursor:pointer;font-weight:500}
+button.ghost{background:#fff;color:#1e293b;border:1px solid #e2e8f0}
+button:disabled{opacity:.5;cursor:default}
+.muted{color:#64748b;font-size:13px}
+.stat{display:inline-flex;gap:6px;align-items:center;background:#f1f5f9;border-radius:999px;padding:4px 12px;margin:3px 6px 3px 0;font-size:13px}
+.ok{color:#15803d}.err{color:#b91c1c}.warnc{color:#b45309}
+.box{border-radius:10px;padding:10px 12px;font-size:13px;margin:8px 0}
+.box.ok{background:#f0fdf4;border:1px solid #bbf7d0}
+.box.err{background:#fef2f2;border:1px solid #fecaca}
+.box.warn{background:#fffbeb;border:1px solid #fde68a}
+pre{white-space:pre-wrap;word-break:break-word;font-size:12px;background:#0b1120;color:#e6edf7;padding:12px;border-radius:10px;overflow:auto}
+code{background:#f1f5f9;padding:1px 5px;border-radius:4px;font-size:13px}
+a{color:#2563eb}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>⚙️ PHX-Assistant · Admin</h1>
+  <p class="muted">อัปโหลดไฟล์ Excel ตารางเวรผู้ช่วย (.xlsx) → ระบบจะ parse + ตรวจสอบ (validator) แล้ว publish ขึ้น Firebase</p>
+
+  <div class="card">
+    <h2>📤 อัปโหลดตารางเวร</h2>
+    <div class="drop" id="drop">
+      <div>ลากไฟล์ .xlsx มาวาง หรือ <u>คลิกเพื่อเลือกไฟล์</u></div>
+      <div class="muted" id="fname" style="margin-top:6px"></div>
+    </div>
+    <input type="file" id="file" accept=".xlsx" style="display:none">
+    <div style="margin-top:12px;display:flex;gap:10px;align-items:center">
+      <button id="upBtn" disabled>ประมวลผล + Publish</button>
+      <label class="muted"><input type="checkbox" id="force"> force publish (ข้าม validator error)</label>
+    </div>
+    <div id="result"></div>
+  </div>
+
+  <div class="card">
+    <h2>🏷️ ทำเนียบชื่อเล่น</h2>
+    <p class="muted">แก้ชื่อเล่นในชีท "<code>ทำเนียบชื่อเล่น</code>" (คอลัมน์ A=personKey, B=nickname) แล้วกดปุ่มนี้เพื่อ sync</p>
+    <button class="ghost" id="nickBtn">Sync ชื่อเล่น → Firebase</button>
+    <div id="nickResult"></div>
+  </div>
+
+  <div class="card">
+    <h2>🔗 ลิงก์</h2>
+    <p class="muted">หน้าผู้ใช้ (ตารางเวร): <a id="userLink" href="#" target="_blank">เปิด</a></p>
+  </div>
+</div>
+
+<script>
+var picked=null;
+function hasGSR(){return typeof google!=='undefined'&&google.script&&google.script.run;}
+var drop=document.getElementById('drop'),fileEl=document.getElementById('file');
+drop.onclick=function(){fileEl.click();};
+['dragover','dragenter'].forEach(function(e){drop.addEventListener(e,function(ev){ev.preventDefault();drop.classList.add('over');});});
+['dragleave','drop'].forEach(function(e){drop.addEventListener(e,function(ev){ev.preventDefault();drop.classList.remove('over');});});
+drop.addEventListener('drop',function(ev){if(ev.dataTransfer.files[0])setFile(ev.dataTransfer.files[0]);});
+fileEl.onchange=function(){if(fileEl.files[0])setFile(fileEl.files[0]);};
+function setFile(f){picked=f;document.getElementById('fname').textContent=f.name;document.getElementById('upBtn').disabled=false;}
+
+document.getElementById('upBtn').onclick=function(){
+  if(!picked)return;
+  var btn=this;btn.disabled=true;btn.textContent='กำลังประมวลผล…';
+  document.getElementById('result').innerHTML='<p class="muted">อ่านไฟล์…</p>';
+  var reader=new FileReader();
+  reader.onload=function(){
+    var b64=reader.result.split(',')[1];
+    var force=document.getElementById('force').checked;
+    if(!hasGSR()){showResult({ok:false,error:'ต้องรันบน GAS web app (google.script.run ไม่พร้อม)'});btn.disabled=false;btn.textContent='ประมวลผล + Publish';return;}
+    google.script.run.withSuccessHandler(function(res){showResult(res);btn.disabled=false;btn.textContent='ประมวลผล + Publish';})
+      .withFailureHandler(function(e){showResult({ok:false,error:e.message||e});btn.disabled=false;btn.textContent='ประมวลผล + Publish';})
+      .uploadAssistantFile(b64,picked.name,{force:force});
+  };
+  reader.readAsDataURL(picked);
+};
+
+function showResult(res){
+  var el=document.getElementById('result');
+  if(!res.ok){el.innerHTML='<div class="box err">❌ '+esc(res.error)+'</div>';return;}
+  var v=res.validation||{errors:[],warnings:[],stats:{}};
+  var h='';
+  h+='<div class="box '+(res.published?'ok':(res.blocked?'err':'warn'))+'">'
+    +(res.published?'✅ Publish สำเร็จ':'⛔ ยังไม่ publish (validator พบ error — ติ๊ก force ถ้าต้องการข้าม)')
+    +' — เดือน <b>'+esc(res.label)+'</b> ('+esc(res.key)+') · '+res.ms+'ms</div>';
+  var c=res.counts||{};
+  h+='<div>'+['clinic','night','daytimeOK','unit30B'].map(function(s){return '<span class="stat">'+s+': <b>'+(c[s]||0)+'</b></span>';}).join('')
+    +'<span class="stat">unique: <b>'+res.uniqueNames+'</b></span></div>';
+  // validation
+  if(v.errors.length){
+    h+='<div class="box err"><b class="err">Validator errors ('+v.errors.length+')</b><ul>'
+      +v.errors.map(function(e){return '<li>'+esc(JSON.stringify(e))+'</li>';}).join('')+'</ul></div>';
+  }else{h+='<div class="box ok"><b class="ok">Validator: population/structural ผ่าน ✔</b></div>';}
+  if(v.warnings.length){
+    var shown=v.warnings.slice(0,12);
+    h+='<div class="box warn"><b class="warnc">Warnings ('+v.warnings.length+')</b><ul>'
+      +shown.map(function(w){return '<li>'+esc(JSON.stringify(w))+'</li>';}).join('')
+      +(v.warnings.length>shown.length?'<li>… อีก '+(v.warnings.length-shown.length)+'</li>':'')+'</ul></div>';
+  }
+  h+='<details><summary class="muted">stats (debug)</summary><pre>'+esc(JSON.stringify(v.stats,null,2))+'</pre></details>';
+  el.innerHTML=h;
+}
+
+document.getElementById('nickBtn').onclick=function(){
+  var btn=this;btn.disabled=true;btn.textContent='กำลัง sync…';
+  var el=document.getElementById('nickResult');
+  if(!hasGSR()){el.innerHTML='<div class="box err">ต้องรันบน GAS</div>';btn.disabled=false;btn.textContent='Sync ชื่อเล่น → Firebase';return;}
+  google.script.run.withSuccessHandler(function(r){
+    el.innerHTML=r.ok?'<div class="box ok">✅ sync '+r.count+' ชื่อเล่น</div>':'<div class="box err">❌ '+esc(r.error)+'</div>';
+    btn.disabled=false;btn.textContent='Sync ชื่อเล่น → Firebase';
+  }).withFailureHandler(function(e){el.innerHTML='<div class="box err">❌ '+esc(e.message||e)+'</div>';btn.disabled=false;btn.textContent='Sync ชื่อเล่น → Firebase';})
+    .syncNicknames();
+};
+
+function esc(s){return String(s==null?'':s).replace(/[&<>]/g,function(c){return{'&':'&amp;','<':'&lt;','>':'&gt;'}[c];});}
+if(hasGSR()){google.script.run.withSuccessHandler(function(u){var a=document.getElementById('userLink');a.href=u;}).getScriptUrl();}
+</script>
+</body>
+</html>
