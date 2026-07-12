@@ -18,9 +18,9 @@ function SYNC_STAMP() {
   return {
     version: 'v3.45',   // ← เลขเวอร์ชัน (bump เองตอนออกรุ่นใหม่) แสดงที่ footer เว็บ
     topic:   'version badge ที่ footer เว็บ (Index/Admin) + หน้า ?action=version',
-    updated: '2026-07-12 07:52 +0000',
+    updated: '2026-07-12 08:27 +0000',
     branch:  'main',
-    based_on_commit: '027942b',
+    based_on_commit: '3a6c7d6',
     note:    'เวลา updated ถูกปั๊มอัตโนมัติเป็นเวลา push จริงตอนขึ้น GAS'
   };
 }
