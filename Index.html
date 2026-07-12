@@ -3309,7 +3309,12 @@ window.allPharmacistNames = [];
           } else if (a.action === 'give') {
             map[a.shiftKey] = { label: 'ยกให้ ' + a.partnerName + ' แล้ว', actionId: a.id, newOwner: a.partnerName };
           } else if (a.action === 'add') {
-            map[a.shiftKey] = { label: 'รับมาแล้ว', actionId: a.id, newOwner: viewerName };
+            // v3.45.3 pt8: a leg-swap's reciprocal `add` strikes the partner's whole shift — make it
+            //   read like a real swap (pair-dot colour + "แลกกับ") so both halves match visually.
+            var _lsw = (Array.isArray(a.legs) && a.legs[0] && a.legs[0].__legswap) ? a.legs[0] : null;
+            map[a.shiftKey] = _lsw
+              ? { label: 'แลกกับ ' + viewerName + ' แล้ว', actionId: a.id, color: _lsw.dot, newOwner: viewerName }
+              : { label: 'รับมาแล้ว', actionId: a.id, newOwner: viewerName };
           }
         });
         return map;
@@ -4168,7 +4173,11 @@ window.allPharmacistNames = [];
             if (o.shiftKey) map[o.shiftKey] = { label: 'ยกให้ ' + o.partnerName + ' แล้ว', actionId: o.actionId, _pbSource: true, newOwner: o.partnerName };
           } else if (act === 'add') {
             // 'add' shiftKey = "date|pos|partnerName|range" → labels partner's original row
-            if (o.shiftKey) map[o.shiftKey] = { label: 'ยกให้ ' + o.viewerName + ' แล้ว', actionId: o.actionId, _pbSource: true, newOwner: o.viewerName };
+            // v3.45.3 pt8: leg-swap reciprocal add → swap-style strike (pair-dot + "แลกกับ") on the partner's row.
+            var _lswP = (Array.isArray(o.legs) && o.legs[0] && o.legs[0].__legswap) ? o.legs[0] : null;
+            if (o.shiftKey) map[o.shiftKey] = _lswP
+              ? { label: 'แลกกับ ' + o.viewerName + ' แล้ว', actionId: o.actionId, color: _lswP.dot, _pbSource: true, newOwner: o.viewerName }
+              : { label: 'ยกให้ ' + o.viewerName + ' แล้ว', actionId: o.actionId, _pbSource: true, newOwner: o.viewerName };
           }
         });
         return map;
@@ -4800,7 +4809,7 @@ window.allPharmacistNames = [];
             .sort(function(x, y){ return String(x.createdAt || '').localeCompare(String(y.createdAt || '')); });
           _pbHops.forEach(function(o, j){
             var _lk = (o.kind === 'swap') ? 'swap' : 'give';
-            var _d = _relayLegStepDesc(o, _pbRelay);
+            var _d = _relayLegStepDesc(o, _pbRelay, true);   // pt8: PB builder prefixes the actor name
             var _ts = o.createdAt ? new Date(o.createdAt).toLocaleString('th-TH', {dateStyle:'short', timeStyle:'short'}) : '';
             if (_ts) _d += ' <span class="tl-inline-ts">· ' + _ts + '</span>';
             html += '<div class="tl-inline-step tl-' + _lk + '"><div class="tl-inline-num">' + (chain.length + j + 1) + '</div><div class="tl-inline-body">' + _d + '</div></div>';
@@ -5735,7 +5744,7 @@ window.allPharmacistNames = [];
     //   swap → "แลก <pos> (ไม้ N · window) กับ <gotPos> จาก <to>"  (mirrors "แลก <pos> กับ <pos> จาก <name>")
     //   No actor prefix (the main steps don't have one either). `master` = the relay action, used to
     //   resolve the shift pos + the ไม้ number from the note's window.
-    function _relayLegStepDesc(o, master) {
+    function _relayLegStepDesc(o, master, withActor) {
       var pos = '', legNo = '';
       if (master) {
         var mk = String(master.shiftKey || '');
@@ -5754,11 +5763,14 @@ window.allPharmacistNames = [];
       var qual = 'ไม้' + (legNo ? ' ' + legNo : '') + (win ? ' · ' + win : '');
       var posB = pos ? '<b>' + _pbEsc(pos) + '</b> ' : '';
       var to = _pbEsc(displayName(o.toOwner || '?'));
+      // v3.45.3 pt8: actor-name prefix for the PB (cross-person) builder, matching how a normal
+      //   swap/give reads there ("นาย A แลก ..."); the author's own builder omits it (it's "you").
+      var by = withActor ? ('<b>' + _pbEsc(displayName(o.actor || o.fromOwner || '?')) + '</b> ') : '';
       if (o.kind === 'swap') {
         var got = o.gotPos ? '<b>' + _pbEsc(o.gotPos) + '</b>' : 'เวร';
-        return 'แลก ' + posB + '(' + _pbEsc(qual) + ') กับ ' + got + ' จาก <b>' + to + '</b>';
+        return by + 'แลก ' + posB + '(' + _pbEsc(qual) + ') กับ ' + got + ' จาก <b>' + to + '</b>';
       }
-      return 'ยก ' + posB + '(' + _pbEsc(qual) + ') ให้ <b>' + to + '</b>';
+      return by + 'ยก ' + posB + '(' + _pbEsc(qual) + ') ให้ <b>' + to + '</b>';
     }
     // v3.45.3 pt7: tapping a ไม้ row → the leg menu AS A STEP OF THE MAIN actionModal (Klui #2:
     //   universal format — same floating popup as แลก/ยก/รับเวร). Context lives in actionState.legMenu.
