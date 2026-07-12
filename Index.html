@@ -2388,7 +2388,7 @@ window.allPharmacistNames = [];
     // (avoids collisions from substring(0,15) truncation)
     // ==========================================
     let editModeActive = false;
-    const actionState = { shiftKey: null, step: 'menu', pickerQuery: '', pickerPerson: '', pickerDate: '', usedInfo: null, legSwap: null };
+    const actionState = { shiftKey: null, step: 'menu', pickerQuery: '', pickerPerson: '', pickerDate: '', usedInfo: null, legSwap: null, legGive: null, legMenu: null };
     const OVERLAY_KEY = 'siriraj_shift_overlay_v4';  // v14: bumped — user-scoped actions
 
     // Composite key — unique within a month's data
@@ -3443,6 +3443,11 @@ window.allPharmacistNames = [];
         seen.add(id);
         if (typeof a.shiftKey === 'string' && a.shiftKey.indexOf('_g_') === 0) stack.push(a.shiftKey.substring(3));
         acts.forEach(c => { if (c && c.shiftKey === '_g_' + id) stack.push(c.id); });
+        // v3.45.3 pt7: a แลกไม้ authors TWO actions (relayleg note + the reciprocal add) linked by
+        //   legs[0].pairId — keep them one chain so publish/unpublish/discard never leaves a half-swap.
+        const _pid = (Array.isArray(a.legs) && a.legs[0] && a.legs[0].pairId) ? String(a.legs[0].pairId) : '';
+        if (_pid) stack.push(_pid);
+        acts.forEach(c => { if (c && Array.isArray(c.legs) && c.legs[0] && String(c.legs[0].pairId) === String(id)) stack.push(c.id); });
       }
       return Array.from(seen);
     }
@@ -3740,7 +3745,10 @@ window.allPharmacistNames = [];
           return !members.some(function(o) { return String(o.shiftKey || '') === '_g_' + m.id; });
         });
         tails.sort(function(x, y) { return String(x.createdAt || '').localeCompare(String(y.createdAt || '')); });
-        reps.push({ rep: tails[tails.length - 1] || members[members.length - 1], size: members.length });
+        // v3.45.3 pt7: a แลกไม้ pair (relayleg note + add) has no _g_ link between them, so both are
+        //   "tails" — prefer the note as the representative so the row reads "แลกไม้", not "รับเวร".
+        var _legNote = members.find(function(m) { return m && String(m.action || '') === 'relayleg'; });
+        reps.push({ rep: _legNote || tails[tails.length - 1] || members[members.length - 1], size: members.length });
       });
       return reps;
     }
@@ -4614,7 +4622,7 @@ window.allPharmacistNames = [];
             .sort(function(x, y){ return String(x.createdAt || '').localeCompare(String(y.createdAt || '')); });
           _tlHops.forEach(function(o, j){
             var _lk = (o.kind === 'swap') ? 'swap' : 'give';
-            var _d = _relayLegStepDesc(o);
+            var _d = _relayLegStepDesc(o, _tlRelay);
             var _ts = o.createdAt ? new Date(o.createdAt).toLocaleString('th-TH', {dateStyle:'short', timeStyle:'short'}) : '';
             if (_ts) _d += ' <span class="tl-inline-ts">· ' + _ts + '</span>';
             html += '<div class="tl-inline-step tl-' + _lk + '"><div class="tl-inline-num">' + (chain.length + j + 1) + '</div><div class="tl-inline-body">' + _d + '</div></div>';
@@ -4774,7 +4782,7 @@ window.allPharmacistNames = [];
             .sort(function(x, y){ return String(x.createdAt || '').localeCompare(String(y.createdAt || '')); });
           _pbHops.forEach(function(o, j){
             var _lk = (o.kind === 'swap') ? 'swap' : 'give';
-            var _d = _relayLegStepDesc(o);
+            var _d = _relayLegStepDesc(o, _pbRelay);
             var _ts = o.createdAt ? new Date(o.createdAt).toLocaleString('th-TH', {dateStyle:'short', timeStyle:'short'}) : '';
             if (_ts) _d += ' <span class="tl-inline-ts">· ' + _ts + '</span>';
             html += '<div class="tl-inline-step tl-' + _lk + '"><div class="tl-inline-num">' + (chain.length + j + 1) + '</div><div class="tl-inline-body">' + _d + '</div></div>';
@@ -5327,7 +5335,7 @@ window.allPharmacistNames = [];
       actionState.pickerQuery = '';
       actionState.pickerPerson = '';
       actionState.pickerDate = '';
-      actionState.legSwap = null;   // v3.45.3: a normal shift tap is never a leg-swap
+      actionState.legSwap = null; actionState.legGive = null; actionState.legMenu = null;   // v3.45.3: a normal shift tap isn't a leg op
 
       if (isUsedAsSource) {
         // Already swapped/given → show undo (works for both real and chained-ghost)
@@ -5560,7 +5568,7 @@ window.allPharmacistNames = [];
       actionState.pickerQuery = '';
       actionState.pickerPerson = '';
       actionState.pickerDate = '';
-      actionState.legSwap = null;   // v3.45.3: cancelling the picker discards a pending leg-swap
+      actionState.legSwap = null; actionState.legGive = null; actionState.legMenu = null;   // v3.45.3: cancel discards pending leg ops
     }
 
     function actionGoTo(step) {
@@ -5580,19 +5588,26 @@ window.allPharmacistNames = [];
         swap: 'สลับเวร — เลือกเวรของอีกฝ่าย',
         give: 'ยกเวร — เลือกผู้รับ',
         add: 'เพิ่มเวร — เลือกเวรที่ต้องการรับ',
-        undo: 'ยกเลิกการแก้ไข'
+        undo: 'ยกเลิกการแก้ไข',
+        legMenu: 'จัดการไม้นี้'
       };
-      let html = '<div class="act-modal-header"><h3>' + titles[s] + '</h3>' +
+      // v3.45.3 pt7: ยก/แลกไม้ reuse the give/swap pickers → relabel the title for the ไม้ context.
+      let _title = titles[s] || '';
+      if (s === 'give' && actionState.legGive) _title = 'ยกไม้ — เลือกผู้รับ';
+      else if (s === 'swap' && actionState.legSwap) _title = 'แลกไม้ — เลือกเวรของอีกฝ่าย';
+      let html = '<div class="act-modal-header"><h3>' + _title + '</h3>' +
                  '<button class="act-modal-close" onclick="closeActionModal()">✕</button></div>';
       html += '<div class="act-modal-body">';
 
-      if (actionState.legSwap && actionState.legSwap.leg) {
-        // v3.45.3: leg-swap — the thing being offered is MY ไม้, not the whole shift. Label it so.
-        const _lg = actionState.legSwap.leg;
+      const _legCtx = actionState.legSwap || actionState.legGive || actionState.legMenu;
+      if (_legCtx && _legCtx.leg) {
+        // v3.45.3: a leg op acts on MY ไม้, not the whole shift — label the header accordingly.
+        const _lg = _legCtx.leg;
         const _shp = findShiftByKey(actionState.shiftKey);
         const _win = (typeof _relayLegWindowText === 'function') ? _relayLegWindowText(_lg) : '';
+        const _lbl = actionState.legSwap ? 'ไม้ของคุณ (ที่จะแลก)' : (actionState.legGive ? 'ไม้ที่จะยกให้' : 'ไม้ที่เลือก');
         html += '<div class="act-shift-info">' +
-                  '<div class="act-shift-info-lbl">ไม้ของคุณ (ที่จะยกให้อีกฝ่าย)</div>' +
+                  '<div class="act-shift-info-lbl">' + _lbl + '</div>' +
                   '<div class="act-shift-info-val">ไม้ ' + (_lg.i || '') + ' • ' + _pbEsc(_win) + (_shp ? ' • ' + _pbEsc(_shp.pos || '') : '') + '</div>' +
                 '</div>';
       } else if (actionState.shiftKey) {
@@ -5607,6 +5622,7 @@ window.allPharmacistNames = [];
 
       if (s === 'menu') html += renderMenuStep();
       else if (s === 'ghostMenu') html += renderGhostMenuStep();
+      else if (s === 'legMenu') html += renderLegMenuStep();
       else if (s === 'swap' || s === 'add') html += renderShiftPickerShell();
       else if (s === 'give') html += renderNamePickerShell();
       else if (s === 'undo') html += renderUndoStep();
@@ -5679,7 +5695,6 @@ window.allPharmacistNames = [];
       if (leg.clinic) return (!s && e) ? ('ถึง ' + e) : (s && !e) ? (s + ' น. เป็นต้นไป') : (s && e) ? (s + '–' + e) : 'ตรวจสอบ';
       return (s && e) ? (s + '-' + e) : (s || e || '');
     }
-    function _relayCloseLegMenu() { var e = document.getElementById('relayLegMenuOverlay'); if (e) e.remove(); }
     // Author one "sticky note" (relayleg) — the identity of WHICH ไม้ rides in legs[0]; everything
     //   else on standard, server-whitelisted fields. viewerName = the actor so phxPushActions pushes
     //   it under their own name (sync-legal even when the actor isn't the master's author).
@@ -5697,20 +5712,39 @@ window.allPharmacistNames = [];
         legs: [pay]
       });
     }
-    // Render a leg-handoff (ยก/แลกไม้) as a timeline-step description — same voice as a whole give/swap.
-    function _relayLegStepDesc(o) {
-      var win = (typeof _relayLegWindowText === 'function') ? _relayLegWindowText({ start: o.legStart, end: o.legEnd, clinic: o.legClinic }) : '';
-      var by = _pbEsc(displayName(o.actor || o.fromOwner || '?'));
-      var to = _pbEsc(displayName(o.toOwner || '?'));
-      var winTxt = win ? ' (' + _pbEsc(win) + ')' : '';
-      if (o.kind === 'swap') {
-        var got = o.gotPos ? ' — ได้ <b>' + _pbEsc(o.gotPos) + '</b> มา' : '';
-        return '<b>' + by + '</b> แลกไม้' + winTxt + ' กับ <b>' + to + '</b>' + got;
+    // v3.45.3 pt7: leg-handoff timeline step — MAIN-system voice (Klui #1: อิงระบบหลัก + วงเล็บไม้):
+    //   give → "ยก <pos> (ไม้ N · window) ให้ <to>"  (mirrors main "ยก <pos> ให้ <name>")
+    //   swap → "แลก <pos> (ไม้ N · window) กับ <gotPos> จาก <to>"  (mirrors "แลก <pos> กับ <pos> จาก <name>")
+    //   No actor prefix (the main steps don't have one either). `master` = the relay action, used to
+    //   resolve the shift pos + the ไม้ number from the note's window.
+    function _relayLegStepDesc(o, master) {
+      var pos = '', legNo = '';
+      if (master) {
+        var mk = String(master.shiftKey || '');
+        if (mk && mk.indexOf('_g_') !== 0) {
+          var sx = (typeof findShiftByKey === 'function') ? findShiftByKey(mk) : null;
+          pos = sx ? String(sx.pos || '') : ((typeof _pbShiftPosFromKey === 'function') ? (_pbShiftPosFromKey(mk) || '') : '');
+        }
+        if (Array.isArray(master.legs)) {
+          for (var i = 0; i < master.legs.length; i++) {
+            var l = master.legs[i];
+            if (String(l.start || '') === o.legStart && String(l.end || '') === o.legEnd && !!l.clinic === !!o.legClinic) { legNo = i + 1; break; }
+          }
+        }
       }
-      return '<b>' + by + '</b> ยกไม้' + winTxt + ' ให้ <b>' + to + '</b>';
+      var win = (typeof _relayLegWindowText === 'function') ? _relayLegWindowText({ start: o.legStart, end: o.legEnd, clinic: o.legClinic }) : '';
+      var qual = 'ไม้' + (legNo ? ' ' + legNo : '') + (win ? ' · ' + win : '');
+      var posB = pos ? '<b>' + _pbEsc(pos) + '</b> ' : '';
+      var to = _pbEsc(displayName(o.toOwner || '?'));
+      if (o.kind === 'swap') {
+        var got = o.gotPos ? '<b>' + _pbEsc(o.gotPos) + '</b>' : 'เวร';
+        return 'แลก ' + posB + '(' + _pbEsc(qual) + ') กับ ' + got + ' จาก <b>' + to + '</b>';
+      }
+      return 'ยก ' + posB + '(' + _pbEsc(qual) + ') ให้ <b>' + to + '</b>';
     }
-    // v3.45.2→3: tapping a ไม้ row → a leg-level menu (ยกไม้ / แลกไม้ / แก้ไม้ทั้งหมด / จัดการทั้งเวร).
-    //   `leg` = {i,start,end,clinic,owner}. Missing (old row) → fall back to the whole-shift menu.
+    // v3.45.3 pt7: tapping a ไม้ row → the leg menu AS A STEP OF THE MAIN actionModal (Klui #2:
+    //   universal format — same floating popup as แลก/ยก/รับเวร). Context lives in actionState.legMenu.
+    //   Missing leg (old row) → fall back to the whole-shift menu.
     function _relayOpenLegMenu(mid, actionId, leg) {
       var a = _relayActionById(mid, actionId);
       if (!leg) {
@@ -5718,143 +5752,99 @@ window.allPharmacistNames = [];
         else if (typeof _relayEditLegs === 'function') _relayEditLegs(mid, actionId);
         return;
       }
+      actionState.shiftKey = (a && a.shiftKey) ? String(a.shiftKey) : null;
+      actionState.usedInfo = null;
+      actionState.legSwap = null; actionState.legGive = null;
+      actionState.legMenu = { mid: mid, actionId: actionId, leg: leg };
+      actionState.step = 'legMenu';
+      if (typeof renderActionModal === 'function') renderActionModal();
+      var modal = document.getElementById('actionModal'); if (modal) modal.style.display = 'flex';
+    }
+    // The leg menu buttons (rendered inside actionModal for step 'legMenu'). Gated: ยก/แลก for the
+    //   ไม้'s current holder or admin; แก้ไม้/จัดการทั้งเวร for the split's author or admin.
+    function renderLegMenuStep() {
+      var lm = actionState.legMenu;
+      if (!lm || !lm.leg) return '<div class="act-prompt">ไม่พบไม้</div><button class="act-btn act-btn-cancel" onclick="closeActionModal()">ปิด</button>';
+      var leg = lm.leg, a = _relayActionById(lm.mid, lm.actionId);
       var _actor = _relayActorName();
       var isAdmin = (typeof phxAuthIsAdmin === 'function' && phxAuthIsAdmin());
       var isLegOwner = _actor && String(_actor) === String(leg.owner || '');
       var isAuthor = a && _actor && String(a.viewerName || '') === String(_actor);
-      var legC = (typeof _relayLegColor === 'function') ? _relayLegColor((leg.i || 1) - 1) : '#0d9488';
-      var winTxt = _relayLegWindowText(leg);
-      _relayCloseLegMenu();
-      var ov = document.createElement('div');
-      ov.id = 'relayLegMenuOverlay';
-      ov.style.cssText = 'position:fixed; inset:0; background:rgba(0,0,0,0.5); z-index:10008; display:flex; align-items:flex-end; justify-content:center; padding:0;';
       var btns = '';
       if (isLegOwner || isAdmin) {
-        btns += '<button type="button" class="act-btn act-btn-danger" id="relayLegGive">🎁 ยกไม้ ' + (leg.i || '') + ' ให้คนอื่น</button>';
-        btns += '<button type="button" class="act-btn act-btn-primary" id="relayLegSwap">🔄 แลกไม้ ' + (leg.i || '') + ' กับเวรคนอื่น</button>';
+        btns += '<button class="act-btn act-btn-danger" onclick="_relayLegGiveStart()">🎁 ยกไม้ ' + (leg.i || '') + ' ให้คนอื่น</button>';
+        btns += '<button class="act-btn act-btn-primary" onclick="_relayLegSwapStart()">🔄 แลกไม้ ' + (leg.i || '') + ' กับเวรคนอื่น</button>';
       }
       if (isAuthor || isAdmin) {
-        btns += '<button type="button" class="act-btn" id="relayLegEditAll" style="background:#f0fdfa; color:#0f766e; border-color:#99f6e4;">🏃 แก้ไม้ทั้งหมด (ต่อเวร)</button>';
-        btns += '<button type="button" class="act-btn" id="relayLegWhole" style="background:#fff7ed; color:#9a3412; border-color:#fed7aa;">⚙️ จัดการทั้งเวร (ยก/สลับ/ยกเลิกแบ่ง)</button>';
+        btns += '<button class="act-btn" style="background:#f0fdfa; color:#0f766e; border-color:#99f6e4;" onclick="_relayLegEditAllFromMenu()">🏃 แก้ไม้ทั้งหมด (ต่อเวร)</button>';
+        btns += '<button class="act-btn" style="background:#fff7ed; color:#9a3412; border-color:#fed7aa;" onclick="_relayLegWholeFromMenu()">⚙️ จัดการทั้งเวร (ยก/สลับ/ยกเลิกแบ่ง)</button>';
       }
-      if (!btns) btns = '<div style="font-size:12.5px; color:var(--sub); text-align:center; padding:10px 0;">ไม้นี้เป็นของ <b>' + _pbEsc(displayName(leg.owner || '?')) + '</b><br>ยก/แลกได้เฉพาะเจ้าของไม้หรือแอดมิน</div>';
-      ov.innerHTML = '<div style="background:var(--surface); width:100%; max-width:460px; border-radius:16px 16px 0 0; padding:16px 16px 20px; font-family:inherit; box-shadow:0 -8px 30px rgba(0,0,0,0.2); box-sizing:border-box;">' +
-        '<div style="display:flex; align-items:center; gap:8px; margin-bottom:4px; flex-wrap:wrap;">' +
-          '<span class="relay-leg-tag" style="color:' + legC + '; border-color:' + legC + '; flex:0 0 auto;">ไม้ ' + (leg.i || '') + '</span>' +
-          '<b style="font-size:15px; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; max-width:60%;">' + _pbEsc(displayName(leg.owner || '?')) + '</b>' +
-          '<span style="margin-left:auto; font-size:12px; color:var(--sub); flex:0 0 auto;">' + _pbEsc(winTxt) + '</span>' +
-        '</div>' +
-        '<div style="font-size:11.5px; color:var(--sub); margin-bottom:12px;">ทำเฉพาะ<b>ไม้นี้</b> — ไม้อื่นไม่กระทบ เวรยังเป็นของเจ้าของเดิม</div>' +
-        '<div style="display:flex; flex-direction:column; gap:8px;">' + btns +
-          '<button type="button" class="act-btn act-btn-cancel" id="relayLegCancel">ยกเลิก</button>' +
-        '</div></div>';
-      document.body.appendChild(ov);
-      ov.addEventListener('click', function (e) { if (e.target === ov) _relayCloseLegMenu(); });
-      var _bind = function (id, fn) { var el = document.getElementById(id); if (el) el.addEventListener('click', fn); };
-      _bind('relayLegCancel', _relayCloseLegMenu);
-      _bind('relayLegGive', function () { _relayCloseLegMenu(); _relayLegGive(mid, actionId, leg); });
-      _bind('relayLegSwap', function () { _relayCloseLegMenu(); _relayLegSwap(mid, actionId, leg); });
-      _bind('relayLegEditAll', function () { _relayCloseLegMenu(); if (typeof _relayEditLegs === 'function') _relayEditLegs(mid, actionId); });
-      _bind('relayLegWhole', function () { _relayCloseLegMenu(); if (a && a.shiftKey && typeof openActionModalForKey === 'function') openActionModalForKey(String(a.shiftKey)); });
+      if (!btns) btns = '<div style="font-size:12px; color:var(--sub); text-align:center; padding:8px 0;">ไม้นี้เป็นของ <b>' + _pbEsc(displayName(leg.owner || '?')) + '</b><br>ยก/แลกได้เฉพาะเจ้าของไม้หรือแอดมิน</div>';
+      return '<div class="act-prompt">ต้องการทำอะไรกับไม้นี้?</div>' + btns +
+             '<button class="act-btn act-btn-cancel" onclick="closeActionModal()">ยกเลิก</button>';
     }
-    // 🎁 ยกไม้ — hand this ONE ไม้ to another known name (a sticky note, no shift ownership change).
-    function _relayLegGive(mid, actionId, leg) {
-      var a = _relayActionById(mid, actionId);
-      if (!a) { if (typeof _p2bShowToast === 'function') _p2bShowToast('ไม่พบการต่อเวร', 'warn'); return; }
-      var _actor = _relayActorName();
-      var isAdmin = (typeof phxAuthIsAdmin === 'function' && phxAuthIsAdmin());
+    // legMenu → main name/shift picker (reused verbatim), then commit through swfOpenConfirm.
+    function _relayLegGiveStart() {
+      var lm = actionState.legMenu; if (!lm) return;
+      var _actor = _relayActorName(), isAdmin = (typeof phxAuthIsAdmin === 'function' && phxAuthIsAdmin());
       if (!_actor) { if (typeof _p2bShowToast === 'function') _p2bShowToast('ต้อง login ก่อนจึงจะยกไม้ได้', 'warn'); return; }
-      if (!isAdmin && String(_actor) !== String(leg.owner || '')) { if (typeof _p2bShowToast === 'function') _p2bShowToast('ยกไม้ได้เฉพาะเจ้าของไม้', 'warn'); return; }
-      if (typeof _lwwNamePicker !== 'function') return;
-      _lwwNamePicker('', function (nm) {
-        if (!nm) return;
-        if (String(nm) === String(leg.owner || '')) { if (typeof _p2bShowToast === 'function') _p2bShowToast('เป็นเจ้าของไม้นี้อยู่แล้ว', 'warn'); return; }
-        var stored = _relayAuthorOverride(mid, a, leg, leg.owner, nm, 'give');
-        if (!stored) { if (typeof _p2bShowToast === 'function') _p2bShowToast('ยกไม้ไม่สำเร็จ', 'warn'); return; }
-        if (typeof triggerUpdate === 'function') triggerUpdate();
-        _relayLegConfirm(mid, [stored.id], '🎁 ยกไม้ ' + (leg.i || '') + ' (' + _pbEsc(_relayLegWindowText(leg)) + ') ให้ <b>' + _pbEsc(displayName(nm)) + '</b>', String(a.id || a.actionId || ''));
-      });
+      if (!isAdmin && String(_actor) !== String(lm.leg.owner || '')) { if (typeof _p2bShowToast === 'function') _p2bShowToast('ยกไม้ได้เฉพาะเจ้าของไม้', 'warn'); return; }
+      actionState.legGive = { mid: lm.mid, actionId: lm.actionId, leg: lm.leg, fromOwner: lm.leg.owner };
+      actionState.legMenu = null;
+      if (typeof actionGoTo === 'function') actionGoTo('give');   // reuse the main name picker
     }
-    // 🔄 แลกไม้ — trade this ไม้ for another whole shift: my ไม้ → them (sticky note), their shift →
-    //   me (a standard `add`, reusing the existing รับเวร machinery). Reuses the swap picker UI by
-    //   flagging actionState.legSwap so confirmPickShift routes into _relayLegSwapCommit.
-    function _relayLegSwap(mid, actionId, leg) {
-      var a = _relayActionById(mid, actionId);
-      if (!a) { if (typeof _p2bShowToast === 'function') _p2bShowToast('ไม่พบการต่อเวร', 'warn'); return; }
-      var _actor = _relayActorName();
-      var isAdmin = (typeof phxAuthIsAdmin === 'function' && phxAuthIsAdmin());
+    function _relayLegSwapStart() {
+      var lm = actionState.legMenu; if (!lm) return;
+      var _actor = _relayActorName(), isAdmin = (typeof phxAuthIsAdmin === 'function' && phxAuthIsAdmin());
       if (!_actor) { if (typeof _p2bShowToast === 'function') _p2bShowToast('ต้อง login ก่อนจึงจะแลกไม้ได้', 'warn'); return; }
-      if (!isAdmin && String(_actor) !== String(leg.owner || '')) { if (typeof _p2bShowToast === 'function') _p2bShowToast('แลกไม้ได้เฉพาะเจ้าของไม้', 'warn'); return; }
-      actionState.shiftKey = String(a.shiftKey || '');
-      actionState.usedInfo = null;
-      actionState.legSwap = { mid: mid, actionId: actionId, leg: leg, fromOwner: leg.owner };
-      if (typeof actionGoTo === 'function') actionGoTo('swap');
-      var modal = document.getElementById('actionModal'); if (modal) modal.style.display = 'flex';
+      if (!isAdmin && String(_actor) !== String(lm.leg.owner || '')) { if (typeof _p2bShowToast === 'function') _p2bShowToast('แลกไม้ได้เฉพาะเจ้าของไม้', 'warn'); return; }
+      actionState.legSwap = { mid: lm.mid, actionId: lm.actionId, leg: lm.leg, fromOwner: lm.leg.owner };
+      actionState.legMenu = null;
+      if (typeof actionGoTo === 'function') actionGoTo('swap');   // reuse the main shift picker
     }
+    function _relayLegEditAllFromMenu() {
+      var lm = actionState.legMenu; if (!lm) return;
+      var mid = lm.mid, aid = lm.actionId;
+      if (typeof closeActionModal === 'function') closeActionModal();
+      if (typeof _relayEditLegs === 'function') _relayEditLegs(mid, aid);
+    }
+    function _relayLegWholeFromMenu() {
+      var lm = actionState.legMenu; if (!lm) return;
+      var a = _relayActionById(lm.mid, lm.actionId);
+      if (a && a.shiftKey && typeof openActionModalForKey === 'function') openActionModalForKey(String(a.shiftKey));
+    }
+    // 🎁 ยกไม้ commit — pick a recipient in the main name picker → author the note → swfOpenConfirm.
+    function _relayLegGiveCommit(nm) {
+      var lg = actionState.legGive; if (!lg) { if (typeof closeActionModal === 'function') closeActionModal(); return; }
+      var mid = lg.mid, a = _relayActionById(mid, lg.actionId);
+      if (!a) { if (typeof closeActionModal === 'function') closeActionModal(); if (typeof _p2bShowToast === 'function') _p2bShowToast('ไม่พบการต่อเวร', 'warn'); return; }
+      if (String(nm) === String(lg.leg.owner || '')) { if (typeof _p2bShowToast === 'function') _p2bShowToast('เป็นเจ้าของไม้นี้อยู่แล้ว', 'warn'); return; }
+      actionState.legGive = null;
+      var ovr = _relayAuthorOverride(mid, a, lg.leg, lg.fromOwner, nm, 'give');
+      if (typeof closeActionModal === 'function') closeActionModal();
+      if (typeof triggerUpdate === 'function') triggerUpdate();
+      if (ovr && typeof swfOpenConfirm === 'function') swfOpenConfirm(mid, ovr);   // SAME confirm popup as ยก/แลกเวร
+    }
+    // 🔄 แลกไม้ commit — reached from the main shift picker (confirmPickShift branches here). My ไม้ →
+    //   partner (note), their whole shift → me (add). The two are pair-linked (legs[0].pairId) so
+    //   swfOpenConfirm publishes/discards them together; then reuse swfOpenConfirm for the confirm.
     function _relayLegSwapCommit(targetKey, targetShift) {
       var ls = actionState.legSwap; if (!ls) { if (typeof closeActionModal === 'function') closeActionModal(); return; }
-      var mid = ls.mid;
-      var a = _relayActionById(mid, ls.actionId);
-      var _actor = _relayActorName();
+      var mid = ls.mid, a = _relayActionById(mid, ls.actionId), _actor = _relayActorName();
       var partner = (typeof _pbHolderOf === 'function')
         ? _pbHolderOf(targetShift, _combinedUsedMap(mid, getCurrentUser()))
         : (targetShift.name || '');
       if (!partner) partner = targetShift.name || '';
       if (String(partner) === String(_actor)) { if (typeof _p2bShowToast === 'function') _p2bShowToast('เลือกเวรของคนอื่น (ไม่ใช่ของคุณเอง)', 'warn'); return; }
       actionState.legSwap = null;
-      // v3.45.3 pt6: ONE golden-ratio pair colour (same palette as a normal แลกเวร) stamped on BOTH
-      //   sides so the swap reads as a pair: my received whole shift AND the ไม้ the partner receives.
-      var _swDot = _legSwapColor(mid);
+      var _swDot = _legSwapColor(mid);   // ONE golden pair colour on both sides (pt6)
       var ovr = a ? _relayAuthorOverride(mid, a, ls.leg, ls.fromOwner, partner, 'swap', { gotPos: String(targetShift.pos || ''), dot: _swDot }) : null;   // my ไม้ → partner
-      // their shift → me (a plain `add`). The pair-dot marker rides in `legs[0]` (whitelisted server
-      //   passthrough, ignored by relay gather since action!=='relay') so it SURVIVES the 30s pull
-      //   that overwrites local actions with the server copy. A leg-swap isn't a real `swap` action
-      //   so without this the received row would be dot-less and hard to spot (Klui: หายาก).
-      var add = OverlayManager.addAction(mid, { action: 'add', viewerName: _actor, shiftKey: targetKey, partnerName: partner, legs: [{ __legswap: 1, dot: _swDot, from: String(partner || '') }] });  // their shift → me
+      // their shift → me. legs[0]: pair-dot marker + pairId link to the note (both whitelisted passthrough).
+      var add = OverlayManager.addAction(mid, { action: 'add', viewerName: _actor, shiftKey: targetKey, partnerName: partner, legs: [{ __legswap: 1, dot: _swDot, from: String(partner || ''), pairId: (ovr ? ovr.id : '') }] });
       if (typeof closeActionModal === 'function') closeActionModal();
       if (typeof triggerUpdate === 'function') triggerUpdate();
-      var ids = []; if (ovr) ids.push(ovr.id); if (add) ids.push(add.id);
-      _relayLegConfirm(mid, ids,
-        '🔄 แลกไม้ ' + (ls.leg.i || '') + ' (' + _pbEsc(_relayLegWindowText(ls.leg)) + ') กับ <b>' + _pbEsc(displayName(partner)) + '</b>' +
-        '<br><span style="font-size:11.5px; color:var(--sub);">ไม้ของคุณ → ' + _pbEsc(displayName(partner)) + ' · เวร <b>' + _pbEsc(targetShift.pos || '') + '</b> ของ ' + _pbEsc(displayName(partner)) + ' → คุณ</span>',
-        String((a && (a.id || a.actionId)) || ''));
-    }
-    // Draft saved → keep-draft or publish-now (publishes all just-authored actions together).
-    //   masterId (optional): if the underlying ต่อเวร split is still a LOCAL draft, publish it too —
-    //   else a published note would orphan (no master to match on other devices).
-    function _relayLegConfirm(mid, ids, summaryHtml, masterId) {
-      ids = (ids || []).filter(Boolean);
-      var ov = document.createElement('div');
-      ov.id = 'relayLegConfirmOverlay';
-      ov.style.cssText = 'position:fixed; inset:0; background:rgba(0,0,0,0.55); z-index:10010; display:flex; align-items:center; justify-content:center; padding:16px;';
-      ov.innerHTML = '<div style="background:var(--surface); width:100%; max-width:420px; border-radius:16px; padding:18px; font-family:inherit;">' +
-        '<div style="font-weight:700; font-size:16px; margin-bottom:6px;">✓ บันทึกแบบร่างแล้ว</div>' +
-        '<div style="font-size:13px; color:var(--text); line-height:1.5; margin-bottom:12px;">' + summaryHtml + '</div>' +
-        '<div style="font-size:11.5px; color:var(--sub); margin-bottom:14px;">แบบร่างเห็นเฉพาะคุณ — กด<b>เผยแพร่</b>ให้ทุกคนเห็น (หรือเผยแพร่ทีหลังผ่านปุ่ม 🌐)</div>' +
-        '<div style="display:flex; gap:8px;">' +
-          '<button type="button" id="relayLegKeepDraft" style="flex:1; padding:11px; border:1px solid var(--border); border-radius:9px; background:var(--surface); color:var(--text); font-family:inherit; font-weight:600; cursor:pointer;">เก็บเป็นร่าง</button>' +
-          '<button type="button" id="relayLegPublish" style="flex:1; padding:11px; border:1px solid #0d9488; border-radius:9px; background:#0d9488; color:#fff; font-family:inherit; font-weight:700; cursor:pointer;">🌐 เผยแพร่เลย</button>' +
-        '</div></div>';
-      document.body.appendChild(ov);
-      function close() { var e = document.getElementById('relayLegConfirmOverlay'); if (e) e.remove(); }
-      ov.addEventListener('click', function (e) { if (e.target === ov) close(); });
-      document.getElementById('relayLegKeepDraft').addEventListener('click', function () { close(); if (typeof _p2bShowToast === 'function') _p2bShowToast('เก็บเป็นร่างแล้ว — กด 🌐 เพื่อเผยแพร่', 'ok'); });
-      document.getElementById('relayLegPublish').addEventListener('click', function () {
-        close();
-        // if the ต่อเวร split itself is still a local draft, publish it FIRST so the note isn't orphaned
-        if (masterId) {
-          try {
-            OverlayManager.load();
-            var bucket = OverlayManager._data && OverlayManager._data[mid];
-            var mAct = (bucket && bucket.actions) ? bucket.actions.find(function (a) { return a && a.id === masterId; }) : null;
-            if (mAct && mAct._visibility === 'draft') OverlayManager.publishAction(mid, masterId);
-          } catch (e) {}
-        }
-        ids.forEach(function (id) { try { OverlayManager.publishAction(mid, id); } catch (e) {} });
-        if (typeof invalidateGhostCache === 'function') invalidateGhostCache();
-        if (typeof triggerUpdate === 'function') triggerUpdate();
-        if (typeof _p2bShowToast === 'function') _p2bShowToast('เผยแพร่แล้ว', 'ok');
-      });
+      var primary = ovr || add;
+      if (primary && typeof swfOpenConfirm === 'function') swfOpenConfirm(mid, primary);   // SAME confirm popup
     }
     // v3.45.2: giving/swapping a split shift WHOLE supersedes the split — drop the relay action
     //   (draft → gone; published → removeAction hook pushes phxRemoveAction) so it can't linger as
@@ -6294,6 +6284,8 @@ window.allPharmacistNames = [];
     }
 
     function confirmPickName(partnerName) {
+      // v3.45.3 pt7: leg-give reuses this name picker — commit the ไม้ handoff, not a whole give.
+      if (actionState.legGive && typeof _relayLegGiveCommit === 'function') { _relayLegGiveCommit(partnerName); return; }
       if (actionState.step === 'give' && actionState.shiftKey) {
         const mid = getCurrentMonthId();
         const _giveKey = actionState.shiftKey;
@@ -6477,6 +6469,18 @@ window.allPharmacistNames = [];
         var _rlN = (Array.isArray(act.legs) && act.legs.length >= 2) ? act.legs.length : null;
         return me + ' ต่อเวร <b>' + _pbEsc(myShift ? myShift.pos : '?') + '</b>' +
                (_rlN ? ' · แบ่งเป็น <b>' + _rlN + ' ไม้</b>' : ' · แบ่งช่วงเวลา');
+      }
+      if (act.action === 'relayleg') {
+        // v3.45.3 pt7: same voice as give/swap — "ยก <pos> (ไม้ · window) ให้ X" / "แลก <pos> (ไม้ · window) กับ <got> จาก X".
+        var p = (Array.isArray(act.legs) && act.legs[0]) ? act.legs[0] : {};
+        var win = _relayLegWindowText({ start: p.legStart, end: p.legEnd, clinic: p.legClinic });
+        var qual = 'ไม้' + (win ? ' · ' + win : '');
+        var posB = myShift ? '<b>' + _pbEsc(myShift.pos) + '</b> ' : '';
+        if (String(p.kind || '') === 'swap') {
+          var got = p.gotPos ? '<b>' + _pbEsc(p.gotPos) + '</b>' : (tgtShift ? '<b>' + _pbEsc(tgtShift.pos) + '</b>' : 'เวร');
+          return me + ' แลก ' + posB + '(' + _pbEsc(qual) + ') กับ ' + got + ' จาก ' + partner;
+        }
+        return me + ' ยก ' + posB + '(' + _pbEsc(qual) + ') ให้ ' + partner;
       }
       return me + ' รับ <b>' + _pbEsc(tgtShift ? tgtShift.pos : '?') + '</b> จาก ' + partner;
     }
@@ -6935,14 +6939,36 @@ window.allPharmacistNames = [];
         myShift = _swfResolveShift(action.shiftKey, viewer);
         rowsHtml = _swfRowHtml(myShift, true);
         miniLabel = 'เวรที่แบ่งช่วงเวลา';
+      } else if (kind === 'relayleg') {
+        // v3.45.3 pt7: ยก/แลกไม้ confirm — reuse the SAME popup as แลก/ยกเวร (Klui #2). myShift =
+        //   the split's master shift; for แลก also show the whole shift received (the paired add).
+        var _legP = (Array.isArray(action.legs) && action.legs[0]) ? action.legs[0] : {};
+        myShift = _swfResolveShift(action.shiftKey, viewer);
+        rowsHtml = _swfRowHtml(myShift, true);
+        if (String(_legP.kind || '') === 'swap') {
+          var _pairAdd = null;
+          try {
+            OverlayManager.load();
+            var _acts = (OverlayManager._data && OverlayManager._data[mid] && OverlayManager._data[mid].actions) || [];
+            _pairAdd = _acts.find(function (x) { return x && x.action === 'add' && Array.isArray(x.legs) && x.legs[0] && String(x.legs[0].pairId) === String(action.id); });
+          } catch (e) {}
+          tgtShift = _pairAdd ? _swfResolveShift(_pairAdd.shiftKey, viewer) : null;
+          if (tgtShift) rowsHtml += _swfRowHtml(tgtShift, true);
+          miniLabel = 'ไม้ที่ยกให้ + เวรที่ได้มา';
+        } else {
+          miniLabel = 'เวร (ไม้) ที่ยกให้';
+        }
       } else {  // add
         tgtShift = _swfResolveShift(action.shiftKey, action.partnerName || '');
         rowsHtml = _swfRowHtml(tgtShift, false);
         miniLabel = 'เวรที่รับมา';
       }
+      var _legKind = (kind === 'relayleg' && Array.isArray(action.legs) && action.legs[0]) ? String(action.legs[0].kind || 'give') : '';
       var title = kind === 'swap' ? '🔄 ยืนยันการแลกเวร'
                 : (kind === 'give' ? '🎁 ยืนยันการยกเวร'
-                : (kind === 'relay' ? '🏃 ยืนยันการต่อเวร' : '🤝 ยืนยันการรับเวร'));
+                : (kind === 'relay' ? '🏃 ยืนยันการต่อเวร'
+                : (kind === 'relayleg' ? (_legKind === 'swap' ? '🔄 ยืนยันการแลกไม้' : '🎁 ยืนยันการยกไม้')
+                : '🤝 ยืนยันการรับเวร')));
       var tableHtml = rowsHtml
         ? '<div class="swf-mini-label">' + miniLabel + '</div>' +
           '<div class="swf-tbl-wrap"><table class="swf-tbl">' +
@@ -7022,7 +7048,12 @@ window.allPharmacistNames = [];
       });
       document.getElementById('swfDiscard').addEventListener('click', function() {
         _swfClose();
-        OverlayManager.removeAction(mid, action.id);
+        // v3.45.3 pt7: a แลกไม้ draft is TWO linked actions (note + add) — discard removes both.
+        if (kind === 'relayleg' && typeof _collectConnectedChain === 'function') {
+          _collectConnectedChain(mid, action.id).forEach(function(x) { OverlayManager.removeAction(mid, x); });
+        } else {
+          OverlayManager.removeAction(mid, action.id);
+        }
         if (typeof triggerUpdate === 'function') triggerUpdate();
         if (typeof _p2bShowToast === 'function') _p2bShowToast('ทิ้งร่างแล้ว', 'ok');
       });
@@ -7034,7 +7065,7 @@ window.allPharmacistNames = [];
     function _swfActionShifts(act) {
       var viewer = act.viewerName || getCurrentUser() || '';
       if (act.action === 'swap') return { my: _swfResolveShift(act.shiftKey, viewer), tgt: _swfResolveShift(act.partnerShiftKey, viewer) };
-      if (act.action === 'give' || act.action === 'relay') return { my: _swfResolveShift(act.shiftKey, viewer), tgt: null };
+      if (act.action === 'give' || act.action === 'relay' || act.action === 'relayleg') return { my: _swfResolveShift(act.shiftKey, viewer), tgt: null };   // relayleg: shiftKey = master shift
       return { my: null, tgt: _swfResolveShift(act.shiftKey, act.partnerName || '') };
     }
     function swfShowPendingDrafts() {
