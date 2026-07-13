@@ -81,7 +81,10 @@ function phxGetAllActiveOverlaysForMonth(monthId) {
         //   every viewer resolves who shares the shift, the current note, and the edit/leave log.
         owners: Array.isArray(payload.owners) ? payload.owners : null,
         note: (payload.note != null ? String(payload.note) : null),
-        refActionId: String(payload.refActionId || '')
+        refActionId: String(payload.refActionId || ''),
+        // v3.47: joint_join (add member) + joint_time (per-person work-time label) linked records.
+        member: String(payload.member || ''),
+        timeRange: String(payload.timeRange || '')
       });
     });
     
