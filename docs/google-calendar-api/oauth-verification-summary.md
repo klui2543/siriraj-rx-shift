@@ -125,7 +125,15 @@ accepted via the app's own shift-handoff workflow.
 
 *(สรุปสั้น — ไม่ใช่ implementation plan รอบนี้ แค่บันทึกไว้ให้รู้ว่า "ยื่นเอกสารผ่าน" ≠ "ใช้งานได้ทันที")*
 
-1. **Deployment mode:** [`appsscript.json`](../../appsscript.json) ปัจจุบันตั้ง `"executeAs": "USER_DEPLOYING"` แต่ `Phase2C.js` (prototype ที่มีอยู่แล้ว) ต้องการ `"Execute as: User accessing the web app"` เพื่อให้ `CalendarApp.getDefaultCalendar()` คืนปฏิทินของผู้ใช้แต่ละคนจริง — ต้องเปลี่ยน deployment mode ตอน implement จริง
+1. **Deployment mode = ต้นตอของหน้าจอ "Unverified" ที่ User กลัว (ยืนยันแล้ว 13 ก.ค. 2569):** [`appsscript.json`](../../appsscript.json) ในโค้ดยังตั้ง `"executeAs": "USER_DEPLOYING"` + `"access": "ANYONE_ANONYMOUS"` แต่ Klui ทดลองตั้งใน Apps Script UI เป็น **"ดำเนินการในฐานะ: ผู้ใช้ที่เข้าถึงเว็บแอปนี้"** + **"ทุกคนที่มีบัญชี Google"** ซึ่งเป็นค่าที่ `Phase2C.js` ต้องการ (เพื่อให้ `CalendarApp.getDefaultCalendar()` คืนปฏิทินของผู้ใช้แต่ละคนจริง)
+
+   **กลไกที่ทำให้เกิดหน้าจอน่ากลัว:** โหมด "ผู้ใช้ที่เข้าถึง" บังคับให้ผู้ใช้**ทุกคน**ต้อง authorize scope ของสคริปต์ด้วยบัญชีตัวเอง (ต่างจากโหมดเดิม "ผู้ใช้ที่ deploy" ที่มีเจ้าของคนเดียว authorize แล้วจบ ผู้ใช้ปลายทางไม่เคยเห็น auth prompt เลย) — เมื่อ + สคริปต์ยังผูกกับ **default GCP project** ที่ verify ไม่ได้ → ผู้ใช้ทุกคนจึงเจอหน้าจอ "แอปนี้ยังไม่ได้รับการยืนยัน" นี่คือเหตุผลที่การ switch ไป standard GCP project แล้ว verify (checklist ข้อ 1-6) คือทางแก้ที่ตรงจุด ไม่ใช่ทางอ้อม
+
+   **ผลกระทบที่ต้องตัดสินใจก่อนทำจริง:** การเปลี่ยนทั้งแอปเป็นโหมดนี้กระทบ **ผู้ใช้ทุกคน (~300 คน)** ไม่ใช่แค่คนที่อยากใช้ Calendar — ทุกคนต้อง login ด้วยบัญชี Google ก่อนเข้าแอป มี 2 เส้นทาง:
+   - **(1) เปลี่ยนทั้งแอป + verify** — หลังผ่าน verify หน้าจอน่ากลัวหายถาวร และได้ email ผู้ใช้ฟรี (ปิดข้อ 2 ด้านล่างให้เลย); ระหว่างรอ verify ใส่ทุกคนเป็น Test users (≤100) เพื่อกันหน้าจอเตือนได้ชั่วคราว → **แนะนำเส้นทางนี้**
+   - **(2) แยก Calendar เป็น deployment/ทางเข้าต่างหาก** — แอปหลักคงเดิม (ไม่มีใครเจอหน้าจอ) เฉพาะคนกดใช้ Calendar เท่านั้นที่ผ่าน Google auth; ซับซ้อนกว่าเชิงโค้ด
+
+   ⚠️ ตอน implement จริงต้องแก้ `appsscript.json` ในโค้ดให้ตรงกับ UI ด้วย (ตอนนี้ค่าใน repo กับที่ตั้งใน UI ยัง**ไม่ตรงกัน** — clasp push ครั้งถัดไปอาจ reset deployment กลับเป็น anonymous ได้)
 2. **การผูก email:** ระบบ auth ปัจจุบัน (`Phase_Z_B1_Auth.js`) คือชื่อ+รหัสผ่าน ไม่ผูกกับบัญชี Google เลย ขณะที่ `Phase2C.js` คาดหวัง `email` เป็น key หลักในตาราง sync — ต้องมีขั้นตอนให้ผู้ใช้ "เชื่อมบัญชี Google" แยกจาก login เดิมของแอป
 3. **`oauthScopes` ใน `appsscript.json`:** ต้องประกาศ `calendar.events` scope อย่างชัดเจน (ปัจจุบันไม่มี array นี้เลย — Apps Script จะเติมให้อัตโนมัติตอน push ถ้าโค้ดเรียก `CalendarApp` แต่ควรประกาศเองให้ชัดเจนกว่าปล่อยให้เดา)
 
