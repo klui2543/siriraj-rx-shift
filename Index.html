@@ -244,10 +244,6 @@
       white-space: nowrap; text-overflow: clip;
       text-align: center; width: 100%; letter-spacing: -0.04em;
     }
-    /* v3.45.2 relay: a split (ต่อเวร) leg badge shows "(ไม้ n)" on its OWN line under the code
-       (Klui: the runner glyph was too small). flex-wrap drops it below the pos so the badge never
-       widens — width stays = the pos code, only a shorter second line is added. */
-    .cal-leg-sub { flex-basis: 100%; text-align: center; font-size: 0.82em; font-weight: 800; line-height: 1; margin-top: 1px; letter-spacing: -0.03em; }
     #calendarGrid {
       display: grid; grid-template-columns: repeat(7, minmax(0, 1fr));
       gap: 0; background: var(--surface);
@@ -677,7 +673,6 @@
     .tl-inline-step.tl-give { border-left-color: #dc2626; }
     .tl-inline-step.tl-add { border-left-color: #16a34a; }
     .tl-inline-step.tl-swap { border-left-color: #2563eb; }
-    .tl-inline-step.tl-relay { border-left-color: #0d9488; }   /* v3.45.2 ต่อเวร = teal (ไม้1 colour) */
     .tl-inline-num {
       flex-shrink: 0; width: 16px; height: 16px;
       border-radius: 50%; background: var(--accent);
@@ -687,26 +682,12 @@
     .tl-inline-step.tl-give .tl-inline-num { background: #dc2626; }
     .tl-inline-step.tl-add .tl-inline-num { background: #16a34a; }
     .tl-inline-step.tl-swap .tl-inline-num { background: #2563eb; }
-    .tl-inline-step.tl-relay .tl-inline-num { background: #0d9488; }
     .tl-inline-body { flex: 1; color: var(--text); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
     .tl-inline-ts { font-size: 0.85em; color: var(--muted); font-weight: 400; }
     .tl-inline-end {
       margin-top: 4px; padding: 3px 8px; border-radius: 4px;
       font-size: 10px; font-weight: 600; text-align: center;
     }
-    .tl-leg-note { font-size: 11px; font-weight: 600; opacity: 0.85; }
-    /* v3.45.2: per-ไม้ breakdown inside a ต่อเวร timeline step — inline, but WRAPS to more lines
-       when a shift has many ไม้ instead of forcing a horizontal scroll (Klui). The nowrap default
-       on .tl-inline-body is what widened the table, so relax it for the relay step only. */
-    .tl-inline-step.tl-relay { align-items: flex-start; }
-    .tl-inline-step.tl-relay .tl-inline-body { white-space: normal; overflow: visible; text-overflow: clip; }
-    /* v3.45.2: one ไม้ per row — the whole list sits CENTERED as a block, but the rows share a
-       LEFT edge (Klui: อยู่ตรงกลางแต่ indent ชิดขอบซ้าย). justify-content centers the single
-       column; justify-items lines the rows up left within it. minmax(0,auto) still lets a long
-       row shrink-wrap on a narrow phone instead of h-scrolling. */
-    .tl-relay-legs { display: grid; grid-template-columns: minmax(0, auto); justify-content: center; justify-items: start; gap: 2px 0; font-size: 12px; margin-top: 3px; }
-    .tl-relay-leg { white-space: normal; line-height: 1.7; text-align: left; }
-    .tl-relay-cont { display: block; margin-top: 1px; }   /* "<the rest> ต่อเวรจาก <owner>" summary line */
     .tl-inline-end.ended { background: #fee2e2; color: #991b1b; }
     .tl-inline-end.active { background: #dcfce7; color: #166534; }
     body.dark-theme .tl-inline-end.ended { background: #450a0a; color: #fca5a5; }
@@ -735,10 +716,6 @@
     .tl-edit-recipient { cursor: pointer; margin-left: 6px; padding: 1px 5px; border-radius: 4px; color: #2563eb; font-size: 13px; }
     .tl-edit-recipient:hover { background: rgba(37,99,235,0.12); }
     body.dark-theme .tl-edit-recipient { color: #93c5fd; }
-    /* v3.45: inline 🏃✎ on a relay hop — edit the legs (ไม้) after publish */
-    .tl-edit-relay { cursor: pointer; margin-left: 6px; padding: 1px 5px; border-radius: 4px; color: #0d9488; font-size: 12.5px; white-space: nowrap; }
-    .tl-edit-relay:hover { background: rgba(13,148,136,0.14); }
-    body.dark-theme .tl-edit-relay { color: #5eead4; }
     /* v3.44: inline ✕ on the latest draft hop in the timeline — peel it off (revert one step) */
     .tl-remove-hop { cursor: pointer; margin-left: 4px; padding: 1px 5px; border-radius: 4px; color: #dc2626; font-size: 13px; }
     .tl-remove-hop:hover { background: rgba(220,38,38,0.12); }
@@ -789,14 +766,6 @@
     .col-name-wrap > .ncw-center { grid-column: 2; text-align: center; }
     .col-name-wrap > .ncw-right { grid-column: 3; text-align: left; display: inline-flex; align-items: center; min-height: 16px; }
     /* When wrapper is absent (no chevron mode), name still centers cleanly */
-    /* v3.45.2: a relay leg row's name cell = ONE inline unit (name + ไม้N chip + ▶), sized to
-       content and centered by the td — no fixed 20px chevron track to clip the chip (the old
-       vanish bug) and NO wrapping to a second line (Klui: ไม้ 1 ตกแถวบนมือถือ). The unit is only
-       ~45px wider than the name, comparable to a normal row's reserved 20px+20px side tracks. */
-    .col-name-wrap.col-name-wrap--relay { display: inline-flex; flex-wrap: nowrap; white-space: nowrap; grid-template-columns: none; justify-content: center; align-items: center; gap: 0 3px; width: auto; }
-    .col-name-wrap.col-name-wrap--relay > .ncw-right { grid-column: auto; min-height: 0; flex: none; }
-    .col-name-wrap.col-name-wrap--relay .relay-leg-tag { margin-right: 0; }
-    .col-name-wrap.col-name-wrap--relay .tl-chevron { margin-left: 1px; }
 
     /* v18: settings popup minimal */
     #settingsPopup.settings-wide {
@@ -944,33 +913,6 @@
       padding: 10px 12px; margin: 14px 0 4px; font-size: 12px; color: #9a3412; line-height: 1.55;
     }
     body.dark-theme .swf-draft-note { background: #3a2408; color: #fcd9b0; }
-    /* v3.45 relay legs (ส่งไม้ต่อเวลา) — capture UI inside the confirm dialog */
-    .swf-relay { margin-top: 14px; border: 1px dashed var(--accent-border); border-radius: 12px; padding: 12px; background: var(--accent-bg); }
-    .swf-relay-head { display: flex; align-items: center; gap: 9px; }
-    .swf-relay-title { font-weight: 700; font-size: 13.5px; color: var(--text); }
-    .swf-relay-sub { font-size: 11.5px; color: var(--sub); margin: 3px 0 0; line-height: 1.5; }
-    .swf-relay-sw { margin-left: auto; width: 42px; height: 24px; border-radius: 12px; background: var(--border); border: none; position: relative; cursor: pointer; flex: none; transition: background .15s; }
-    .swf-relay-sw::after { content: ""; position: absolute; top: 2px; left: 2px; width: 20px; height: 20px; border-radius: 50%; background: #fff; transition: left .15s; }
-    .swf-relay-sw.on { background: var(--accent); }
-    .swf-relay-sw.on::after { left: 20px; }
-    .swf-bar { height: 32px; border-radius: 8px; overflow: hidden; display: flex; border: 1px solid var(--border); margin: 12px 0 5px; }
-    .swf-bar-seg { display: flex; align-items: center; justify-content: center; font-size: 11px; font-weight: 700; color: #fff; min-width: 0; overflow: hidden; white-space: nowrap; }
-    .swf-bar-ticks { display: flex; justify-content: space-between; font-size: 10px; color: var(--sub); margin-bottom: 12px; font-variant-numeric: tabular-nums; }
-    .swf-leg { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; }
-    .swf-leg-dot { width: 10px; height: 10px; border-radius: 50%; flex: none; }
-    .swf-leg-owner { flex: 1; min-width: 0; text-align: left; background: var(--surface); border: 1px solid var(--border); border-radius: 8px; padding: 8px 10px; font-size: 13px; font-family: inherit; color: var(--text); cursor: pointer; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-    .swf-leg-owner-inp { flex: 1; min-width: 0; box-sizing: border-box; background: var(--surface); border: 1px solid var(--border); border-radius: 8px; padding: 8px 10px; font-size: 13px; font-family: inherit; color: var(--text); }
-    .swf-leg-dd-row:last-child { border-bottom: none !important; }
-    .swf-leg-dd-row:hover { background: var(--accent-bg); }
-    .swf-leg-until { font-size: 11.5px; color: var(--sub); white-space: nowrap; }
-    .swf-leg-time { width: 94px; background: var(--surface); border: 1px solid var(--border); border-radius: 8px; padding: 7px 8px; font-size: 13px; font-family: inherit; color: var(--text); }
-    .swf-leg-time-fixed { width: 94px; text-align: center; font-size: 13px; font-weight: 600; color: var(--sub); background: var(--bg); border: 1px solid var(--border); border-radius: 8px; padding: 8px; }
-    .swf-leg-del { border: none; background: none; color: #dc2626; font-size: 15px; cursor: pointer; padding: 2px 4px; flex: none; }
-    .swf-leg-add { width: 100%; margin-top: 2px; padding: 8px; border: 1px dashed var(--border); border-radius: 8px; background: transparent; color: var(--accent); font-size: 12.5px; font-weight: 600; font-family: inherit; cursor: pointer; }
-    /* v3.45 relay: 'ไม้ N' chip on a split leg-row — colour set inline per leg. Clinic handoff
-       window rides in a title tooltip (not inline text — see the renderTable comment). */
-    .relay-leg-tag { display: inline-block; font-size: 8.5px; font-weight: 700; background: transparent; border: 1px solid currentColor; border-radius: 4px; padding: 0 4px; margin-right: 3px; vertical-align: middle; line-height: 1.5; cursor: help; }
-    .swf-relay-clinic-hint { font-size: 11.5px; color: var(--sub); background: rgba(124,58,237,0.08); border-radius: 8px; padding: 7px 9px; margin: 2px 0 8px; line-height: 1.5; }
     .swf-btns { display: flex; gap: 8px; margin-top: 16px; }
     .swf-btn {
       flex: 1; padding: 11px; border-radius: 9px; font-family: inherit;
@@ -1996,12 +1938,6 @@
                   <span>ซ่อนเวรที่ขีดฆ่า</span>
                   <input type="checkbox" id="hideStruckToggle" onchange="toggleHideStruck(this.checked)" style="width:36px;height:20px;cursor:pointer;">
                 </label>
-                <!-- v3.45.2: ต่อเวร (relay) display toggle — the flag is per-device, so this lets you
-                     enable it on a phone (no console). Off by default; flipping it re-renders. -->
-                <label style="display:flex;align-items:center;justify-content:space-between;font-size:11px;color:var(--text);font-weight:600;margin-bottom:5px;cursor:pointer;">
-                  <span>🏃 โหมดต่อเวร (แบ่งไม้)</span>
-                  <input type="checkbox" id="relayModeToggle" onchange="setRelayLegs(this.checked)" style="width:36px;height:20px;cursor:pointer;">
-                </label>
                 <div id="overlayCountText" style="text-align:center; font-size:10px; color:var(--sub); margin-bottom:4px;">ยังไม่มีการแก้ไข</div>
                 <button id="resetOverlayBtn" onclick="clearOverlaysConfirm()" class="pill-btn" style="width:100%; justify-content:center; padding:5px 0; font-size:10px; gap:4px; opacity:0.5; cursor:not-allowed;" disabled>
                   รีเซ็ตการแก้ไขทั้งหมด
@@ -2388,7 +2324,7 @@ window.allPharmacistNames = [];
     // (avoids collisions from substring(0,15) truncation)
     // ==========================================
     let editModeActive = false;
-    const actionState = { shiftKey: null, step: 'menu', pickerQuery: '', pickerPerson: '', pickerDate: '', usedInfo: null, legSwap: null, legGive: null, legMenu: null };
+    const actionState = { shiftKey: null, step: 'menu', pickerQuery: '', pickerPerson: '', pickerDate: '', usedInfo: null };
     const OVERLAY_KEY = 'siriraj_shift_overlay_v4';  // v14: bumped — user-scoped actions
 
     // Composite key — unique within a month's data
@@ -2665,10 +2601,7 @@ window.allPharmacistNames = [];
             _ghost: 'received',
             _ghostType: 'add',
             _ghostActionId: act.id,
-            _ghostPartnerName: act.partnerName,
-            // v3.45.3: received-via-ไม้-swap marker rides in legs[0] (survives the server round-trip)
-            _legSwapDot: (Array.isArray(act.legs) && act.legs[0] && act.legs[0].__legswap) ? (act.legs[0].dot || null) : null,
-            _legSwapFrom: (Array.isArray(act.legs) && act.legs[0] && act.legs[0].__legswap) ? (act.legs[0].from || '') : ''
+            _ghostPartnerName: act.partnerName
           });
         }
         // v3.42.11: guard against duplicate if bilateral already covered same actionId
@@ -2772,21 +2705,6 @@ window.allPharmacistNames = [];
       console.log('[sync publish] ' + (on ? 'ON (persisted)' : 'OFF'));
     };
 
-    // v3.45 — Relay-baton time-split ownership (ส่งไม้ต่อเวลา). Flag OFF by default:
-    //   a give/swap with an action.legs array behaves as a plain whole-shift transfer
-    //   until flipped ON, when getEffectiveData fans the master row into per-leg rows.
-    //   Opt-in per-browser: setRelayLegs(true) → persists 'relay_legs'='1'. See DESIGN_relay_legs.md.
-    window._relayEnabled = (function() { try { return localStorage.getItem('relay_legs') === '1'; } catch (e) { return false; } })();
-    window.setRelayLegs = function(on) {
-      window._relayEnabled = !!on;
-      try { localStorage.setItem('relay_legs', on ? '1' : '0'); } catch (e) {}
-      // v3.45.2: keep the Settings toggle in step whether flipped from the UI or the console
-      //   (the flag is per-device — this is how you enable it on a phone without a console).
-      var _rt = document.getElementById('relayModeToggle'); if (_rt) _rt.checked = !!on;
-      if (typeof invalidateGhostCache === 'function') invalidateGhostCache();
-      if (typeof triggerUpdate === 'function') triggerUpdate();
-      console.log('[relay legs] ' + (on ? 'ON (persisted)' : 'OFF'));
-    };
     function _lwwViewerRecords(monthId, viewerName) {
       var pub = (Array.isArray(pathBOverlays) ? pathBOverlays : []).filter(function(o) { return o && String(o._visibility || 'public') !== 'draft'; });
       if (!viewerName || typeof OverlayManager === 'undefined') return pub;
@@ -2886,205 +2804,6 @@ window.allPharmacistNames = [];
       });
     }
 
-    // ═══ v3.45.3 relay leg handoff ("sticky note") — leg-level ยก/แลก ═══
-    //   A `relayleg` action is a first-class "sticky note" that rewrites the owner of ONE ไม้ of a
-    //   master `relay`, WITHOUT moving the shift's ownership (no strike/no ghost — all used-map +
-    //   ghost engines ignore an unknown action, same as `relay` itself). Whoever holds a ไม้ can
-    //   author their own note to pass it on (viewerName = the actor → phxPushActions pushes it under
-    //   their own name → sync-legal), so B can hand ไม้2 to C without touching A's master sheet.
-    //   ZERO server change: the note rides entirely on already-whitelisted overlay fields —
-    //     action='relayleg', viewerName=actor, originalOwner=fromOwner, partnerName=toOwner,
-    //     shiftKey=masterKey (unused by any engine), and the leg IDENTITY inside legs[0]
-    //     ({__relayleg, masterId, legStart, legEnd, legClinic, kind}) which passes through as an
-    //     arbitrary array. Notes are matched to a master by masterId and to a ไม้ by its (start,end,
-    //     clinic) window (stable across แก้ไม้ reorders), replayed in createdAt order with a
-    //     fromOwner guard so a stale/duplicate note can't hijack a ไม้ that already moved on.
-    function _relayLegOverrides(mid) {
-      var out = [], seen = {};
-      function consider(a) {
-        if (!a || String(a.action || '') !== 'relayleg') return;
-        var id = a.id || a.actionId; if (!id || seen[id]) return;
-        var pay = (Array.isArray(a.legs) && a.legs[0]) ? a.legs[0] : null;
-        if (!pay || !pay.masterId) return;                 // identity rides in legs[0]
-        seen[id] = 1;
-        out.push({
-          id: id, actor: String(a.viewerName || ''), createdAt: String(a.createdAt || ''),
-          masterId: String(pay.masterId), legStart: String(pay.legStart || ''),
-          legEnd: String(pay.legEnd || ''), legClinic: !!pay.legClinic, kind: String(pay.kind || 'give'),
-          gotPos: String(pay.gotPos || ''), dot: String(pay.dot || ''),
-          fromOwner: String(a.originalOwner || ''), toOwner: String(a.partnerName || ''),
-          _visibility: a._visibility || 'public'
-        });
-      }
-      try { OverlayManager.load(); ((OverlayManager._data && OverlayManager._data[mid] && OverlayManager._data[mid].actions) || []).forEach(consider); } catch (e) {}
-      try { (typeof pathBOverlays !== 'undefined' && Array.isArray(pathBOverlays) ? pathBOverlays : []).forEach(consider); } catch (e) {}
-      return out;
-    }
-    // Replay the sticky notes for ONE master onto a fresh copy of its legs. Pure; `ovs` is the
-    //   pre-fetched _relayLegOverrides(mid) so gathering many masters doesn't rescan per master.
-    //   Each returned leg carries _baseOwner (the original author's assignment) + _chain (the hop
-    //   history) so displays/exports can show "รับต่อจาก X" without re-resolving.
-    function _relayApplyOverrides(master, ovs) {
-      var baseLegs = (master && Array.isArray(master.legs)) ? master.legs : [];
-      var mId = String((master && (master.id || master.actionId)) || '');
-      var legs = baseLegs.map(function (l) {
-        return { owner: l.owner, start: l.start, end: l.end, clinic: !!l.clinic, _baseOwner: l.owner, _chain: [] };
-      });
-      if (!ovs || !ovs.length || !mId) return legs;
-      var mine = ovs.filter(function (o) { return o.masterId === mId; })
-        .sort(function (a, b) { return a.createdAt < b.createdAt ? -1 : (a.createdAt > b.createdAt ? 1 : 0); });
-      mine.forEach(function (o) {
-        var idx = -1;
-        for (var i = 0; i < legs.length; i++) {
-          if (String(legs[i].start || '') === o.legStart && String(legs[i].end || '') === o.legEnd && !!legs[i].clinic === !!o.legClinic) { idx = i; break; }
-        }
-        if (idx < 0) return;                               // leg window changed (แก้ไม้) → note inert
-        if (o.fromOwner && String(legs[idx].owner || '') !== o.fromOwner) return;  // stale/dup → skip
-        legs[idx].owner = o.toOwner;
-        // v3.45.3 pt8: carry dot + gotPos on the hop so _relayExpand can emit a swap-symmetric
-        //   STRUCK row for the giver (the ไม้ they handed off) matching the received row's colour.
-        legs[idx]._chain.push({ from: o.fromOwner, to: o.toOwner, by: o.actor, kind: o.kind, at: o.createdAt, dot: String(o.dot || ''), gotPos: String(o.gotPos || ''), actionId: o.id });
-        // v3.45.3 pt6: a ไม้ received via แลกไม้ carries the swap pair-dot colour so the recipient's
-        //   leg row shows the SAME golden dot as the giver's received whole shift (a matched pair).
-        legs[idx]._swapDot = (o.kind === 'swap' && o.dot) ? o.dot : '';
-      });
-      return legs;
-    }
-    // Resolve a single master action's CURRENT legs (base + sticky notes) — used by the timeline
-    //   builders which hold the raw action but not the gathered relay.
-    function _relayLegsFor(mid, master) { return _relayApplyOverrides(master, _relayLegOverrides(mid)); }
-
-    /** Combined rawData + ghost rows for current viewer */
-    // ═══ v3.45 relay Stage 1b — fan a legged shift into per-leg rows in the effective data ═══
-    //   A give/add carrying action.legs replaces its master row with one row per leg (owner +
-    //   sub-range), and the plain whole-shift ghost of that same action is dropped (the legs
-    //   already cover everyone). Flag-gated: window._relayEnabled OFF → untouched pass-through.
-    function _relayGather(mid) {
-      var out = [], seen = {};
-      var _ovs = _relayLegOverrides(mid);                  // v3.45.3: fetch leg handoffs once
-      function consider(a) {
-        // v3.45.2: legs live ONLY on the first-class 'relay' (ต่อเวร) action — no longer on
-        //   give/add (Klui: cancelling a give-ridden split stranded the whole shift with the
-        //   recipient). Old give+legs data is deliberately ignored (ล้างของเก่า decision).
-        if (!a || String(a.action || '') !== 'relay') return;
-        if (!Array.isArray(a.legs) || a.legs.length < 2) return;
-        var id = a.id || a.actionId;
-        if (!id || seen[id]) return;
-        var sk = String(a.shiftKey || '');
-        if (sk.indexOf('_g_') === 0) {          // chained hop — resolve to the real master key
-          if (typeof LWW !== 'undefined' && LWW._resolveKey) {
-            var consumer = (String(a.action || '') === 'add') ? (a.partnerName || '') : (a.viewerName || '');
-            var ov = (typeof pathBOverlays !== 'undefined' && Array.isArray(pathBOverlays)) ? pathBOverlays : [];
-            sk = LWW._resolveKey(sk, consumer, ov, (typeof rawData !== 'undefined' ? rawData : [])) || '';
-          } else { sk = ''; }
-        }
-        if (!sk || typeof findShiftByKey !== 'function' || !findShiftByKey(sk)) return;  // must be a real master row
-        seen[id] = 1;
-        out.push({ slotKey: sk, legs: _relayApplyOverrides(a, _ovs), actionId: id });   // v3.45.3: current owners
-      }
-      try {
-        OverlayManager.load();
-        var own = (OverlayManager._data && OverlayManager._data[mid] && OverlayManager._data[mid].actions) || [];
-        own.forEach(consider);
-      } catch (e) {}
-      try {
-        (typeof pathBOverlays !== 'undefined' && Array.isArray(pathBOverlays) ? pathBOverlays : []).forEach(consider);
-      } catch (e) {}
-      return out;
-    }
-    function _relayExpand(rows, mid) {
-      if (!window._relayEnabled || !Array.isArray(rows)) return rows;
-      var relays = _relayGather(mid);
-      if (!relays.length) return rows;
-      var byAct = {}, bySlot = {}, bySlotDPR = {};
-      relays.forEach(function(r) {
-        byAct[r.actionId] = r;
-        if (r.slotKey) {
-          bySlot[r.slotKey] = r;
-          // v3.45.2: also index by date|pos|range (drop the name) — the recipient's own WHOLE-shift
-          //   ghost of a split shift has the SAME date/pos/range as the master slot, differing only
-          //   in the name; matching it here folds it into the legs so it isn't shown ALONGSIDE the
-          //   ไม้ rows (Klui: I-18/103(1)* ซ้อนกับเวรเต็มในวันเดียว).
-          var _sp = String(r.slotKey).split('|');
-          if (_sp.length >= 4) bySlotDPR[_sp[0] + '|' + _sp[1] + '|' + _sp[3]] = r;
-        }
-      });
-      var mk = (typeof makeShiftKey === 'function') ? makeShiftKey : function () { return null; };
-      // Which relay action does a row anchor? A give's master row matches slotKey; the receiver's
-      //   whole-shift GHOST of the same slot (date|pos|range) is a DUPLICATE of the legs → also
-      //   folded in. Prefer the master as the leg template.
-      function anchorActId(r) {
-        if (!r._ghost) { var k = mk(r); return (k && bySlot[k]) ? bySlot[k].actionId : null; }
-        var gk = mk(r), gp = String(gk).split('|');
-        if (gp.length >= 4 && bySlotDPR[gp[0] + '|' + gp[1] + '|' + gp[3]]) return bySlotDPR[gp[0] + '|' + gp[1] + '|' + gp[3]].actionId;
-        return (r._ghostActionId && byAct[r._ghostActionId]) ? r._ghostActionId : null;
-      }
-      var tmpl = {};
-      rows.forEach(function(r) {
-        if (!r) return;
-        var id = anchorActId(r);
-        if (id && (!tmpl[id] || !r._ghost)) tmpl[id] = r;   // master row overrides a ghost template
-      });
-      var out = [], emitted = {};
-      rows.forEach(function(r) {
-        if (!r) return;
-        var id = anchorActId(r);
-        if (!id) { out.push(r); return; }
-        if (emitted[id]) return;                            // legs already placed for this action
-        emitted[id] = 1;
-        var rel = byAct[id], t = tmpl[id] || r;
-        rel.legs.forEach(function(leg, i) {
-          var lr = Object.assign({}, t);
-          lr.name = leg.owner;
-          // v3.45.2: neighbours ride along so displays/exports can say WHO hands off to whom
-          //   (ใครมาต่อเรา / เราไปต่อใคร) without re-resolving the action.
-          var _prevO = (i > 0 && rel.legs[i - 1]) ? String(rel.legs[i - 1].owner || '') : '';
-          var _nextO = (rel.legs[i + 1]) ? String(rel.legs[i + 1].owner || '') : '';
-          // v3.45.3: a ไม้ may have been handed on (sticky notes) — _baseOwner is who the author
-          //   first assigned, _chain the hop list, legFrom the immediate previous holder. legOwn'd
-          //   lets the tap-menu decide who may ยก/แลก this ไม้ (the CURRENT holder or admin).
-          var _chain = Array.isArray(leg._chain) ? leg._chain : [];
-          var _legFrom = _chain.length ? String(_chain[_chain.length - 1].from || '') : '';
-          var _swapDot = String(leg._swapDot || '');   // v3.45.3 pt6: golden pair-dot if received via แลกไม้
-          if (leg.clinic) {
-            // clinic ไม้ (handoff-time-only): KEEP the shift's own (clinic) range so isSpecialClinic
-            //   stays true — badge + all-day .ics export path. The seam window rides on _relayLeg.
-            lr._relayLeg = { i: i + 1, of: rel.legs.length, actionId: id, from: t.name,
-                             clinic: true, start: String(leg.start || ''), end: String(leg.end || ''),
-                             prevOwner: _prevO, nextOwner: _nextO,
-                             baseOwner: String(leg._baseOwner || ''), legFrom: _legFrom, chain: _chain, swapDot: _swapDot };
-          } else {
-            lr.range = String(leg.start || '') + '-' + String(leg.end || '');
-            lr._relayLeg = { i: i + 1, of: rel.legs.length, actionId: id, from: t.name,
-                             start: String(leg.start || ''), end: String(leg.end || ''),
-                             prevOwner: _prevO, nextOwner: _nextO,
-                             baseOwner: String(leg._baseOwner || ''), legFrom: _legFrom, chain: _chain, swapDot: _swapDot };
-          }
-          // a leg is a first-class own-row, not a ghost — strip inherited ghost markers
-          lr._ghost = undefined; lr._ghostKey = undefined; lr._ghostActionId = undefined;
-          lr._ghostType = undefined; lr._ghostLabel = undefined; lr._conflict = undefined;
-          out.push(lr);
-          // v3.45.3 pt8: SYMMETRY — for each handoff hop, emit a STRUCK ไม้ row for the giver
-          //   (hop.from), exactly like a normal ยก/แลกเวร shows the source struck. Renders on the
-          //   giver's own name-filtered view; ownership still never moves (this is display-only).
-          _chain.forEach(function(hop) {
-            if (!hop || !hop.from) return;
-            var sr = Object.assign({}, t);
-            sr.name = hop.from;
-            if (!leg.clinic) sr.range = String(leg.start || '') + '-' + String(leg.end || '');
-            sr._relayStruck = { i: i + 1, actionId: id, kind: String(hop.kind || 'give'), to: String(hop.to || ''),
-                                dot: (hop.kind === 'swap' ? String(hop.dot || '') : ''), gotPos: String(hop.gotPos || ''),
-                                clinic: !!leg.clinic, start: String(leg.start || ''), end: String(leg.end || '') };
-            sr._ghost = undefined; sr._ghostKey = undefined; sr._ghostActionId = undefined;
-            sr._ghostType = undefined; sr._ghostLabel = undefined; sr._conflict = undefined;
-            sr._relayLeg = undefined; sr._swapDot = undefined;
-            out.push(sr);
-          });
-        });
-      });
-      return out;
-    }
-
     function getEffectiveData() {
       try {
         const mid = getCurrentMonthId();
@@ -3118,7 +2837,7 @@ window.allPharmacistNames = [];
             } catch(e) {}
           });
         }
-        return _relayExpand((rawData || []).concat(ghosts), mid);
+        return (rawData || []).concat(ghosts);
       } catch(err) {
         v10ShowError('getEffectiveData', err);
         return rawData || [];
@@ -3309,12 +3028,7 @@ window.allPharmacistNames = [];
           } else if (a.action === 'give') {
             map[a.shiftKey] = { label: 'ยกให้ ' + a.partnerName + ' แล้ว', actionId: a.id, newOwner: a.partnerName };
           } else if (a.action === 'add') {
-            // v3.45.3 pt8: a leg-swap's reciprocal `add` strikes the partner's whole shift — make it
-            //   read like a real swap (pair-dot colour + "แลกกับ") so both halves match visually.
-            var _lsw = (Array.isArray(a.legs) && a.legs[0] && a.legs[0].__legswap) ? a.legs[0] : null;
-            map[a.shiftKey] = _lsw
-              ? { label: 'แลกกับ ' + viewerName + ' แล้ว', actionId: a.id, color: _lsw.dot, newOwner: viewerName }
-              : { label: 'รับมาแล้ว', actionId: a.id, newOwner: viewerName };
+            map[a.shiftKey] = { label: 'รับมาแล้ว', actionId: a.id, newOwner: viewerName };
           }
         });
         return map;
@@ -3466,11 +3180,6 @@ window.allPharmacistNames = [];
         seen.add(id);
         if (typeof a.shiftKey === 'string' && a.shiftKey.indexOf('_g_') === 0) stack.push(a.shiftKey.substring(3));
         acts.forEach(c => { if (c && c.shiftKey === '_g_' + id) stack.push(c.id); });
-        // v3.45.3 pt7: a แลกไม้ authors TWO actions (relayleg note + the reciprocal add) linked by
-        //   legs[0].pairId — keep them one chain so publish/unpublish/discard never leaves a half-swap.
-        const _pid = (Array.isArray(a.legs) && a.legs[0] && a.legs[0].pairId) ? String(a.legs[0].pairId) : '';
-        if (_pid) stack.push(_pid);
-        acts.forEach(c => { if (c && Array.isArray(c.legs) && c.legs[0] && String(c.legs[0].pairId) === String(id)) stack.push(c.id); });
       }
       return Array.from(seen);
     }
@@ -3699,15 +3408,6 @@ window.allPharmacistNames = [];
       var id = btn.getAttribute('data-tl-edit');
       if (mid && id && typeof _pbEditRecipient === 'function') _pbEditRecipient(mid, id);
     }, true);
-    // v3.45: inline 🏃✎ in the timeline → edit the relay legs in place (draft or published).
-    document.addEventListener('click', function(e) {
-      var btn = (e.target && e.target.closest) ? e.target.closest('[data-tl-relayedit]') : null;
-      if (!btn) return;
-      e.stopPropagation();
-      var mid = btn.getAttribute('data-tl-mid');
-      var id = btn.getAttribute('data-tl-relayedit');
-      if (mid && id && typeof _relayEditLegs === 'function') _relayEditLegs(mid, id);
-    }, true);
     // v3.44: ✕ on the latest draft hop → remove just that action (reverts the chain one step).
     //   removeAction of a draft is local-only (its sync wrapper skips the server for non-public).
     document.addEventListener('click', function(e) {
@@ -3768,10 +3468,7 @@ window.allPharmacistNames = [];
           return !members.some(function(o) { return String(o.shiftKey || '') === '_g_' + m.id; });
         });
         tails.sort(function(x, y) { return String(x.createdAt || '').localeCompare(String(y.createdAt || '')); });
-        // v3.45.3 pt7: a แลกไม้ pair (relayleg note + add) has no _g_ link between them, so both are
-        //   "tails" — prefer the note as the representative so the row reads "แลกไม้", not "รับเวร".
-        var _legNote = members.find(function(m) { return m && String(m.action || '') === 'relayleg'; });
-        reps.push({ rep: _legNote || tails[tails.length - 1] || members[members.length - 1], size: members.length });
+        reps.push({ rep: tails[tails.length - 1] || members[members.length - 1], size: members.length });
       });
       return reps;
     }
@@ -3797,25 +3494,12 @@ window.allPharmacistNames = [];
 
       function typeText(a) {
         var act = String(a.action || '');
-        // v3.45.3: a leg handoff (sticky note) reads ยกไม้/แลกไม้ per its kind (rides in legs[0]).
-        if (act === 'relayleg') { var k = (Array.isArray(a.legs) && a.legs[0] && a.legs[0].kind) || 'give'; return k === 'swap' ? 'แลกไม้' : 'ยกไม้'; }
-        return act === 'swap' ? 'แลกเวร' : (act === 'give' ? 'ยกเวร' : (act === 'relay' ? 'ต่อเวร' : 'รับเวร'));
+        return act === 'swap' ? 'แลกเวร' : (act === 'give' ? 'ยกเวร' : 'รับเวร');
       }
       function relText(a) {
         var act = String(a.action || ''), who = _pbEsc(displayName(a.partnerName || '?'));
-        if (act === 'relayleg') {
-          var p = (Array.isArray(a.legs) && a.legs[0]) ? a.legs[0] : {};
-          var win = (typeof _relayLegWindowText === 'function') ? _relayLegWindowText({ start: p.legStart, end: p.legEnd, clinic: p.legClinic }) : '';
-          return 'ไม้ ' + (win ? '(' + _pbEsc(win) + ') ' : '') + '→ ' + who;
-        }
         if (act === 'swap') return 'แลกกับ ' + who;
         if (act === 'give') return 'ยกให้ ' + who;
-        if (act === 'relay') {
-          var ls = Array.isArray(a.legs) ? a.legs : [];
-          return ls.length >= 2
-            ? ('แบ่งเป็น ' + ls.length + ' ไม้: ' + _pbEsc(ls.map(function(l) { return displayName(l.owner || '?'); }).join(' → ')))
-            : 'ยังแบ่งไม่ครบ';
-        }
         return 'รับจาก ' + who;
       }
       // Context-aware label: add → edit the GIVER (ผู้ให้ = B); give → edit the RECEIVER (ผู้รับ);
@@ -4173,11 +3857,7 @@ window.allPharmacistNames = [];
             if (o.shiftKey) map[o.shiftKey] = { label: 'ยกให้ ' + o.partnerName + ' แล้ว', actionId: o.actionId, _pbSource: true, newOwner: o.partnerName };
           } else if (act === 'add') {
             // 'add' shiftKey = "date|pos|partnerName|range" → labels partner's original row
-            // v3.45.3 pt8: leg-swap reciprocal add → swap-style strike (pair-dot + "แลกกับ") on the partner's row.
-            var _lswP = (Array.isArray(o.legs) && o.legs[0] && o.legs[0].__legswap) ? o.legs[0] : null;
-            if (o.shiftKey) map[o.shiftKey] = _lswP
-              ? { label: 'แลกกับ ' + o.viewerName + ' แล้ว', actionId: o.actionId, color: _lswP.dot, _pbSource: true, newOwner: o.viewerName }
-              : { label: 'ยกให้ ' + o.viewerName + ' แล้ว', actionId: o.actionId, _pbSource: true, newOwner: o.viewerName };
+            if (o.shiftKey) map[o.shiftKey] = { label: 'ยกให้ ' + o.viewerName + ' แล้ว', actionId: o.actionId, _pbSource: true, newOwner: o.viewerName };
           }
         });
         return map;
@@ -4318,16 +3998,9 @@ window.allPharmacistNames = [];
       try {
         // v3.42.10: use combined map so PB-struck rows (partner's swap → own row) don't count
         const _bUsedMap = _combinedUsedMap(getCurrentMonthId(), target);
-        // v3.45 relay 1c: count leg-aware. A shift split into ไม้ credits EACH leg-owner
-        //   (incl. the giver's own KEPT leg — the used-map marks that shift 'given away' so
-        //   the old own+ghost tally silently dropped it). getEffectiveData() already runs
-        //   _relayExpand, so when the relay flag is OFF this reduces EXACTLY to the previous
-        //   (own-active + ghosts-active) count. Clinic legs have no duration → still +1 each
-        //   (per-person presence), matching the table which shows one row per ไม้.
         const _bEff = (typeof getEffectiveData === 'function') ? getEffectiveData() : (rawData || []);
         total = _bEff.filter(function(s) {
           if (!s || s.name !== target) return false;
-          if (s._relayLeg) return true;                        // a ไม้ this person covers → +1
           const _k = s._ghost ? s._ghostKey : makeShiftKey(s);
           return !_bUsedMap[_k];                                // whole shift: drop if given/swapped away
         }).length;
@@ -4394,27 +4067,6 @@ window.allPharmacistNames = [];
     document.addEventListener('click', function(e) {
       try {
       if (!editModeActive) return;
-      // v3.45: 0) relay leg-row tap → open the leg editor (the leg's sub-range key isn't a real
-      //   shift, so the normal data-shift-key path below would silently fail on it).
-      const relayTr = e.target.closest('tr[data-relay-actid]');
-      if (relayTr) {
-        e.stopPropagation();
-        const _raid = decodeURIComponent(relayTr.getAttribute('data-relay-actid'));
-        const _rmid = decodeURIComponent(relayTr.getAttribute('data-relay-mid') || '') || getCurrentMonthId();
-        // v3.45.3: carry the tapped ไม้'s identity so the menu offers leg-level ยก/แลก for THIS
-        //   ไม้ (not the whole shift). Older rows without leg attrs → leg = null → menu falls back
-        //   to whole-shift actions (แก้ไม้ / จัดการทั้งเวร) only.
-        const _leg = relayTr.hasAttribute('data-relay-legstart') ? {
-          i: parseInt(relayTr.getAttribute('data-relay-legi'), 10) || 0,
-          start: decodeURIComponent(relayTr.getAttribute('data-relay-legstart') || ''),
-          end: decodeURIComponent(relayTr.getAttribute('data-relay-legend') || ''),
-          clinic: relayTr.getAttribute('data-relay-legclinic') === '1',
-          owner: decodeURIComponent(relayTr.getAttribute('data-relay-legowner') || '')
-        } : null;
-        if (_raid && typeof _relayOpenLegMenu === 'function') _relayOpenLegMenu(_rmid, _raid, _leg);
-        else if (_raid && typeof _relayEditLegs === 'function') _relayEditLegs(_rmid, _raid);
-        return;
-      }
       // 1) Table row click (data-shift-key directly on tr)
       const trTarget = e.target.closest('tr[data-shift-key]');
       if (trTarget) {
@@ -4566,21 +4218,6 @@ window.allPharmacistNames = [];
             }
             kind = 'give';
             desc = (srcStr ? 'ยก ' + srcStr : 'ยก') + 'ให้ <b>' + displayName(act.partnerName) + '</b>';
-          } else if (act.action === 'relay') {
-            // v3.45.2: ต่อเวร hop — ownership stays put; show the per-ไม้ who-until-when breakdown
-            //   right in the step (Klui: couldn't see who the split went to / which hours).
-            let srcStr = '';
-            if (act.shiftKey && act.shiftKey.indexOf('_g_') !== 0) {
-              const sx = findShiftByKey(act.shiftKey);
-              if (sx) srcStr = '<b>' + sx.pos + '</b> ';
-            }
-            kind = 'relay';
-            // v3.45.2: top summary line "<the rest> ต่อเวรจาก <owner>" then the ไม้ list (no 🏃 —
-            //   the teal border + number already mark the step; Klui: เอา 🏃 ออก).
-            // v3.45.3 pt4: this step is the RECORD OF THE ORIGINAL SPLIT → show the legs AS AUTHORED
-            //   (raw act.legs). A ไม้ that later changed hands is its OWN step below + the holder line
-            //   reflects it (Klui: ไม้1 ควรเป็น "ขลุ่ย" เพราะแยกส่วนแลกออกเป็นอีกขั้นแล้ว).
-            desc = (srcStr ? srcStr : '') + _relayHandoffSummary(act.legs) + _relayLegsSummaryHtml(act.legs);
           }
           // v3.44: inline ✎ right after the name → edit the counterpart (B) in place. Shown on a
           //   DRAFT (to its author) or on any record when the viewer is Admin (published = final,
@@ -4592,17 +4229,6 @@ window.allPharmacistNames = [];
           if (_tlEdit && (act.action === 'add' || act.action === 'give' || act.action === 'swap') &&
               (act._visibility === 'draft' || (typeof phxAuthIsAdmin === 'function' && phxAuthIsAdmin()))) {
             desc += ' <span class="tl-edit-recipient" data-tl-edit="' + act.id + '" data-tl-mid="' + monthId + '" title="แก้ชื่อ" role="button" aria-label="แก้ชื่อ">✎</span>';
-          }
-          // v3.45.2: 🏃✎ to edit the legs — the first-class ต่อเวร action only. Gated by
-          //   editModeActive so it follows the same "กดดินสอ (แก้ไข) ก่อน" gesture as tapping a
-          //   shift row (Klui). The AUTHOR may edit their own split even after publish; the save
-          //   re-syncs so every viewer's rows update. Admin may edit anyone's.
-          if (window._relayEnabled && act.action === 'relay' && (typeof editModeActive === 'undefined' || editModeActive)) {
-            var _rlBnd = (typeof _pbGetLoggedInName === 'function') ? _pbGetLoggedInName() : null;
-            var _rlMine = _rlBnd && String(act.viewerName || '') === String(_rlBnd);
-            if (_rlMine || (typeof phxAuthIsAdmin === 'function' && phxAuthIsAdmin())) {
-              desc += ' <span class="tl-edit-relay" data-tl-relayedit="' + act.id + '" data-tl-mid="' + monthId + '" title="แก้ไม้ (ต่อเวร)" role="button" aria-label="แก้ไม้">🏃✎</span>';
-            }
           }
           // v3.44: ✕ to peel off the LATEST hop (DRAFT only) → reverts the chain to the previous
           //   state (e.g. remove the swap-with-กฤตยา → back to just รับ-O9-จาก-พรผกา). Only the tail
@@ -4638,23 +4264,6 @@ window.allPharmacistNames = [];
           html += '<div class="tl-inline-num">' + (idx + 1) + '</div>';
           html += '<div class="tl-inline-body">' + desc + '</div></div>';
         });
-        // v3.45.3: leg handoffs (ยก/แลกไม้) render as their OWN numbered history steps (Klui:
-        //   ควรแยกประวัติเป็นอีกรายการ — ไม่ใช่เขียนทับเงียบ ๆ). A relayleg note isn't in the _g_ chain,
-        //   so pull the notes for this master by masterId and append them in createdAt order.
-        var _tlRelay = (targetAction && targetAction.action === 'relay') ? targetAction
-                     : chain.find(function(a){ return a && a.action === 'relay'; });
-        if (window._relayEnabled && _tlRelay && typeof _relayLegOverrides === 'function') {
-          var _tlMid = String(_tlRelay.id || '');
-          var _tlHops = _relayLegOverrides(monthId).filter(function(o){ return o.masterId === _tlMid; })
-            .sort(function(x, y){ return String(x.createdAt || '').localeCompare(String(y.createdAt || '')); });
-          _tlHops.forEach(function(o, j){
-            var _lk = (o.kind === 'swap') ? 'swap' : 'give';
-            var _d = _relayLegStepDesc(o, _tlRelay);
-            var _ts = o.createdAt ? new Date(o.createdAt).toLocaleString('th-TH', {dateStyle:'short', timeStyle:'short'}) : '';
-            if (_ts) _d += ' <span class="tl-inline-ts">· ' + _ts + '</span>';
-            html += '<div class="tl-inline-step tl-' + _lk + '"><div class="tl-inline-num">' + (chain.length + j + 1) + '</div><div class="tl-inline-body">' + _d + '</div></div>';
-          });
-        }
         const lastAct = chain[chain.length - 1];
         // v3.41: unified end message — match PB format so all viewers see the same
         let _curHolder;
@@ -4668,30 +4277,8 @@ window.allPharmacistNames = [];
           _curHolder = viewer;
         }
         const _pinnedSrc = chain.some(a => a && a._retroFinal);
-        // v3.45.2: for a ต่อเวร the shift is covered by EVERY ไม้-owner, so the holder line lists
-        //   them all (Klui: "ขลุ่ย ตามด้วยชื่อคนอื่นๆ ที่เป็นไม้ที่เหลือ") instead of "แบ่งเป็น N ไม้".
-        //   A relay never moves ownership, so this replaces (not appends to) the single holder.
-        let _relayHolders = null, _relayIsClin = false;
-        try {
-          const _legAct = (targetAction && targetAction.action === 'relay' && Array.isArray(targetAction.legs) && targetAction.legs.length >= 2) ? targetAction
-                        : (lastAct && lastAct.action === 'relay' && Array.isArray(lastAct.legs) && lastAct.legs.length >= 2) ? lastAct : null;
-          if (window._relayEnabled && _legAct) {
-            // v3.45.3: resolve sticky-note handoffs so the holder line shows the CURRENT ไม้ owners
-            //   (was raw _legAct.legs → a handed-off ไม้ still credited its original owner).
-            const _rLegs = (typeof _relayLegsFor === 'function') ? _relayLegsFor(monthId, _legAct) : _legAct.legs;
-            _relayIsClin = _rLegs.some(l => l && l.clinic);
-            const _seen = {}, _names = [];
-            _rLegs.forEach(l => { const nm = displayName((l && l.owner) || '?'); if (!_seen[nm]) { _seen[nm] = 1; _names.push(nm); } });
-            _relayHolders = _names;
-          }
-        } catch (e) {}
-        if (_relayHolders && _relayHolders.length) {
-          // v3.45.2: names only — no trailing (คลินิก · ต่อเวร) tag (Klui: ไม่มีอะไรต่อท้ายชื่อแล้ว)
-          html += '<div class="tl-inline-end active">ปัจจุบันเวรนี้อยู่กับ: <b>' + _relayHolders.join(', ') + '</b></div>';
-        } else {
-          html += '<div class="tl-inline-end active">ปัจจุบันเวรนี้อยู่กับ: <b>' + displayName(_curHolder || '?') + '</b>' +
-                  (_pinnedSrc ? ' <span title="ปักหมุดจากการบันทึกย้อนหลัง (ข้ามช่วงที่ไม่ทราบ)">🔒</span>' : '') + '</div>';
-        }
+        html += '<div class="tl-inline-end active">ปัจจุบันเวรนี้อยู่กับ: <b>' + displayName(_curHolder || '?') + '</b>' +
+                (_pinnedSrc ? ' <span title="ปักหมุดจากการบันทึกย้อนหลัง (ข้ามช่วงที่ไม่ทราบ)">🔒</span>' : '') + '</div>';
         // v3.44: publish/unpublish moved OUT of the timeline into the single "🌐 เผยแพร่"
         //   FAB modal (openPublishModal). The timeline is now read-only history.
         return html;
@@ -4745,26 +4332,6 @@ window.allPharmacistNames = [];
             }
             kind = 'give';
             desc = '<b>' + actor + '</b> ' + (srcStr ? 'ยก ' + srcStr : 'ยก') + 'ให้ <b>' + displayName(ov.partnerName) + '</b>';
-          } else if (act === 'relay') {
-            // v3.45.2: ต่อเวร hop for non-author viewers (e.g. a leg recipient checking history) —
-            //   same per-ไม้ breakdown the author sees. legs ride on pathBOverlays (server passthrough).
-            let srcStr = '';
-            if (ov.shiftKey && ov.shiftKey.indexOf('_g_') !== 0) {
-              const sp = _pbShiftPosFromKey(ov.shiftKey);
-              if (sp) srcStr = '<b>' + sp + '</b> ';
-            }
-            kind = 'relay';
-            // v3.45.2: summary already names the owner, so no separate actor prefix; no 🏃 (Klui).
-            // v3.45.3 pt4: original-split record → raw ov.legs (handoffs are separate steps below +
-            //   the holder line shows the current holder).
-            desc = srcStr + _relayHandoffSummary(ov.legs) + _relayLegsSummaryHtml(ov.legs);
-            // author's own 🏃✎ (the action IS in their local OverlayManager even when this PB
-            //   builder renders — e.g. anonymous-mode view); admin uses the ✕ cancel below instead.
-            //   Edit-mode gated like the author builder (กดดินสอก่อน).
-            var _rlBndPB = (typeof _pbGetLoggedInName === 'function') ? _pbGetLoggedInName() : null;
-            if (window._relayEnabled && (typeof editModeActive === 'undefined' || editModeActive) && _rlBndPB && String(ov.viewerName || '') === String(_rlBndPB)) {
-              desc += ' <span class="tl-edit-relay" data-tl-relayedit="' + _pbEsc(ov.actionId) + '" data-tl-mid="' + _pbEsc(getCurrentMonthId()) + '" title="แก้ไม้ (ต่อเวร)" role="button" aria-label="แก้ไม้">🏃✎</span>';
-            }
           }
           const tsStr = ov.createdAt ? new Date(ov.createdAt).toLocaleString('th-TH', {dateStyle:'short', timeStyle:'short'}) : '';
           if (tsStr) desc += ' <span class="tl-inline-ts">· ' + tsStr + '</span>';
@@ -4800,44 +4367,10 @@ window.allPharmacistNames = [];
           html += '<div class="tl-inline-num">' + (idx + 1) + '</div>';
           html += '<div class="tl-inline-body">' + desc + '</div></div>';
         });
-        // v3.45.3: leg handoffs (ยก/แลกไม้) as their own numbered steps here too, so a non-author
-        //   viewer sees the swap/give story, not a silent owner change (Klui: ประวัติต้องครบ).
-        var _pbRelay = chain.find(function(o){ return o && String(o.action || '') === 'relay'; });
-        if (window._relayEnabled && _pbRelay && typeof _relayLegOverrides === 'function') {
-          var _pbMid = String(_pbRelay.actionId || _pbRelay.id || '');
-          var _pbHops = _relayLegOverrides(getCurrentMonthId()).filter(function(o){ return o.masterId === _pbMid; })
-            .sort(function(x, y){ return String(x.createdAt || '').localeCompare(String(y.createdAt || '')); });
-          _pbHops.forEach(function(o, j){
-            var _lk = (o.kind === 'swap') ? 'swap' : 'give';
-            var _d = _relayLegStepDesc(o, _pbRelay, true);   // pt8: PB builder prefixes the actor name
-            var _ts = o.createdAt ? new Date(o.createdAt).toLocaleString('th-TH', {dateStyle:'short', timeStyle:'short'}) : '';
-            if (_ts) _d += ' <span class="tl-inline-ts">· ' + _ts + '</span>';
-            html += '<div class="tl-inline-step tl-' + _lk + '"><div class="tl-inline-num">' + (chain.length + j + 1) + '</div><div class="tl-inline-body">' + _d + '</div></div>';
-          });
-        }
         const ep = PBOverlays.getChainEndpoints(chain, pbSide);   // v3.42.9: pbSide picks correct holder for swap
         const _pinnedPB = chain.some(o => o && o._retroFinal);
-        // v3.45.2: a relay tail never moves ownership — holder = the relay's own author, plus
-        //   the แบ่ง note (getChainEndpoints only understands add/give/swap and would say '?').
-        const _tailPB = chain[chain.length - 1];
-        // v3.45.2: relay tail → list every ไม้-owner covering the shift (Klui), same as the author
-        //   builder. legs ride on pathBOverlays (server passthrough) so non-authors see the names too.
-        let _pbRelayHolders = null, _pbRelayClin = false;
-        if (_tailPB && String(_tailPB.action || '') === 'relay' && Array.isArray(_tailPB.legs) && _tailPB.legs.length >= 2) {
-          // v3.45.3: resolve sticky-note handoffs → current ไม้ owners (was raw → stale owner lingers).
-          const _rLegsPB = (typeof _relayLegsFor === 'function') ? _relayLegsFor(getCurrentMonthId(), _tailPB) : _tailPB.legs;
-          _pbRelayClin = _rLegsPB.some(function(l) { return l && l.clinic; });
-          const _seenPB = {}, _namesPB = [];
-          _rLegsPB.forEach(function(l) { const nm = displayName((l && l.owner) || '?'); if (!_seenPB[nm]) { _seenPB[nm] = 1; _namesPB.push(nm); } });
-          _pbRelayHolders = _namesPB;
-        }
-        if (_pbRelayHolders && _pbRelayHolders.length) {
-          // v3.45.2: names only — no trailing tag (Klui)
-          html += '<div class="tl-inline-end active">ปัจจุบันเวรนี้อยู่กับ: <b>' + _pbRelayHolders.join(', ') + '</b></div>';
-        } else {
-          html += '<div class="tl-inline-end active">ปัจจุบันเวรนี้อยู่กับ: <b>' + displayName(ep.last || '?') + '</b>' +
-                  (_pinnedPB ? ' <span title="ปักหมุดจากการบันทึกย้อนหลัง (ข้ามช่วงที่ไม่ทราบ)">🔒</span>' : '') + '</div>';
-        }
+        html += '<div class="tl-inline-end active">ปัจจุบันเวรนี้อยู่กับ: <b>' + displayName(ep.last || '?') + '</b>' +
+                (_pinnedPB ? ' <span title="ปักหมุดจากการบันทึกย้อนหลัง (ข้ามช่วงที่ไม่ทราบ)">🔒</span>' : '') + '</div>';
         return html;
       } catch (err) {
         v10ShowError('_buildPBTimelineHTML', err);
@@ -5362,7 +4895,6 @@ window.allPharmacistNames = [];
       actionState.pickerQuery = '';
       actionState.pickerPerson = '';
       actionState.pickerDate = '';
-      actionState.legSwap = null; actionState.legGive = null; actionState.legMenu = null;   // v3.45.3: a normal shift tap isn't a leg op
 
       if (isUsedAsSource) {
         // Already swapped/given → show undo (works for both real and chained-ghost)
@@ -5420,27 +4952,8 @@ window.allPharmacistNames = [];
         else if (sl.indexOf('รอบ 3') >= 0 || sl.indexOf('รอบ3') >= 0) bcls = 'badge-s3';
         const btnStyle = isStruck ? 'margin-bottom:6px; opacity:0.6;' : 'margin-bottom:6px;';
         const strikeStyle = isStruck ? 'text-decoration:line-through;' : '';
-        // v3.45 relay: a leg-row's synthetic sub-range key isn't in rawData (same issue the
-        //   table hit — commit 7144959) — stamp actionId so the click handler below can route to
-        //   the leg editor INSTEAD of data-cell-pick-key → openActionModalForKey (silent no-op /
-        //   wrong modal). Also show the ไม้ tag + handoff window so a split isn't indistinguishable.
         let legTag = '';
-        const relayAttr = (s._relayLeg && s._relayLeg.actionId)
-          ? ' data-relay-actid="' + encodeURIComponent(s._relayLeg.actionId) + '" data-relay-mid="' + encodeURIComponent(_pickerMid) + '"' +
-            ' data-relay-legi="' + s._relayLeg.i + '" data-relay-legstart="' + encodeURIComponent(s._relayLeg.start||'') + '"' +
-            ' data-relay-legend="' + encodeURIComponent(s._relayLeg.end||'') + '" data-relay-legclinic="' + (s._relayLeg.clinic?1:0) + '"' +
-            ' data-relay-legowner="' + encodeURIComponent(s.name||'') + '"'
-          : '';
-        if (s._relayLeg) {
-          const _legC = (typeof _relayLegColor === 'function') ? _relayLegColor(s._relayLeg.i - 1) : '#0d9488';
-          let _legWhen = '';
-          if (s._relayLeg.clinic) {
-            const _cs = s._relayLeg.start, _ce = s._relayLeg.end;
-            _legWhen = (!_cs && _ce) ? (' · ถึง ' + _ce) : (_cs && !_ce) ? (' · ' + _cs + ' เป็นต้นไป') : (_cs && _ce) ? (' · ' + _cs + '–' + _ce) : '';
-          }
-          legTag = '<span class="relay-leg-tag" style="color:' + _legC + '; border-color:' + _legC + ';">ไม้ ' + s._relayLeg.i + _legWhen + '</span> ';
-        }
-        let row = '<button class="pick-result" data-cell-pick-key="' + enc + '"' + relayAttr + ' style="' + btnStyle + '">';
+        let row = '<button class="pick-result" data-cell-pick-key="' + enc + '" style="' + btnStyle + '">';
         row += '<div style="flex:1;">';
         row += '<div class="pick-result-name" style="' + strikeStyle + '">' + s.pos + ' ' + legTag + ghostTag + statusTag + '</div>';
         row += '</div>';
@@ -5477,25 +4990,6 @@ window.allPharmacistNames = [];
       box.querySelectorAll('[data-cell-pick-key]').forEach(btn => {
         btn.addEventListener('click', function(ev) {
           ev.stopPropagation();
-          // v3.45 relay: a leg-row → the ไม้ menu, same as the table. Must check this FIRST — the
-          //   synthetic key still resolves openActionModalForKey down a wrong path for ไม้1
-          //   (coincides with the real master key → "undo the give") and no-ops for ไม้2+.
-          // v3.45.3: open the leg-level menu (ยกไม้/แลกไม้/แก้ไม้/จัดการทั้งเวร), carrying the ไม้
-          //   identity from the row's data-relay-leg* attrs.
-          const raid = btn.getAttribute('data-relay-actid');
-          if (raid && typeof _relayOpenLegMenu === 'function') {
-            const _rmid = decodeURIComponent(btn.getAttribute('data-relay-mid') || '') || getCurrentMonthId();
-            const _leg = btn.hasAttribute('data-relay-legstart') ? {
-              i: parseInt(btn.getAttribute('data-relay-legi'), 10) || 0,
-              start: decodeURIComponent(btn.getAttribute('data-relay-legstart') || ''),
-              end: decodeURIComponent(btn.getAttribute('data-relay-legend') || ''),
-              clinic: btn.getAttribute('data-relay-legclinic') === '1',
-              owner: decodeURIComponent(btn.getAttribute('data-relay-legowner') || '')
-            } : null;
-            closeActionModal();
-            _relayOpenLegMenu(_rmid, decodeURIComponent(raid), _leg);
-            return;
-          }
           const k = decodeURIComponent(btn.getAttribute('data-cell-pick-key'));
           openActionModalForKey(k);
         });
@@ -5529,18 +5023,7 @@ window.allPharmacistNames = [];
         else if (sl.indexOf('รอบ 2') >= 0 || sl.indexOf('รอบ2') >= 0) bcls = 'badge-s2';
         else if (sl.indexOf('รอบ 3') >= 0 || sl.indexOf('รอบ3') >= 0) bcls = 'badge-s3';
         const ghostTag = s._ghost ? ' <span style="color:#16a34a; font-size:10px; font-weight:600;">' + (s._ghostLabel || '(เวรที่รับมา)') + '</span>' : '';
-        // v3.45 relay: display-only ไม้ tag (view mode has no edit routing — just parity with
-        //   the table/edit-mode picker so a split shift isn't shown as if it were a whole one).
         let legTag = '';
-        if (s._relayLeg) {
-          const _legC = (typeof _relayLegColor === 'function') ? _relayLegColor(s._relayLeg.i - 1) : '#0d9488';
-          let _legWhen = '';
-          if (s._relayLeg.clinic) {
-            const _cs = s._relayLeg.start, _ce = s._relayLeg.end;
-            _legWhen = (!_cs && _ce) ? (' · ถึง ' + _ce) : (_cs && !_ce) ? (' · ' + _cs + ' เป็นต้นไป') : (_cs && _ce) ? (' · ' + _cs + '–' + _ce) : '';
-          }
-          legTag = '<span class="relay-leg-tag" style="color:' + _legC + '; border-color:' + _legC + ';">ไม้ ' + s._relayLeg.i + _legWhen + '</span> ';
-        }
         const detailAttrs = isClinic
           ? 'data-cv-clinic="1" data-cv-date="' + encodeURIComponent(s.date || '') + '" data-cv-pos="' + encodeURIComponent(s.pos || '') + '"'
           : 'data-cv-pos="' + encodeURIComponent(s.pos || '') + '"';
@@ -5595,7 +5078,6 @@ window.allPharmacistNames = [];
       actionState.pickerQuery = '';
       actionState.pickerPerson = '';
       actionState.pickerDate = '';
-      actionState.legSwap = null; actionState.legGive = null; actionState.legMenu = null;   // v3.45.3: cancel discards pending leg ops
     }
 
     function actionGoTo(step) {
@@ -5615,29 +5097,14 @@ window.allPharmacistNames = [];
         swap: 'สลับเวร — เลือกเวรของอีกฝ่าย',
         give: 'ยกเวร — เลือกผู้รับ',
         add: 'เพิ่มเวร — เลือกเวรที่ต้องการรับ',
-        undo: 'ยกเลิกการแก้ไข',
-        legMenu: 'จัดการไม้นี้'
+        undo: 'ยกเลิกการแก้ไข'
       };
-      // v3.45.3 pt7: ยก/แลกไม้ reuse the give/swap pickers → relabel the title for the ไม้ context.
       let _title = titles[s] || '';
-      if (s === 'give' && actionState.legGive) _title = 'ยกไม้ — เลือกผู้รับ';
-      else if (s === 'swap' && actionState.legSwap) _title = 'แลกไม้ — เลือกเวรของอีกฝ่าย';
       let html = '<div class="act-modal-header"><h3>' + _title + '</h3>' +
                  '<button class="act-modal-close" onclick="closeActionModal()">✕</button></div>';
       html += '<div class="act-modal-body">';
 
-      const _legCtx = actionState.legSwap || actionState.legGive || actionState.legMenu;
-      if (_legCtx && _legCtx.leg) {
-        // v3.45.3: a leg op acts on MY ไม้, not the whole shift — label the header accordingly.
-        const _lg = _legCtx.leg;
-        const _shp = findShiftByKey(actionState.shiftKey);
-        const _win = (typeof _relayLegWindowText === 'function') ? _relayLegWindowText(_lg) : '';
-        const _lbl = actionState.legSwap ? 'ไม้ของคุณ (ที่จะแลก)' : (actionState.legGive ? 'ไม้ที่จะยกให้' : 'ไม้ที่เลือก');
-        html += '<div class="act-shift-info">' +
-                  '<div class="act-shift-info-lbl">' + _lbl + '</div>' +
-                  '<div class="act-shift-info-val">ไม้ ' + (_lg.i || '') + ' • ' + _pbEsc(_win) + (_shp ? ' • ' + _pbEsc(_shp.pos || '') : '') + '</div>' +
-                '</div>';
-      } else if (actionState.shiftKey) {
+      if (actionState.shiftKey) {
         const shift = findShiftByKey(actionState.shiftKey);
         if (shift) {
           html += '<div class="act-shift-info">' +
@@ -5649,7 +5116,6 @@ window.allPharmacistNames = [];
 
       if (s === 'menu') html += renderMenuStep();
       else if (s === 'ghostMenu') html += renderGhostMenuStep();
-      else if (s === 'legMenu') html += renderLegMenuStep();
       else if (s === 'swap' || s === 'add') html += renderShiftPickerShell();
       else if (s === 'give') html += renderNamePickerShell();
       else if (s === 'undo') html += renderUndoStep();
@@ -5678,243 +5144,6 @@ window.allPharmacistNames = [];
       }
     }
 
-    // v3.45.2: find this user's own relay (ต่อเวร) action on a shiftKey → {id, action} or null.
-    //   local-only (their OverlayManager); a shift you can act on is one you hold, so the relay
-    //   that split it is your own.
-    function _relayActionForKey(mid, key) {
-      if (!window._relayEnabled || !key) return null;
-      var sk = String(key);
-      try {
-        OverlayManager.load();
-        var acts = (OverlayManager._data && OverlayManager._data[mid] && OverlayManager._data[mid].actions) || [];
-        var f = acts.find(function(a) { return a && String(a.action || '') === 'relay' && Array.isArray(a.legs) && a.legs.length >= 2 && String(a.shiftKey || '') === sk; });
-        if (f) return { id: f.id, action: f };
-      } catch (e) {}
-      return null;
-    }
-    function _relayActionById(mid, id) {
-      try {
-        OverlayManager.load();
-        var acts = (OverlayManager._data && OverlayManager._data[mid] && OverlayManager._data[mid].actions) || [];
-        var f = acts.find(function(a) { return a && a.id === id; });
-        if (f) return f;
-      } catch (e) {}
-      try {
-        var pb = (typeof pathBOverlays !== 'undefined' && Array.isArray(pathBOverlays)) ? pathBOverlays : [];
-        var f2 = pb.find(function(o) { return o && String(o.actionId) === String(id); });
-        if (f2) return f2;
-      } catch (e) {}
-      return null;
-    }
-    // ─── v3.45.3: leg-level ยก/แลก — the tap-menu for ONE ไม้ ───────────────────────────────
-    //   Klui: "ควรมีเมนูแลกเวร ยกเวร แม้กรณีที่เป็นไม้ต่อ — สลับเอาชื่อคนอื่นแทนตำแหน่งของเรา".
-    //   Whoever CURRENTLY holds a ไม้ (or an admin) may hand just that ไม้ to someone else (ยก) or
-    //   trade it for another whole shift (แลก). Ownership of the master shift never moves.
-    function _relayActorName() {
-      try { if (typeof _pbGetLoggedInName === 'function') { var n = _pbGetLoggedInName(); if (n) return String(n); } } catch (e) {}
-      try { if (typeof phxAuthGetUser === 'function') { var u = phxAuthGetUser(); if (u && u.name) return String(u.name); } } catch (e) {}
-      try { if (typeof getCurrentUser === 'function') { var g = getCurrentUser(); if (g) return String(g); } } catch (e) {}
-      return '';
-    }
-    function _relayLegWindowText(leg) {
-      if (!leg) return '';
-      var s = String(leg.start || ''), e = String(leg.end || '');
-      if (leg.clinic) return (!s && e) ? ('ถึง ' + e) : (s && !e) ? (s + ' น. เป็นต้นไป') : (s && e) ? (s + '–' + e) : 'ตรวจสอบ';
-      return (s && e) ? (s + '-' + e) : (s || e || '');
-    }
-    // Author one "sticky note" (relayleg) — the identity of WHICH ไม้ rides in legs[0]; everything
-    //   else on standard, server-whitelisted fields. viewerName = the actor so phxPushActions pushes
-    //   it under their own name (sync-legal even when the actor isn't the master's author).
-    function _relayAuthorOverride(mid, master, leg, fromOwner, toOwner, kind, extra) {
-      var mId = String((master && (master.id || master.actionId)) || '');
-      if (!mId) return null;
-      var pay = { __relayleg: 1, masterId: mId, legStart: String(leg.start || ''), legEnd: String(leg.end || ''), legClinic: !!leg.clinic, kind: String(kind || 'give') };
-      if (extra && typeof extra === 'object') { for (var k in extra) { if (Object.prototype.hasOwnProperty.call(extra, k)) pay[k] = extra[k]; } }  // e.g. gotPos for a swap
-      return OverlayManager.addAction(mid, {
-        action: 'relayleg',
-        viewerName: _relayActorName(),
-        shiftKey: String((master && master.shiftKey) || ''),
-        originalOwner: String(fromOwner || ''),
-        partnerName: String(toOwner || ''),
-        legs: [pay]
-      });
-    }
-    // v3.45.3 pt7: leg-handoff timeline step — MAIN-system voice (Klui #1: อิงระบบหลัก + วงเล็บไม้):
-    //   give → "ยก <pos> (ไม้ N · window) ให้ <to>"  (mirrors main "ยก <pos> ให้ <name>")
-    //   swap → "แลก <pos> (ไม้ N · window) กับ <gotPos> จาก <to>"  (mirrors "แลก <pos> กับ <pos> จาก <name>")
-    //   No actor prefix (the main steps don't have one either). `master` = the relay action, used to
-    //   resolve the shift pos + the ไม้ number from the note's window.
-    function _relayLegStepDesc(o, master, withActor) {
-      var pos = '', legNo = '';
-      if (master) {
-        var mk = String(master.shiftKey || '');
-        if (mk && mk.indexOf('_g_') !== 0) {
-          var sx = (typeof findShiftByKey === 'function') ? findShiftByKey(mk) : null;
-          pos = sx ? String(sx.pos || '') : ((typeof _pbShiftPosFromKey === 'function') ? (_pbShiftPosFromKey(mk) || '') : '');
-        }
-        if (Array.isArray(master.legs)) {
-          for (var i = 0; i < master.legs.length; i++) {
-            var l = master.legs[i];
-            if (String(l.start || '') === o.legStart && String(l.end || '') === o.legEnd && !!l.clinic === !!o.legClinic) { legNo = i + 1; break; }
-          }
-        }
-      }
-      var win = (typeof _relayLegWindowText === 'function') ? _relayLegWindowText({ start: o.legStart, end: o.legEnd, clinic: o.legClinic }) : '';
-      var qual = 'ไม้' + (legNo ? ' ' + legNo : '') + (win ? ' · ' + win : '');
-      var posB = pos ? '<b>' + _pbEsc(pos) + '</b> ' : '';
-      var to = _pbEsc(displayName(o.toOwner || '?'));
-      // v3.45.3 pt8: actor-name prefix for the PB (cross-person) builder, matching how a normal
-      //   swap/give reads there ("นาย A แลก ..."); the author's own builder omits it (it's "you").
-      var by = withActor ? ('<b>' + _pbEsc(displayName(o.actor || o.fromOwner || '?')) + '</b> ') : '';
-      if (o.kind === 'swap') {
-        var got = o.gotPos ? '<b>' + _pbEsc(o.gotPos) + '</b>' : 'เวร';
-        return by + 'แลก ' + posB + '(' + _pbEsc(qual) + ') กับ ' + got + ' จาก <b>' + to + '</b>';
-      }
-      return by + 'ยก ' + posB + '(' + _pbEsc(qual) + ') ให้ <b>' + to + '</b>';
-    }
-    // v3.45.3 pt7: tapping a ไม้ row → the leg menu AS A STEP OF THE MAIN actionModal (Klui #2:
-    //   universal format — same floating popup as แลก/ยก/รับเวร). Context lives in actionState.legMenu.
-    //   Missing leg (old row) → fall back to the whole-shift menu.
-    function _relayOpenLegMenu(mid, actionId, leg) {
-      var a = _relayActionById(mid, actionId);
-      if (!leg) {
-        if (a && a.shiftKey && typeof openActionModalForKey === 'function') openActionModalForKey(String(a.shiftKey));
-        else if (typeof _relayEditLegs === 'function') _relayEditLegs(mid, actionId);
-        return;
-      }
-      actionState.shiftKey = (a && a.shiftKey) ? String(a.shiftKey) : null;
-      actionState.usedInfo = null;
-      actionState.legSwap = null; actionState.legGive = null;
-      actionState.legMenu = { mid: mid, actionId: actionId, leg: leg };
-      actionState.step = 'legMenu';
-      if (typeof renderActionModal === 'function') renderActionModal();
-      var modal = document.getElementById('actionModal'); if (modal) modal.style.display = 'flex';
-    }
-    // The leg menu buttons (rendered inside actionModal for step 'legMenu'). Gated: ยก/แลก for the
-    //   ไม้'s current holder or admin; แก้ไม้/จัดการทั้งเวร for the split's author or admin.
-    function renderLegMenuStep() {
-      var lm = actionState.legMenu;
-      if (!lm || !lm.leg) return '<div class="act-prompt">ไม่พบไม้</div><button class="act-btn act-btn-cancel" onclick="closeActionModal()">ปิด</button>';
-      var leg = lm.leg, a = _relayActionById(lm.mid, lm.actionId);
-      var _actor = _relayActorName();
-      var isAdmin = (typeof phxAuthIsAdmin === 'function' && phxAuthIsAdmin());
-      var isLegOwner = _actor && String(_actor) === String(leg.owner || '');
-      var isAuthor = a && _actor && String(a.viewerName || '') === String(_actor);
-      var btns = '';
-      if (isLegOwner || isAdmin) {
-        btns += '<button class="act-btn act-btn-danger" onclick="_relayLegGiveStart()">🎁 ยกไม้ ' + (leg.i || '') + ' ให้คนอื่น</button>';
-        btns += '<button class="act-btn act-btn-primary" onclick="_relayLegSwapStart()">🔄 แลกไม้ ' + (leg.i || '') + ' กับเวรคนอื่น</button>';
-      }
-      if (isAuthor || isAdmin) {
-        btns += '<button class="act-btn" style="background:#f0fdfa; color:#0f766e; border-color:#99f6e4;" onclick="_relayLegEditAllFromMenu()">🏃 แก้ไม้ทั้งหมด (ต่อเวร)</button>';
-        btns += '<button class="act-btn" style="background:#fff7ed; color:#9a3412; border-color:#fed7aa;" onclick="_relayLegWholeFromMenu()">⚙️ จัดการทั้งเวร (ยก/สลับ/ยกเลิกแบ่ง)</button>';
-      }
-      if (!btns) btns = '<div style="font-size:12px; color:var(--sub); text-align:center; padding:8px 0;">ไม้นี้เป็นของ <b>' + _pbEsc(displayName(leg.owner || '?')) + '</b><br>ยก/แลกได้เฉพาะเจ้าของไม้หรือแอดมิน</div>';
-      return '<div class="act-prompt">ต้องการทำอะไรกับไม้นี้?</div>' + btns +
-             '<button class="act-btn act-btn-cancel" onclick="closeActionModal()">ยกเลิก</button>';
-    }
-    // legMenu → main name/shift picker (reused verbatim), then commit through swfOpenConfirm.
-    function _relayLegGiveStart() {
-      var lm = actionState.legMenu; if (!lm) return;
-      var _actor = _relayActorName(), isAdmin = (typeof phxAuthIsAdmin === 'function' && phxAuthIsAdmin());
-      if (!_actor) { if (typeof _p2bShowToast === 'function') _p2bShowToast('ต้อง login ก่อนจึงจะยกไม้ได้', 'warn'); return; }
-      if (!isAdmin && String(_actor) !== String(lm.leg.owner || '')) { if (typeof _p2bShowToast === 'function') _p2bShowToast('ยกไม้ได้เฉพาะเจ้าของไม้', 'warn'); return; }
-      actionState.legGive = { mid: lm.mid, actionId: lm.actionId, leg: lm.leg, fromOwner: lm.leg.owner };
-      actionState.legMenu = null;
-      if (typeof actionGoTo === 'function') actionGoTo('give');   // reuse the main name picker
-    }
-    function _relayLegSwapStart() {
-      var lm = actionState.legMenu; if (!lm) return;
-      var _actor = _relayActorName(), isAdmin = (typeof phxAuthIsAdmin === 'function' && phxAuthIsAdmin());
-      if (!_actor) { if (typeof _p2bShowToast === 'function') _p2bShowToast('ต้อง login ก่อนจึงจะแลกไม้ได้', 'warn'); return; }
-      if (!isAdmin && String(_actor) !== String(lm.leg.owner || '')) { if (typeof _p2bShowToast === 'function') _p2bShowToast('แลกไม้ได้เฉพาะเจ้าของไม้', 'warn'); return; }
-      actionState.legSwap = { mid: lm.mid, actionId: lm.actionId, leg: lm.leg, fromOwner: lm.leg.owner };
-      actionState.legMenu = null;
-      if (typeof actionGoTo === 'function') actionGoTo('swap');   // reuse the main shift picker
-    }
-    function _relayLegEditAllFromMenu() {
-      var lm = actionState.legMenu; if (!lm) return;
-      var mid = lm.mid, aid = lm.actionId;
-      if (typeof closeActionModal === 'function') closeActionModal();
-      if (typeof _relayEditLegs === 'function') _relayEditLegs(mid, aid);
-    }
-    function _relayLegWholeFromMenu() {
-      var lm = actionState.legMenu; if (!lm) return;
-      var a = _relayActionById(lm.mid, lm.actionId);
-      if (a && a.shiftKey && typeof openActionModalForKey === 'function') openActionModalForKey(String(a.shiftKey));
-    }
-    // 🎁 ยกไม้ commit — pick a recipient in the main name picker → author the note → swfOpenConfirm.
-    function _relayLegGiveCommit(nm) {
-      var lg = actionState.legGive; if (!lg) { if (typeof closeActionModal === 'function') closeActionModal(); return; }
-      var mid = lg.mid, a = _relayActionById(mid, lg.actionId);
-      if (!a) { if (typeof closeActionModal === 'function') closeActionModal(); if (typeof _p2bShowToast === 'function') _p2bShowToast('ไม่พบการต่อเวร', 'warn'); return; }
-      if (String(nm) === String(lg.leg.owner || '')) { if (typeof _p2bShowToast === 'function') _p2bShowToast('เป็นเจ้าของไม้นี้อยู่แล้ว', 'warn'); return; }
-      actionState.legGive = null;
-      var ovr = _relayAuthorOverride(mid, a, lg.leg, lg.fromOwner, nm, 'give');
-      if (typeof closeActionModal === 'function') closeActionModal();
-      if (typeof triggerUpdate === 'function') triggerUpdate();
-      if (ovr && typeof swfOpenConfirm === 'function') swfOpenConfirm(mid, ovr);   // SAME confirm popup as ยก/แลกเวร
-    }
-    // 🔄 แลกไม้ commit — reached from the main shift picker (confirmPickShift branches here). My ไม้ →
-    //   partner (note), their whole shift → me (add). The two are pair-linked (legs[0].pairId) so
-    //   swfOpenConfirm publishes/discards them together; then reuse swfOpenConfirm for the confirm.
-    function _relayLegSwapCommit(targetKey, targetShift) {
-      var ls = actionState.legSwap; if (!ls) { if (typeof closeActionModal === 'function') closeActionModal(); return; }
-      var mid = ls.mid, a = _relayActionById(mid, ls.actionId), _actor = _relayActorName();
-      var partner = (typeof _pbHolderOf === 'function')
-        ? _pbHolderOf(targetShift, _combinedUsedMap(mid, getCurrentUser()))
-        : (targetShift.name || '');
-      if (!partner) partner = targetShift.name || '';
-      if (String(partner) === String(_actor)) { if (typeof _p2bShowToast === 'function') _p2bShowToast('เลือกเวรของคนอื่น (ไม่ใช่ของคุณเอง)', 'warn'); return; }
-      actionState.legSwap = null;
-      var _swDot = _legSwapColor(mid);   // ONE golden pair colour on both sides (pt6)
-      var ovr = a ? _relayAuthorOverride(mid, a, ls.leg, ls.fromOwner, partner, 'swap', { gotPos: String(targetShift.pos || ''), dot: _swDot }) : null;   // my ไม้ → partner
-      // their shift → me. legs[0]: pair-dot marker + pairId link to the note (both whitelisted passthrough).
-      var add = OverlayManager.addAction(mid, { action: 'add', viewerName: _actor, shiftKey: targetKey, partnerName: partner, legs: [{ __legswap: 1, dot: _swDot, from: String(partner || ''), pairId: (ovr ? ovr.id : '') }] });
-      if (typeof closeActionModal === 'function') closeActionModal();
-      if (typeof triggerUpdate === 'function') triggerUpdate();
-      var primary = ovr || add;
-      if (primary && typeof swfOpenConfirm === 'function') swfOpenConfirm(mid, primary);   // SAME confirm popup
-    }
-    // v3.45.2: giving/swapping a split shift WHOLE supersedes the split — drop the relay action
-    //   (draft → gone; published → removeAction hook pushes phxRemoveAction) so it can't linger as
-    //   stale legs on a shift that just changed hands.
-    function _relayClearForShift(mid, key) {
-      var found = _relayActionForKey(mid, key);
-      if (!found) return false;
-      var mId = String(found.id);
-      OverlayManager.removeAction(mid, found.id);
-      // v3.45.3: also drop this device's OWN leg handoffs for that master — else they'd orphan.
-      //   (Others' published notes go inert on their own once the master is gone: no master to match.)
-      try {
-        OverlayManager.load();
-        var acts = (OverlayManager._data && OverlayManager._data[mid] && OverlayManager._data[mid].actions) || [];
-        acts.slice().forEach(function (a) {
-          if (a && String(a.action || '') === 'relayleg' && Array.isArray(a.legs) && a.legs[0] && String(a.legs[0].masterId) === mId) {
-            OverlayManager.removeAction(mid, a.id);
-          }
-        });
-      } catch (e) {}
-      if (typeof invalidateGhostCache === 'function') invalidateGhostCache();
-      if (typeof _p2bShowToast === 'function') _p2bShowToast('ยกเลิกการแบ่งไม้ (ยก/สลับทั้งเวร)', 'ok');
-      return true;
-    }
-    // v3.45.2: ต่อเวร is offered only on a shift that can actually be split — a parseable time
-    //   range OR a clinic shift. When the shift is ALREADY split, the button edits the ไม้ instead.
-    function _relayMenuBtnHtml() {
-      if (!window._relayEnabled) return '';
-      const shift = actionState.shiftKey ? findShiftByKey(actionState.shiftKey) : null;
-      if (!shift) return '';
-      const mid = getCurrentMonthId();
-      const existing = _relayActionForKey(mid, actionState.shiftKey);
-      if (existing) {
-        return '<button class="act-btn" style="background:#f0fdfa; color:#0f766e; border-color:#99f6e4;" onclick="closeActionModal(); _relayEditLegs(\'' + mid + '\',\'' + existing.id + '\')">🏃 แก้ไม้ (ต่อเวร)</button>';
-      }
-      const splittable = !!_relayRangeParts(shift.range) || isSpecialClinic(shift);
-      if (!splittable) return '';
-      return '<button class="act-btn" style="background:#f0fdfa; color:#0f766e; border-color:#99f6e4;" onclick="_relayStartFromMenu()">🏃 ต่อเวร — แบ่งช่วงเวลา</button>';
-    }
-
     function renderMenuStep() {
       const shift = actionState.shiftKey ? findShiftByKey(actionState.shiftKey) : null;
       const isClinic = shift && isSpecialClinic(shift);
@@ -5924,7 +5153,6 @@ window.allPharmacistNames = [];
       return '<div class="act-prompt">ต้องการทำอะไรกับเวรนี้?</div>' +
              '<button class="act-btn act-btn-primary" onclick="actionGoTo(\'swap\')">สลับเวรกับ...</button>' +
              '<button class="act-btn act-btn-danger" onclick="actionGoTo(\'give\')">ยกเวรให้คนอื่น</button>' +
-             _relayMenuBtnHtml() +
              clinicBtn +
              '<button class="act-btn act-btn-cancel" onclick="closeActionModal()">ยกเลิก</button>';
     }
@@ -5939,28 +5167,9 @@ window.allPharmacistNames = [];
       return '<div class="act-prompt">เวรนี้คุณรับมาจากคนอื่น — ต้องการทำอะไรต่อ?</div>' +
              '<button class="act-btn act-btn-primary" onclick="actionGoTo(\'swap\')">สลับเวรนี้กับคนอื่น</button>' +
              '<button class="act-btn" style="background:#fef3c7; color:#92400e; border-color:#fcd34d;" onclick="actionGoTo(\'give\')">ยกเวรนี้ให้คนอื่น</button>' +
-             _relayMenuBtnHtml() +
              clinicBtn +
              '<button class="act-btn act-btn-danger" onclick="confirmUndo()">ยกเลิกการรับเวร</button>' +
              '<button class="act-btn act-btn-cancel" onclick="closeActionModal()">ปิด</button>';
-    }
-
-    // v3.45.2: create the first-class ต่อเวร action and open its confirm dialog. The shift
-    //   stays the viewer's — legs only say who covers which window. No partnerName here;
-    //   the leg owners ARE the counterparties.
-    function _relayStartFromMenu() {
-      const key = actionState.shiftKey;
-      const shift = key ? findShiftByKey(key) : null;
-      if (!shift) { closeActionModal(); return; }
-      if (!_relayRangeParts(shift.range) && !isSpecialClinic(shift)) {
-        if (typeof _p2bShowToast === 'function') _p2bShowToast('เวรนี้แบ่งเวลาไม่ได้ (เวลาไม่ชัดเจน)', 'warn');
-        return;
-      }
-      const mid = getCurrentMonthId();
-      const stored = OverlayManager.addAction(mid, { action: 'relay', shiftKey: key });
-      closeActionModal();
-      triggerUpdate();
-      if (stored && typeof swfOpenConfirm === 'function') swfOpenConfirm(mid, stored);
     }
 
     function renderShiftPickerShell() {
@@ -6275,8 +5484,6 @@ window.allPharmacistNames = [];
         console.error('[overlay] target not found:', targetKey);
         return;
       }
-      // v3.45.3: leg-swap reuses this picker — commit MY ไม้ ↔ THEIR whole shift, not a whole swap.
-      if (actionState.legSwap && typeof _relayLegSwapCommit === 'function') { _relayLegSwapCommit(targetKey, targetShift); return; }
       const mid = getCurrentMonthId();
       // v3.44: default "รับจาก/แลกกับ" = the shift's CURRENT holder (after gives/swaps), not the
       //   master owner — so a re-transferred shift records the real chain. Still editable in the dialog.
@@ -6292,8 +5499,6 @@ window.allPharmacistNames = [];
         _lwwTransferConfirm({ kind: 'swap', targetKey: targetKey, targetShift: targetShift, defaultFrom: _curHolder,
           onConfirm: function(fromName) {
             var stored = OverlayManager.addAction(mid, { action: 'swap', shiftKey: myKey, partnerShiftKey: targetKey, partnerName: fromName, originalOwner: mineName });
-            // v3.45.2: swapping the WHOLE shift supersedes any ต่อเวร split on it → drop the relay.
-            if (window._relayEnabled && typeof _relayClearForShift === 'function') _relayClearForShift(mid, myKey);
             closeActionModal(); triggerUpdate();
             // v3.45: transaction confirm — draft saved; เสร็จสิ้น = publish now, or keep draft
             if (stored && typeof swfOpenConfirm === 'function') swfOpenConfirm(mid, stored);
@@ -6314,8 +5519,6 @@ window.allPharmacistNames = [];
     }
 
     function confirmPickName(partnerName) {
-      // v3.45.3 pt7: leg-give reuses this name picker — commit the ไม้ handoff, not a whole give.
-      if (actionState.legGive && typeof _relayLegGiveCommit === 'function') { _relayLegGiveCommit(partnerName); return; }
       if (actionState.step === 'give' && actionState.shiftKey) {
         const mid = getCurrentMonthId();
         const _giveKey = actionState.shiftKey;
@@ -6324,8 +5527,6 @@ window.allPharmacistNames = [];
           shiftKey: _giveKey,
           partnerName: partnerName
         });
-        // v3.45.2: giving the WHOLE shift supersedes any ต่อเวร split on it → drop the relay.
-        if (window._relayEnabled && typeof _relayClearForShift === 'function') _relayClearForShift(mid, _giveKey);
         closeActionModal();
         triggerUpdate();
         // v3.45: transaction confirm — draft saved; เสร็จสิ้น = publish now, or keep draft
@@ -6495,459 +5696,9 @@ window.allPharmacistNames = [];
       if (act.action === 'give') {
         return me + ' ยก <b>' + _pbEsc(myShift ? myShift.pos : '?') + '</b> ให้ ' + partner;
       }
-      if (act.action === 'relay') {
-        var _rlN = (Array.isArray(act.legs) && act.legs.length >= 2) ? act.legs.length : null;
-        return me + ' ต่อเวร <b>' + _pbEsc(myShift ? myShift.pos : '?') + '</b>' +
-               (_rlN ? ' · แบ่งเป็น <b>' + _rlN + ' ไม้</b>' : ' · แบ่งช่วงเวลา');
-      }
-      if (act.action === 'relayleg') {
-        // v3.45.3 pt7: same voice as give/swap — "ยก <pos> (ไม้ · window) ให้ X" / "แลก <pos> (ไม้ · window) กับ <got> จาก X".
-        var p = (Array.isArray(act.legs) && act.legs[0]) ? act.legs[0] : {};
-        var win = _relayLegWindowText({ start: p.legStart, end: p.legEnd, clinic: p.legClinic });
-        var qual = 'ไม้' + (win ? ' · ' + win : '');
-        var posB = myShift ? '<b>' + _pbEsc(myShift.pos) + '</b> ' : '';
-        if (String(p.kind || '') === 'swap') {
-          var got = p.gotPos ? '<b>' + _pbEsc(p.gotPos) + '</b>' : (tgtShift ? '<b>' + _pbEsc(tgtShift.pos) + '</b>' : 'เวร');
-          return me + ' แลก ' + posB + '(' + _pbEsc(qual) + ') กับ ' + got + ' จาก ' + partner;
-        }
-        return me + ' ยก ' + posB + '(' + _pbEsc(qual) + ') ให้ ' + partner;
-      }
       return me + ' รับ <b>' + _pbEsc(tgtShift ? tgtShift.pos : '?') + '</b> จาก ' + partner;
     }
     function _swfClose() { var e = document.getElementById('swfConfirmOverlay'); if (e) e.remove(); }
-
-    // ═══ v3.45 relay-baton legs (ส่งไม้ต่อเวลา) — capture UI in the confirm dialog ═══
-    //   State lives in _swfRelay while a give-dialog is open; _relayCollect() reads it
-    //   back into a validated legs array on confirm. Flag-gated (window._relayEnabled).
-    var _swfRelay = null;
-    var _RELAY_COLORS = ['#0d9488', '#ea580c', '#7c3aed', '#db2777', '#0891b2'];   // teal · orange · violet · pink · cyan
-    function _relayLegColor(i) { return _RELAY_COLORS[i % _RELAY_COLORS.length]; }
-    // v3.45.3 pt6: a แลกไม้ pair-dot uses the SAME golden-ratio palette as a normal แลกเวร
-    //   (Klui: ทำให้เหมือนแลกเวรปกติ) — index = the count of existing swap-like actions this month,
-    //   so leg-swaps colour-cycle alongside real swaps. The resulting hex is STORED on both the
-    //   note and the add so every viewer/side reads the identical colour without recomputing.
-    function _legSwapColor(mid) {
-      var n = 0;
-      try {
-        OverlayManager.load();
-        var acts = (OverlayManager._data && OverlayManager._data[mid] && OverlayManager._data[mid].actions) || [];
-        acts.forEach(function (a) {
-          if (!a) return;
-          if (a.action === 'swap') n++;
-          else if (a.action === 'relayleg' && a.legs && a.legs[0] && a.legs[0].kind === 'swap') n++;
-        });
-      } catch (e) {}
-      return (typeof swapPairColor === 'function') ? swapPairColor(n) : '#3b82f6';
-    }
-    // v3.45.2: per-ไม้ breakdown for the timeline — "ไม้ N <คน> <ช่วง>", 2-up grid. Kept lean
-    //   (Klui: มือถือเบียด) — no "อยู่"/"ตั้งแต่" filler. Timed → "16:30-19:00"; clinic open head →
-    //   "ถึง 11:00"; open tail → "11:00 น. เป็นต้นไป".
-    function _relayLegsSummaryHtml(legs) {
-      if (!Array.isArray(legs) || legs.length < 2) return '';
-      return '<span class="tl-relay-legs">' + legs.map(function(l, i) {
-        var s = String(l.start || ''), e = String(l.end || '');
-        var when = (!s && e) ? ('ถึง ' + e)
-                 : (s && !e) ? (s + ' น. เป็นต้นไป')
-                 : (s && e) ? (s + '-' + e) : '';
-        var c = _relayLegColor(i);
-        // v3.45.3 pt4: NO "← original" hop here — this list is the original-split record (raw legs);
-        //   a ไม้ that changed hands shows as its own step + the holder line (Klui: ไม้1 ต้องเป็นชื่อเดิม).
-        return '<span class="tl-relay-leg"><span class="relay-leg-tag" style="color:' + c + '; border-color:' + c + ';">ไม้ ' + (i + 1) + '</span> ' +
-               '<b>' + _pbEsc(displayName(l.owner || '?')) + '</b>' + (when ? ' ' + _pbEsc(when) : '') + '</span>';
-      }).join(' ') + '</span>';
-    }
-    // v3.45.2: one-line summary at the top of a ต่อเวร step — "<the rest> ต่อเวรจาก <owner>"
-    //   (Klui's wording). owner = ไม้1's owner; others = the distinct remaining leg owners,
-    //   in ไม้ order.
-    function _relayHandoffSummary(legs) {
-      if (!Array.isArray(legs) || legs.length < 2) return '';
-      var owner = displayName((legs[0] && legs[0].owner) || '?');
-      var seen = {}; seen[owner] = 1; var others = [];
-      legs.forEach(function(l) { var nm = displayName((l && l.owner) || '?'); if (!seen[nm]) { seen[nm] = 1; others.push(nm); } });
-      if (!others.length) return '';
-      return '<span class="tl-relay-cont"><b>' + _pbEsc(others.join(', ')) + '</b> ต่อเวรจาก <b>' + _pbEsc(owner) + '</b></span>';
-    }
-    function _relayRangeParts(rangeStr) {
-      var m = String(rangeStr || '').replace(/\s/g, '').match(/^(\d{1,2}:\d{2})-(\d{1,2}:\d{2})$/);
-      return m ? { start: m[1], end: m[2] } : null;
-    }
-    function _relayMin(hhmm) {
-      var p = String(hhmm || '').split(':'); if (p.length < 2) return NaN;
-      var h = parseInt(p[0], 10), m = parseInt(p[1], 10);
-      return (isNaN(h) || isNaN(m)) ? NaN : h * 60 + m;
-    }
-    function _relayFmt(min) {
-      min = ((Math.round(min) % 1440) + 1440) % 1440;
-      var h = Math.floor(min / 60), m = min % 60;
-      return (h < 10 ? '0' : '') + h + ':' + (m < 10 ? '0' : '') + m;
-    }
-    function _relayMid(startMin, endMin) {      // sensible default split, rounded to 30 min
-      var mid = Math.round((startMin + endMin) / 2 / 30) * 30;
-      if (mid <= startMin) mid = startMin + 30;
-      if (mid >= endMin) mid = Math.max(startMin + 1, endMin - 30);
-      return mid;
-    }
-    function _relaySectionShellHtml() {
-      return '<div class="swf-relay" id="swfRelay">' +
-        '<div class="swf-relay-head">' +
-          '<span style="font-size:15px;">🏃</span>' +
-          '<span class="swf-relay-title">ส่งไม้ต่อเวลา</span>' +
-          '<button type="button" id="swfRelayToggle" class="swf-relay-sw" role="switch" aria-checked="false" aria-label="ส่งไม้ต่อเวลา"></button>' +
-        '</div>' +
-        '<div class="swf-relay-sub" id="swfRelaySub">เปิดเมื่อ<b>ไม่ได้อยู่เต็มเวร</b> — แบ่งเวรว่าใครอยู่ถึงกี่โมง</div>' +
-        '<div id="swfRelayBody" style="display:none;"></div>' +
-      '</div>';
-    }
-    function _relayBarHtml() {
-      if (!_swfRelay || _swfRelay.clinic) return '';   // clinic split has no time horizon → no proportion bar
-      var total = _swfRelay.endMin - _swfRelay.startMin;
-      if (total <= 0) return '';
-      var segs = '', prev = _swfRelay.startMin;
-      _swfRelay.legs.forEach(function(l, i) {
-        var endM = (i === _swfRelay.legs.length - 1) ? _swfRelay.endMin : _relayMin(l.end);
-        if (!isNaN(endM) && i !== _swfRelay.legs.length - 1 && endM <= prev) endM += 1440;   // cross-midnight leg
-        if (isNaN(endM) || endM <= prev) endM = prev;
-        var pct = Math.max(0, (endM - prev) / total * 100);
-        segs += '<div class="swf-bar-seg" style="flex:0 0 ' + pct.toFixed(2) + '%; background:' + _relayLegColor(i) + ';"><span>ไม้ ' + (i + 1) + '</span></div>';
-        prev = endM;
-      });
-      return '<div class="swf-bar">' + segs + '</div>' +
-        '<div class="swf-bar-ticks"><span>' + _pbEsc(_swfRelay.start) + '</span><span>' + _pbEsc(_swfRelay.end) + '</span></div>';
-    }
-    // v3.45: inline typeahead for a leg owner — a text box + a body-appended dropdown that
-    //   floats ABOVE the confirm dialog (no more picker-behind). Matches real name or nickname;
-    //   picking a suggestion stores the real name, free-typing an unknown name keeps it as-is.
-    function _relayOwnerTypeahead(inp, i) {
-      if (!inp || isNaN(i)) return;
-      var names = (window.allPharmacistNames || []).slice();
-      var dd = null;
-      function closeDD() { if (dd) { dd.remove(); dd = null; } }
-      function openDD() {
-        var q = (inp.value || '').trim();
-        var matched = names.filter(function(n) { return _nkNameMatches(n, q); }).slice(0, 8);
-        if (!matched.length) { closeDD(); return; }
-        if (!dd) {
-          dd = document.createElement('div');
-          dd.style.cssText = 'position:fixed; z-index:10020; background:var(--surface); border:1px solid var(--border); border-radius:8px; box-shadow:0 6px 20px rgba(0,0,0,0.18); max-height:200px; overflow-y:auto;';
-          document.body.appendChild(dd);
-        }
-        var r = inp.getBoundingClientRect();
-        dd.style.left = r.left + 'px';
-        dd.style.top = (r.bottom + 2) + 'px';
-        dd.style.width = r.width + 'px';
-        dd.innerHTML = matched.map(function(n) {
-          var d = displayName(n);
-          var sub = (d && d !== n) ? '<span style="color:var(--sub); font-size:11px; margin-left:5px;">(' + _pbEsc(n) + ')</span>' : '';
-          return '<div class="swf-leg-dd-row" data-nm="' + _pbEsc(n) + '" style="padding:9px 11px; cursor:pointer; font-size:13px; border-bottom:1px solid var(--border);">' + _pbEsc(d) + sub + '</div>';
-        }).join('');
-        Array.prototype.forEach.call(dd.querySelectorAll('.swf-leg-dd-row'), function(row) {
-          row.addEventListener('mousedown', function(e) {          // mousedown fires before blur
-            e.preventDefault();
-            var nm = row.getAttribute('data-nm');
-            if (_swfRelay && _swfRelay.legs[i]) _swfRelay.legs[i].owner = nm;
-            inp.value = displayName(nm);
-            closeDD();
-          });
-        });
-      }
-      inp.addEventListener('input', openDD);
-      inp.addEventListener('focus', openDD);
-      inp.addEventListener('blur', function() {
-        setTimeout(function() {
-          closeDD();
-          if (!_swfRelay || !_swfRelay.legs[i]) return;
-          var t = (inp.value || '').trim();
-          if (!t) { _swfRelay.legs[i].owner = ''; inp.value = ''; return; }
-          // v3.45.2: KNOWN-NAMES-ONLY (Klui: ต่อเวรไม่ควรใส่ชื่อที่ไม่มีในตาราง). Accept only an
-          //   exact real/nickname match, or a UNIQUE fuzzy match; anything else reverts the field
-          //   to the last valid owner instead of inventing a person not in the schedule.
-          var exact = names.find(function(n) { return n === t || displayName(n) === t; });
-          if (!exact) {
-            var fuzzy = names.filter(function(n) { return _nkNameMatches(n, t); });
-            if (fuzzy.length === 1) exact = fuzzy[0];
-          }
-          if (exact) {
-            _swfRelay.legs[i].owner = exact;
-            inp.value = displayName(exact);
-          } else {
-            inp.value = _swfRelay.legs[i].owner ? displayName(_swfRelay.legs[i].owner) : '';
-            if (typeof _p2bShowToast === 'function') _p2bShowToast('เลือกได้เฉพาะชื่อที่มีในตาราง', 'warn');
-          }
-        }, 150);
-      });
-    }
-    function _relayRenderLegs() {
-      if (!_swfRelay) return;
-      var body = document.getElementById('swfRelayBody');
-      if (!body) return;
-      var legs = _swfRelay.legs;
-      var clinic = !!_swfRelay.clinic;
-      if (!clinic) legs[legs.length - 1].end = _swfRelay.end;   // timed: last leg always ends at the shift end
-      // clinic (idea C): no time horizon — capture ONLY the handoff time(s); last ไม้ runs "จนจบ" (open)
-      var html = clinic
-        ? '<div class="swf-relay-clinic-hint">🕐 คลินิกพิเศษ — ใส่เฉพาะ<b>เวลาที่คนถัดไปมารับช่วง</b> ไม่ต้องรู้เวลาเริ่ม/จบ</div>'
-        : _relayBarHtml();
-      legs.forEach(function(l, i) {
-        var isLast = (i === legs.length - 1);
-        html += '<div class="swf-leg" data-leg="' + i + '">' +
-          '<span class="swf-leg-dot" style="background:' + _relayLegColor(i) + ';"></span>' +
-          '<input type="text" class="swf-leg-owner-inp" data-leg-owner="' + i + '" autocomplete="off" ' +
-            'placeholder="พิมพ์ชื่อ / ชื่อเล่น" value="' + _pbEsc(l.owner ? displayName(l.owner) : '') + '">' +
-          '<span class="swf-leg-until">' + ((clinic && isLast) ? 'อยู่ต่อ' : 'อยู่ถึง') + '</span>' +
-          (isLast
-            ? '<span class="swf-leg-time-fixed">' + (clinic ? 'จนจบ' : _pbEsc(_swfRelay.end)) + '</span>'
-            : '<input type="time" class="swf-leg-time" data-leg-time="' + i + '" value="' + _pbEsc(l.end || '') + '">') +
-          (legs.length > 2 && !isLast ? '<button type="button" class="swf-leg-del" data-leg-del="' + i + '" aria-label="ลบไม้นี้">✕</button>' : '') +
-          '</div>';
-      });
-      html += '<button type="button" class="swf-leg-add" id="swfLegAdd">+ เพิ่มไม้</button>';
-      body.innerHTML = html;
-      Array.prototype.forEach.call(body.querySelectorAll('.swf-leg-owner-inp'), function(inp) {
-        _relayOwnerTypeahead(inp, parseInt(inp.getAttribute('data-leg-owner'), 10));
-      });
-      Array.prototype.forEach.call(body.querySelectorAll('[data-leg-time]'), function(inp) {
-        inp.addEventListener('change', function() {
-          var i = parseInt(inp.getAttribute('data-leg-time'), 10);
-          _swfRelay.legs[i].end = inp.value || '';
-          _relayRenderLegs();
-        });
-      });
-      var addBtn = document.getElementById('swfLegAdd');
-      if (addBtn) addBtn.addEventListener('click', function() {
-        // clinic: new ไม้ starts with a blank handoff time (user fills it — no range to interpolate)
-        var newEnd = '';
-        if (!clinic) {
-          var ls = (legs.length >= 2) ? _relayMin(legs[legs.length - 2].end) : _swfRelay.startMin;
-          newEnd = _relayFmt(_relayMid(ls, _swfRelay.endMin));
-        }
-        legs.splice(legs.length - 1, 0, { owner: '', end: newEnd });
-        _relayRenderLegs();
-      });
-      Array.prototype.forEach.call(body.querySelectorAll('[data-leg-del]'), function(btn) {
-        btn.addEventListener('click', function() {
-          var i = parseInt(btn.getAttribute('data-leg-del'), 10);
-          if (_swfRelay.legs.length <= 2) return;
-          _swfRelay.legs.splice(i, 1);
-          _relayRenderLegs();
-        });
-      });
-    }
-    function _relayInit(action, shift, viewer, opts) {
-      opts = opts || {};
-      var wrap = document.getElementById('swfRelay');
-      if (!wrap) { _swfRelay = null; return; }
-      var parts = shift ? _relayRangeParts(shift.range) : null;
-      var startMin = parts ? _relayMin(parts.start) : NaN;
-      var endMin = parts ? _relayMin(parts.end) : NaN;
-      if (parts && !isNaN(startMin) && !isNaN(endMin) && endMin <= startMin) endMin += 1440;   // cross-midnight (e.g. 16:30-0:00)
-      var timed = !!parts && !isNaN(startMin) && !isNaN(endMin) && (endMin - startMin) >= 2;
-      // idea C: a clinic (ตรวจสอบ / ⚠️) shift has no clear head/tail. Instead of disabling the
-      //   toggle, allow a handoff-time-only split — capture just the seam time(s); the first
-      //   ไม้'s head and the last ไม้'s tail stay OPEN.
-      var clinic = !timed && !!shift && (typeof isSpecialClinic === 'function') && isSpecialClinic(shift);
-      if (!timed && !clinic) {
-        var sub = document.getElementById('swfRelaySub');
-        if (sub) sub.innerHTML = 'เวรนี้ยังแบ่งเวลาไม่ได้ (เวลาไม่ชัดเจน)';
-        var tg = document.getElementById('swfRelayToggle');
-        if (tg) { tg.disabled = true; tg.style.opacity = '0.4'; tg.style.cursor = 'default'; }
-        _swfRelay = null;
-        return;
-      }
-      var hasLegs = Array.isArray(action.legs) && action.legs.length >= 2;
-      var seed;
-      if (hasLegs) {
-        seed = action.legs.map(function(l) { return { owner: l.owner || '', end: l.end || '' }; });
-      } else if (clinic) {
-        // give: giver = ไม้1, recipient picks up "จนจบ". add/other: actor = ไม้1, ไม้2 blank.
-        //   end='' on every seed leg → the user fills the seam time; last ไม้ stays open.
-        var secondOwnerC = (String(action.action || '') === 'give') ? (action.partnerName || '') : '';
-        seed = [{ owner: viewer || '', end: '' }, { owner: secondOwnerC, end: '' }];
-      } else {
-        var mid = _relayFmt(_relayMid(startMin, endMin));
-        // give: giver keeps ไม้1, recipient = ไม้2. add/other: actor = ไม้1, ไม้2 blank (pick who covers the rest).
-        var secondOwner = (String(action.action || '') === 'give') ? (action.partnerName || '') : '';
-        seed = [{ owner: viewer || '', end: mid }, { owner: secondOwner, end: parts.end }];
-      }
-      _swfRelay = clinic
-        ? { on: hasLegs, clinic: true, legs: seed, start: null, end: null, startMin: null, endMin: null }
-        : { on: hasLegs, legs: seed, start: parts.start, end: parts.end, startMin: startMin, endMin: endMin };
-      if (clinic) {
-        var subC = document.getElementById('swfRelaySub');
-        if (subC) subC.innerHTML = 'คลินิกพิเศษ — แบ่งเวรได้โดยใส่<b>เวลาส่งไม้</b>เท่านั้น';
-      }
-      var toggle = document.getElementById('swfRelayToggle');
-      var bodyEl = document.getElementById('swfRelayBody');
-      // v3.45.2: ต่อเวร dialog — legs ARE the transaction, no on/off switch. The editor is
-      //   always open; backing out = ยกเลิกรายการ (discard the action), not a toggle.
-      if (opts.forceOn) {
-        _swfRelay.on = true;
-        if (toggle) toggle.style.display = 'none';
-        var subF = document.getElementById('swfRelaySub');
-        if (subF && !clinic) subF.innerHTML = 'แบ่งว่าใครอยู่ถึงกี่โมง — <b>เวรยังเป็นของคุณ</b> แค่มีคนมาช่วยคุมบางช่วง';
-      }
-      function paint() {
-        toggle.setAttribute('aria-checked', _swfRelay.on ? 'true' : 'false');
-        toggle.classList.toggle('on', _swfRelay.on);
-        bodyEl.style.display = _swfRelay.on ? 'block' : 'none';
-      }
-      toggle.addEventListener('click', function() {
-        if (toggle.disabled || opts.forceOn) return;
-        _swfRelay.on = !_swfRelay.on;
-        paint();
-        if (_swfRelay.on) _relayRenderLegs();
-      });
-      paint();
-      if (_swfRelay.on) _relayRenderLegs();
-    }
-    // Read the open dialog's legs back → { legs } (null = relay off) or { error }.
-    function _relayCollect() {
-      if (!_swfRelay || !_swfRelay.on) return { legs: null };
-      var legs = _swfRelay.legs;
-      if (!legs || legs.length < 2) return { error: 'ต้องมีอย่างน้อย 2 ไม้' };
-      if (_swfRelay.clinic) {
-        // idea C — handoff-time-only. Each ไม้ stores {start,end} where the seam times chain;
-        //   the FIRST ไม้'s start and the LAST ไม้'s end stay '' (open head/tail). Seams must be
-        //   present and strictly increasing. clinic:true rides along for display + all-day export.
-        var outC = [], prevC = '', prevMinC = -1;
-        for (var j = 0; j < legs.length; j++) {
-          var ownerC = (legs[j].owner || '').trim();
-          if (!ownerC) return { error: 'ไม้ ' + (j + 1) + ' ยังไม่ได้เลือกชื่อ' };
-          var lastC = (j === legs.length - 1);
-          var seam = lastC ? '' : (legs[j].end || '');
-          if (!lastC) {
-            var seamMin = _relayMin(seam);
-            if (isNaN(seamMin)) return { error: 'ไม้ ' + (j + 1) + ' ยังไม่ได้ใส่เวลาส่งไม้' };
-            if (seamMin <= prevMinC) return { error: 'เวลาส่งไม้ต้องเรียงจากน้อยไปมาก' };
-            prevMinC = seamMin;
-          }
-          outC.push({ owner: ownerC, start: prevC, end: seam, clinic: true });
-          prevC = seam;
-        }
-        var distinctC = {}; outC.forEach(function(l) { distinctC[l.owner] = 1; });
-        if (Object.keys(distinctC).length < 2) return { error: 'ต้องมีอย่างน้อย 2 คนที่ต่างกัน' };
-        return { legs: outC };
-      }
-      var prevMin = _swfRelay.startMin, out = [];
-      for (var i = 0; i < legs.length; i++) {
-        var owner = (legs[i].owner || '').trim();
-        if (!owner) return { error: 'ไม้ ' + (i + 1) + ' ยังไม่ได้เลือกชื่อ' };
-        var endMin = (i === legs.length - 1) ? _swfRelay.endMin : _relayMin(legs[i].end);
-        if (!isNaN(endMin) && i !== legs.length - 1 && endMin <= prevMin) endMin += 1440;   // cross-midnight leg
-        if (isNaN(endMin) || endMin <= prevMin) return { error: 'เวลาไม้ ' + (i + 1) + ' ต้องมากกว่าไม้ก่อนหน้า' };
-        if (endMin > _swfRelay.endMin) return { error: 'ไม้ ' + (i + 1) + ' เกินเวลาเวร' };
-        out.push({ owner: owner, start: _relayFmt(prevMin), end: _relayFmt(endMin) });
-        prevMin = endMin;
-      }
-      if (prevMin !== _swfRelay.endMin) return { error: 'ช่วงเวลารวมกันไม่ครบทั้งเวร' };
-      // a single owner covering the whole shift = not really a relay
-      var distinct = {}; out.forEach(function(l) { distinct[l.owner] = 1; });
-      if (Object.keys(distinct).length < 2) return { error: 'ต้องมีอย่างน้อย 2 คนที่ต่างกัน' };
-      return { legs: out };
-    }
-    // Persist legs onto the draft action (or clear them). Local-only until published.
-    function _relaySaveLegs(mid, actionId, legs) {
-      try {
-        OverlayManager.load();
-        var bucket = OverlayManager._data && OverlayManager._data[mid];
-        if (!bucket || !bucket.actions) return;
-        var a = bucket.actions.find(function(x) { return x.id === actionId; });
-        if (!a) return;
-        if (legs && legs.length) a.legs = legs; else delete a.legs;
-        OverlayManager.save();
-        if (typeof invalidateGhostCache === 'function') invalidateGhostCache();
-        if (typeof triggerUpdate === 'function') triggerUpdate();   // re-render so the split legs show
-      } catch (e) { console.warn('[relay] save legs failed', e); }
-    }
-
-    // ═══ v3.45 relay Stage 1d — edit legs after publish (opened from the timeline 🏃✎) ═══
-    //   Reuses the confirm-dialog leg editor (_relaySectionShellHtml + _relayInit + _relayCollect)
-    //   inside a small standalone modal. The author may edit their OWN relay even once it's public;
-    //   on save we mirror the new legs into pathBOverlays and re-sync so every viewer repaints
-    //   (the server now round-trips `legs` — see Phase_PathB_Global.js). Turning the switch OFF and
-    //   saving clears the split back to a plain whole-shift transfer.
-    function _relayEditLegs(mid, id) {
-      var viewer = (typeof _pbGetLoggedInName === 'function') ? _pbGetLoggedInName()
-                 : ((typeof getCurrentUser === 'function') ? getCurrentUser() : null);
-      OverlayManager.load();
-      var bucket = OverlayManager._data && OverlayManager._data[mid];
-      var a = (bucket && bucket.actions) ? bucket.actions.find(function(x) { return x && x.id === id; }) : null;
-      if (!a) {
-        // Not in local OverlayManager → viewer isn't the author (e.g. a leg RECIPIENT tapping
-        //   their row). Tell them why instead of a confusing "ไม่พบรายการ".
-        var _isPublicRelay = (typeof pathBOverlays !== 'undefined' && Array.isArray(pathBOverlays)) &&
-          pathBOverlays.some(function(o) { return o && String(o.actionId) === String(id); });
-        if (typeof _p2bShowToast === 'function') _p2bShowToast(_isPublicRelay ? 'แก้ไม้ได้เฉพาะเจ้าของเวร (คนที่สร้างการต่อเวร)' : 'ไม่พบรายการ', 'warn');
-        return;
-      }
-      if (a.action !== 'relay') return;   // v3.45.2: legs live only on the ต่อเวร action
-      var isAuthor = viewer && String(a.viewerName || '') === String(viewer);
-      var isAdmin = (typeof phxAuthIsAdmin === 'function' && phxAuthIsAdmin());
-      if (!isAuthor && !isAdmin) { if (typeof _p2bShowToast === 'function') _p2bShowToast('แก้ได้เฉพาะเจ้าของหรือแอดมิน', 'warn'); return; }
-      var shift = _swfResolveShift(a.shiftKey, a.viewerName || viewer);
-      if (!shift) { if (typeof _p2bShowToast === 'function') _p2bShowToast('หาเวรต้นทางไม่เจอ — แก้ไม้ไม่ได้', 'warn'); return; }
-      var wasPublic = (a._visibility !== 'draft');
-
-      _relayCloseEdit();
-      var ov = document.createElement('div');
-      ov.id = 'relayEditOverlay';
-      ov.style.cssText = 'position:fixed; inset:0; background:rgba(0,0,0,0.5); z-index:10008; display:flex; align-items:center; justify-content:center; padding:16px;';
-      var partnerLine = displayName(a.viewerName || viewer) + ' ต่อเวร <b>' + _pbEsc(shift.pos || '') + '</b> — เวรยังเป็นของเจ้าของ ปิดสวิตช์แล้วบันทึก = ยกเลิกการแบ่ง';
-      ov.innerHTML = '<div style="background:var(--surface); width:100%; max-width:440px; max-height:88vh; overflow-y:auto; border-radius:16px; padding:18px; font-family:inherit;">' +
-        '<div style="display:flex; align-items:center; gap:7px;"><div style="font-weight:700; font-size:16px;">🏃 แก้ไม้ (ส่งไม้ต่อเวลา)</div>' +
-        '<button type="button" id="relayEditX" style="margin-left:auto; border:none; background:none; color:var(--sub); font-size:18px; cursor:pointer;">✕</button></div>' +
-        '<div style="font-size:12.5px; color:var(--sub); margin:5px 0 4px;">' + partnerLine + '</div>' +
-        '<div style="font-size:11.5px; color:var(--sub); margin:0 0 4px;">' + _pbEsc(shift.date || '') + ' · ' + _pbEsc(shift.range || '') + '</div>' +
-        (wasPublic ? '<div style="font-size:11.5px; color:#b45309; background:rgba(245,158,11,0.12); border-radius:8px; padding:7px 9px; margin:6px 0;">⚠️ เวรนี้เผยแพร่แล้ว — แก้ไม้แล้วจะซิงค์ให้ทุกคนเห็นทันที</div>' : '') +
-        _relaySectionShellHtml() +
-        '<div class="swf-btns" style="margin-top:14px;">' +
-        '<button type="button" id="relayEditCancel" class="swf-btn">ยกเลิก</button>' +
-        '<button type="button" id="relayEditSave" class="swf-btn swf-primary">✓ บันทึกไม้</button>' +
-        '</div></div>';
-      document.body.appendChild(ov);
-      try { _relayInit(a, shift, a.viewerName || viewer); } catch (e) { console.warn('[relay] edit init', e); _swfRelay = null; }
-      if (!_swfRelay) { _relayCloseEdit(); if (typeof _p2bShowToast === 'function') _p2bShowToast('เวรนี้แบ่งเวลาไม่ได้', 'warn'); return; }
-
-      ov.addEventListener('click', function(e) { if (e.target === ov) _relayCloseEdit(); });
-      document.getElementById('relayEditX').addEventListener('click', _relayCloseEdit);
-      document.getElementById('relayEditCancel').addEventListener('click', _relayCloseEdit);
-      document.getElementById('relayEditSave').addEventListener('click', function() {
-        var rc = _relayCollect();                       // {legs}|{legs:null}|{error}
-        if (rc.error) { if (typeof _p2bShowToast === 'function') _p2bShowToast(rc.error, 'warn'); return; }
-        _relayCloseEdit();
-        // v3.45.2: toggle OFF + save = cancel the ต่อเวร — the shift simply reverts to its
-        //   owner in full (relay never transfers ownership, so nothing can strand anywhere).
-        //   Draft → delete outright; published → keep an inert legless record + resync so
-        //   every viewer's split disappears (relay w/o legs renders nothing by design).
-        if (!rc.legs && !wasPublic) {
-          OverlayManager.removeAction(mid, id);
-          if (typeof invalidateGhostCache === 'function') invalidateGhostCache();
-          if (typeof triggerUpdate === 'function') triggerUpdate();
-          if (typeof _p2bShowToast === 'function') _p2bShowToast('ยกเลิกต่อเวรแล้ว — เวรกลับเป็นของเจ้าของเต็มเวร', 'ok');
-          return;
-        }
-        _relaySaveLegs(mid, id, rc.legs);               // local update + triggerUpdate (rc.legs=null clears split)
-        if (wasPublic) {
-          // Public rows render from pathBOverlays (the server copy) — mirror the change for an
-          //   instant repaint, then push the upsert (debounced). Gated by window._syncPublish.
-          if (typeof pathBOverlays !== 'undefined' && Array.isArray(pathBOverlays)) {
-            pathBOverlays.forEach(function(o) {
-              if (o && String(o.actionId) === String(id)) o.legs = (rc.legs && rc.legs.length) ? rc.legs : null;
-            });
-          }
-          if (typeof invalidateGhostCache === 'function') invalidateGhostCache();
-          if (window._syncPublish && typeof _phxScheduleSync === 'function') {
-            if (typeof phxShowSyncBanner === 'function') phxShowSyncBanner('syncing', 'กำลัง sync...');
-            _phxScheduleSync();
-          }
-        }
-        if (typeof _p2bShowToast === 'function') _p2bShowToast(rc.legs ? 'แก้ไม้แล้ว' : 'ยกเลิกต่อเวรแล้ว — เวรกลับเป็นของเจ้าของเต็มเวร', 'ok');
-      });
-    }
-    function _relayCloseEdit() {
-      var e = document.getElementById('relayEditOverlay');
-      if (e) e.remove();
-      _swfRelay = null;
-    }
 
     function swfOpenConfirm(mid, action) {
       if (!action || !action.id) return;
@@ -6964,51 +5715,20 @@ window.allPharmacistNames = [];
         myShift = _swfResolveShift(action.shiftKey, viewer);
         rowsHtml = _swfRowHtml(myShift, true);
         miniLabel = 'เวรที่ยกให้';
-      } else if (kind === 'relay') {
-        // v3.45.2: ต่อเวร — the shift stays the viewer's; legs say who covers which window.
-        myShift = _swfResolveShift(action.shiftKey, viewer);
-        rowsHtml = _swfRowHtml(myShift, true);
-        miniLabel = 'เวรที่แบ่งช่วงเวลา';
-      } else if (kind === 'relayleg') {
-        // v3.45.3 pt7: ยก/แลกไม้ confirm — reuse the SAME popup as แลก/ยกเวร (Klui #2). myShift =
-        //   the split's master shift; for แลก also show the whole shift received (the paired add).
-        var _legP = (Array.isArray(action.legs) && action.legs[0]) ? action.legs[0] : {};
-        myShift = _swfResolveShift(action.shiftKey, viewer);
-        rowsHtml = _swfRowHtml(myShift, true);
-        if (String(_legP.kind || '') === 'swap') {
-          var _pairAdd = null;
-          try {
-            OverlayManager.load();
-            var _acts = (OverlayManager._data && OverlayManager._data[mid] && OverlayManager._data[mid].actions) || [];
-            _pairAdd = _acts.find(function (x) { return x && x.action === 'add' && Array.isArray(x.legs) && x.legs[0] && String(x.legs[0].pairId) === String(action.id); });
-          } catch (e) {}
-          tgtShift = _pairAdd ? _swfResolveShift(_pairAdd.shiftKey, viewer) : null;
-          if (tgtShift) rowsHtml += _swfRowHtml(tgtShift, true);
-          miniLabel = 'ไม้ที่ยกให้ + เวรที่ได้มา';
-        } else {
-          miniLabel = 'เวร (ไม้) ที่ยกให้';
-        }
       } else {  // add
         tgtShift = _swfResolveShift(action.shiftKey, action.partnerName || '');
         rowsHtml = _swfRowHtml(tgtShift, false);
         miniLabel = 'เวรที่รับมา';
       }
-      var _legKind = (kind === 'relayleg' && Array.isArray(action.legs) && action.legs[0]) ? String(action.legs[0].kind || 'give') : '';
       var title = kind === 'swap' ? '🔄 ยืนยันการแลกเวร'
                 : (kind === 'give' ? '🎁 ยืนยันการยกเวร'
-                : (kind === 'relay' ? '🏃 ยืนยันการต่อเวร'
-                : (kind === 'relayleg' ? (_legKind === 'swap' ? '🔄 ยืนยันการแลกไม้' : '🎁 ยืนยันการยกไม้')
-                : '🤝 ยืนยันการรับเวร')));
+                : '🤝 ยืนยันการรับเวร');
       var tableHtml = rowsHtml
         ? '<div class="swf-mini-label">' + miniLabel + '</div>' +
           '<div class="swf-tbl-wrap"><table class="swf-tbl">' +
           '<thead><tr><th>วันที่</th><th>ชื่อเภสัชกร</th><th>ตำแหน่ง</th><th>รอบเวลา</th></tr></thead>' +
           '<tbody>' + rowsHtml + '</tbody></table></div>'
         : '';
-      // v3.45.2: the leg editor belongs to the first-class ต่อเวร action ONLY. give/add/swap
-      //   never carry legs any more — a split shift is its own transaction, so cancelling it
-      //   can't strand the whole shift with a partner (the bug that motivated the split-out).
-      var relayHtml = (window._relayEnabled && kind === 'relay') ? _relaySectionShellHtml() : '';
       var ov = document.createElement('div');
       ov.id = 'swfConfirmOverlay';
       ov.style.cssText = 'position:fixed; inset:0; background:rgba(0,0,0,0.5); z-index:10005; display:flex; align-items:center; justify-content:center; padding:16px;';
@@ -7018,7 +5738,6 @@ window.allPharmacistNames = [];
         '<div style="font-size:12px; color:var(--sub); margin:3px 0 12px; text-align:center;">ตรวจสอบก่อนเผยแพร่ให้ทุกคนเห็น</div>' +
         '<div class="swf-summary">' + _swfSummaryHtml(action, viewer, myShift, tgtShift) + '</div>' +
         tableHtml +
-        relayHtml +
         '<div class="swf-draft-note">💾 <div>บันทึกเป็น <b>ฉบับร่าง</b> ไว้แล้ว — เน็ตหลุดก็ไม่หาย กด <b>"เสร็จสิ้น"</b> เพื่อเผยแพร่ให้คนอื่นเห็น</div></div>' +
         '<div class="swf-btns">' +
         '<button type="button" id="swfKeep" class="swf-btn">เก็บร่างไว้ก่อน</button>' +
@@ -7027,19 +5746,6 @@ window.allPharmacistNames = [];
         '<button type="button" id="swfDiscard" class="swf-link-cancel">ยกเลิกรายการนี้ (ทิ้งร่าง)</button>' +
         '</div>';
       document.body.appendChild(ov);
-      // v3.45.2: wire the leg editor (ต่อเวร only + flag on) after the dialog is in the DOM.
-      //   forceOn — the whole point of a relay action is its legs, so no on/off switch here.
-      if (window._relayEnabled && kind === 'relay') {
-        try { _relayInit(action, myShift, viewer, { forceOn: true }); } catch (e) { console.warn('[relay] init', e); _swfRelay = null; }
-        if (!_swfRelay) {
-          // shift turned out unsplittable (shouldn't happen — menu pre-checks) → drop the draft
-          _swfClose();
-          OverlayManager.removeAction(mid, action.id);
-          if (typeof triggerUpdate === 'function') triggerUpdate();
-          if (typeof _p2bShowToast === 'function') _p2bShowToast('เวรนี้แบ่งเวลาไม่ได้', 'warn');
-          return;
-        }
-      } else { _swfRelay = null; }
       // ✕ / tap outside / "เก็บร่างไว้ก่อน" — draft stays (already saved); the
       //   pending-drafts popup reminds on the next edit-mode entry.
       ov.addEventListener('click', function(e) { if (e.target === ov) _swfClose(); });
@@ -7048,28 +5754,12 @@ window.allPharmacistNames = [];
         // Keeping a draft is friction-free: valid legs are saved; incomplete legs stay as
         //   they were on the draft (resume later) — an ownerless/lopsided split never publishes
         //   anyway because swfDone re-validates.
-        if (window._relayEnabled && kind === 'relay') {
-          var rc = _relayCollect();
-          if (!rc.error && rc.legs) _relaySaveLegs(mid, action.id, rc.legs);
-          _swfClose();
-          if (typeof _p2bShowToast === 'function') _p2bShowToast(rc.error ? 'เก็บร่างต่อเวรไว้ (ยังแบ่งไม่ครบ — กลับมาแก้ได้)' : 'เก็บร่างต่อเวรไว้แล้ว', 'ok');
-          return;
-        }
         _swfClose();
         if (typeof _p2bShowToast === 'function') _p2bShowToast('เก็บเป็นร่างแล้ว — ยังไม่เผยแพร่', 'ok');
       });
       document.getElementById('swfDone').addEventListener('click', function() {
-        // Publishing a ต่อเวร requires complete legs — read them BEFORE closing (needs the DOM).
-        var relayLegs = null;
-        if (window._relayEnabled && kind === 'relay') {
-          var rc = _relayCollect();
-          if (rc.error) { if (typeof _p2bShowToast === 'function') _p2bShowToast(rc.error, 'warn'); return; }
-          if (!rc.legs) { if (typeof _p2bShowToast === 'function') _p2bShowToast('ต้องแบ่งอย่างน้อย 2 ไม้ก่อนเผยแพร่', 'warn'); return; }
-          relayLegs = rc.legs;
-        }
         var bound = (typeof _pbGetLoggedInName === 'function') ? _pbGetLoggedInName() : null;
         _swfClose();
-        if (window._relayEnabled && kind === 'relay') _relaySaveLegs(mid, action.id, relayLegs);
         if (!bound) {
           if (typeof _p2bShowToast === 'function') _p2bShowToast('ต้อง login ก่อนเผยแพร่ — บันทึกร่างไว้แล้ว', 'warn');
           return;
@@ -7078,12 +5768,7 @@ window.allPharmacistNames = [];
       });
       document.getElementById('swfDiscard').addEventListener('click', function() {
         _swfClose();
-        // v3.45.3 pt7: a แลกไม้ draft is TWO linked actions (note + add) — discard removes both.
-        if (kind === 'relayleg' && typeof _collectConnectedChain === 'function') {
-          _collectConnectedChain(mid, action.id).forEach(function(x) { OverlayManager.removeAction(mid, x); });
-        } else {
-          OverlayManager.removeAction(mid, action.id);
-        }
+        OverlayManager.removeAction(mid, action.id);
         if (typeof triggerUpdate === 'function') triggerUpdate();
         if (typeof _p2bShowToast === 'function') _p2bShowToast('ทิ้งร่างแล้ว', 'ok');
       });
@@ -7095,7 +5780,7 @@ window.allPharmacistNames = [];
     function _swfActionShifts(act) {
       var viewer = act.viewerName || getCurrentUser() || '';
       if (act.action === 'swap') return { my: _swfResolveShift(act.shiftKey, viewer), tgt: _swfResolveShift(act.partnerShiftKey, viewer) };
-      if (act.action === 'give' || act.action === 'relay' || act.action === 'relayleg') return { my: _swfResolveShift(act.shiftKey, viewer), tgt: null };   // relayleg: shiftKey = master shift
+      if (act.action === 'give') return { my: _swfResolveShift(act.shiftKey, viewer), tgt: null };
       return { my: null, tgt: _swfResolveShift(act.shiftKey, act.partnerName || '') };
     }
     function swfShowPendingDrafts() {
@@ -8675,9 +7360,7 @@ window.allPharmacistNames = [];
         const _shiftKey = _isGhost ? i._ghostKey : makeShiftKey(i);
         const _used = _usedMap[_shiftKey] || _pbUsedMap[_shiftKey];  // v13/v3.41
         const _isOwn = !_isGhost && i.name === _curUser;
-        // pt8: a struck ไม้ row has a synthetic (sub-window) key not in rawData → NOT tappable as a
-        //   shift (its ▶ chevron opens the relay timeline, where the hop can be cancelled instead).
-        const _tappable = editModeActive && !i._relayStruck && (_isOwn || _isGhost || !!_used);
+        const _tappable = editModeActive && (_isOwn || _isGhost || !!_used);
         let badge = "badge-other"; let s = i.shift.toLowerCase();
         if (s.includes("⚠️")) badge = "badge-purple";
         else if (s.includes("กลางวัน") || s.includes("เช้า")) badge = "badge-day";
@@ -8690,17 +7373,7 @@ window.allPharmacistNames = [];
         let displayFormat = "";
 
         if (timeRange === "ตรวจสอบ") {
-          // v3.45.2: a clinic ไม้ shows its handoff window IN the time column ("ถึง 01:13" /
-          //   "01:13 เป็นต้นไป") — visible without hover (Klui: no-hover machines), and still
-          //   opens the clinic note on tap like the plain "ตรวจสอบ" badge it replaces.
-          let _clinicTxt = 'ตรวจสอบ';
-          if (i._relayLeg && i._relayLeg.clinic) {
-            const _cs = i._relayLeg.start, _ce = i._relayLeg.end;
-            _clinicTxt = (!_cs && _ce) ? ('ถึง ' + _ce)
-                       : (_cs && !_ce) ? (_cs + ' เป็นต้นไป')
-                       : (_cs && _ce) ? (_cs + '–' + _ce) : 'ตรวจสอบ';
-          }
-          displayFormat = `<span class="inline-flex items-center justify-center text-purple-700 font-bold text-[9px]" data-phx-note-trigger="1" data-phx-note-date="${encodeURIComponent(i.date || '')}" data-phx-note-pos="${encodeURIComponent(i.pos || '')}" style="cursor:pointer; text-decoration:underline; text-underline-offset:2px;">${_clinicTxt}</span>`;
+          displayFormat = `<span class="inline-flex items-center justify-center text-purple-700 font-bold text-[9px]" data-phx-note-trigger="1" data-phx-note-date="${encodeURIComponent(i.date || '')}" data-phx-note-pos="${encodeURIComponent(i.pos || '')}" style="cursor:pointer; text-decoration:underline; text-underline-offset:2px;">ตรวจสอบ</span>`;
         } else if (shiftName && timeRange) {
           displayFormat = `<span class="font-bold tracking-tight">${shiftName}</span><span class="font-light opacity-90 tracking-tighter ml-1">${timeRange}</span>`;
         } else if (shiftName) {
@@ -8716,30 +7389,7 @@ window.allPharmacistNames = [];
         //      full details in expandable timeline.
         // v3.42.8: per-row hash makes swap-partner and bilateral-ghost aids unique
         const _rowUniq = _rowAidHash(_shiftKey, i.name);
-        // v3.45.2: ไม้ chip moved from the time badge to HERE — grouped with the pair-dot +
-        //   chevron so all "this row relates to a transaction" cues sit in one spot (Klui's
-        //   grouping call). Leg-colour dot + ไม้ N chip + ▶ opening the relay timeline.
-        if (i._relayLeg && i._relayLeg.actionId) {
-          const _legC = _relayLegColor(i._relayLeg.i - 1);
-          const _legUniq = _rowAidHash(_shiftKey, i.name + '#ไม้' + i._relayLeg.i);
-          _overlayActionId = i._relayLeg.actionId;
-          // v3.45.2: no color dot — the ไม้ chip is already colour-coded (Klui: ไม่ต้องมีตุ่มสี),
-          //   which also relieves the crowding on mobile.
-          // v3.45.3 pt6: EXCEPTION — a ไม้ received via แลกไม้ shows the golden swap pair-dot (same
-          //   as the giver's received whole shift) so both halves of the trade are visibly a pair.
-          const _legSwapDot = i._relayLeg.swapDot ? `<span class="swap-pair-dot" style="background:${i._relayLeg.swapDot}" title="ได้ไม้นี้จากการแลกเวร"></span>` : '';
-          _suffix = `${_legSwapDot}<span class="relay-leg-tag" style="color:${_legC}; border-color:${_legC};">ไม้ ${i._relayLeg.i}</span>` +
-                    `<span class="tl-chevron" data-tl-toggle="${i._relayLeg.actionId}__src_${_legUniq}" title="ดูประวัติ">▶</span>`;
-        } else if (i._relayStruck && i._relayStruck.actionId) {
-          // v3.45.3 pt8: the giver's STRUCK ไม้ row — mirrors a normal ยก/แลกเวร source row (strike
-          //   + swap pair-dot for แลก). ไม้ chip + ▶ open the same relay timeline.
-          const _rsC = _relayLegColor(i._relayStruck.i - 1);
-          const _rsUniq = _rowAidHash(_shiftKey, i.name + '#ไม้x' + i._relayStruck.i);
-          _overlayActionId = i._relayStruck.actionId;
-          const _rsDot = i._relayStruck.dot ? `<span class="swap-pair-dot" style="background:${i._relayStruck.dot}" title="แลกไม้นี้ไป"></span>` : '';
-          _suffix = `${_rsDot}<span class="relay-leg-tag" style="color:${_rsC}; border-color:${_rsC};">ไม้ ${i._relayStruck.i}</span>` +
-                    `<span class="tl-chevron" data-tl-toggle="${i._relayStruck.actionId}__src_${_rsUniq}" title="ดูประวัติ">▶</span>`;
-        } else if (_used) {
+        if (_used) {
           const dot = _used.color ? `<span class="swap-pair-dot" style="background:${_used.color}"></span>` : '';
           _overlayActionId = _used.actionId;
           // v3.42.9: pass _pbSide so partner-side swap rows resolve to correct "current holder"
@@ -8753,10 +7403,6 @@ window.allPharmacistNames = [];
             const gc = OverlayManager.getSwapColor(_mid, _curUser, i._ghostActionId)
                     || (typeof PBOverlays !== 'undefined' ? PBOverlays.getSwapColor(i._ghostActionId) : null);
             if (gc) ghostDot = `<span class="swap-pair-dot" style="background:${gc}"></span>`;
-          } else if (i._legSwapDot) {
-            // v3.45.3: a whole shift received by TRADING A ไม้ (leg-swap) — dot it like a normal swap
-            //   so it's findable (Klui: หายาก). Tinted to the ไม้ traded; title names the counterpart.
-            ghostDot = `<span class="swap-pair-dot" style="background:${i._legSwapDot}" title="ได้มาจากการแลกไม้${i._legSwapFrom ? ' กับ ' + i._legSwapFrom : ''}"></span>`;
           }
           _overlayActionId = i._ghostActionId;
           const chev = i._ghostActionId
@@ -8767,18 +7413,16 @@ window.allPharmacistNames = [];
         const _pencil = (editModeActive && _isOwn && !_used) ? '<span class="inline-pencil">✎</span>' : '';
         // v3.43: dashed strike when the action behind this strikethrough is still a draft.
         //   Only the author's OverlayManager holds drafts, so _isActionDraft returns true only in their session.
-        const _strikeActionId = _used ? _used.actionId : (i._relayStruck ? i._relayStruck.actionId : (_isGhost ? i._ghostActionId : null));
+        const _strikeActionId = _used ? _used.actionId : (_isGhost ? i._ghostActionId : null);
         const _isDraftLocal = _strikeActionId ? _isActionDraft(_strikeActionId) : false;
-        const _strike = (_used || i._relayStruck) ? (_isDraftLocal ? 'shift-line-through-draft' : 'shift-line-through') : '';   // pt8: struck ไม้ row
+        const _strike = _used ? (_isDraftLocal ? 'shift-line-through-draft' : 'shift-line-through') : '';
         // v3.44: inline publish button removed — publishing is centralized in the single
         //   "🌐 เผยแพร่" FAB modal (openPublishModal). Draft rows still render with the dashed
         //   strike (_isDraftLocal / shift-draft above) so the author can still spot unpublished rows.
         const _pubInline = '';
         const _nameBase = i.isNew ? 'text-orange-600 font-bold leading-none' : 'text-blue-900 font-bold leading-none';
-        // v3.45.2: relay leg rows use a wrap-friendly variant (see .col-name-wrap--relay CSS)
-        const _isRelayLegRow = !!(i._relayLeg && i._relayLeg.actionId) || !!(i._relayStruck && i._relayStruck.actionId);   // pt8: struck ไม้ row wraps like a leg row
-        const _cnwCls = _isRelayLegRow ? 'col-name-wrap col-name-wrap--relay' : 'col-name-wrap';
-        const _ncwLeft = _isRelayLegRow ? '' : '<span class="ncw-left"></span>';
+        const _cnwCls = 'col-name-wrap';
+        const _ncwLeft = '<span class="ncw-left"></span>';
         const nameDisplay = `<span class="${_cnwCls}">${_ncwLeft}<span class="ncw-center"><span class="${_nameBase} ${_strike}">${i.isNew?'⚠️ ':''}${displayName(i.name)}</span>${_pencil}${_pubInline}</span><span class="ncw-right">${_suffix}</span></span>`;
         let _ghostCls = '';
         if (_isGhost) {
@@ -8790,21 +7434,11 @@ window.allPharmacistNames = [];
         if (_isGhost && _isDraftLocal) _ghostCls += ' shift-draft';
         const _rowClasses = [
           'bg-white hover:bg-gray-50 border-b border-gray-100 transition-all',
-          (_used || i._relayStruck) ? 'shift-used' : '',
+          _used ? 'shift-used' : '',
           _ghostCls,
           _tappable ? 'shift-row-tappable' : ''
         ].filter(Boolean).join(' ');
         const _dataAttr = _tappable ? ` data-shift-key="${encodeURIComponent(_shiftKey)}"` : '';
-        // v3.45: a relay leg-row has no real master shift key (its range is a sub-window), so the
-        //   normal tap path can't resolve it — carry the action id so a tap opens the leg editor.
-        // v3.45.3: also carry the ไม้ identity (index + window + current owner) so the tap can open
-        //   the leg-level ยก/แลก menu for THIS ไม้ (not the whole shift).
-        const _relayAttr = (editModeActive && i._relayLeg && i._relayLeg.actionId)
-          ? ` data-relay-actid="${encodeURIComponent(i._relayLeg.actionId)}" data-relay-mid="${encodeURIComponent(_mid)}"` +
-            ` data-relay-legi="${i._relayLeg.i}" data-relay-legstart="${encodeURIComponent(i._relayLeg.start||'')}"` +
-            ` data-relay-legend="${encodeURIComponent(i._relayLeg.end||'')}" data-relay-legclinic="${i._relayLeg.clinic?1:0}"` +
-            ` data-relay-legowner="${encodeURIComponent(i.name||'')}"`
-          : '';
         // Patch ZZ3 / PB-1b: VIEW mode trigger ATTACHED to POS cell only — avoids covering chevron timeline
         const _isHospital = i.room && i.room !== 'clinic';
         const _isClinic = i.room === 'clinic' || timeRange === 'ตรวจสอบ' || (i.shift && i.shift.indexOf('⚠️') >= 0);
@@ -8814,9 +7448,9 @@ window.allPharmacistNames = [];
         } else if (_isClinic) {
           _posAttrs = ` data-phx-note-trigger="1" data-phx-note-date="${encodeURIComponent(i.date || '')}" data-phx-note-pos="${encodeURIComponent(i.pos || '')}" style="cursor:pointer;"`;
         }
-        return `<tr class="${_rowClasses}" style="font-size: var(--table-font-size);"${_dataAttr}${_relayAttr}>
+        return `<tr class="${_rowClasses}" style="font-size: var(--table-font-size);"${_dataAttr}>
           <td class="px-0.5 py-1.5 font-semibold text-gray-600 align-middle text-center whitespace-nowrap ${_strike}">${i.date}</td>
-          <td class="px-1 py-1.5 align-middle col-name leading-tight${_isRelayLegRow ? ' col-name--relay' : ''}">${nameDisplay}</td>
+          <td class="px-1 py-1.5 align-middle col-name leading-tight">${nameDisplay}</td>
           <td class="px-0.5 py-1.5 pl-5 text-center font-bold text-gray-800 align-middle whitespace-nowrap ${_strike}"${_posAttrs}>${i.pos}</td>
           <td class="px-0.5 py-1.5 text-center align-middle whitespace-nowrap">
             <div class="inline-flex items-center justify-center ${badge} px-1.5 py-1 rounded font-bold shadow-2xs whitespace-nowrap text-center box-border leading-none ${_strike}">
@@ -8834,10 +7468,7 @@ window.allPharmacistNames = [];
         const _usedX = _usedMap[_shiftKeyX] || _pbUsedMap[_shiftKeyX];
         const _rowUniqX = _rowAidHash(_shiftKeyX, i.name);
         let _aid = null;
-        // v3.45.2: relay leg-rows carry their own chevron (suffix above) — same '#ไม้N' salt so
-        //   the toggle id matches, and same-owner non-adjacent legs can't collide.
-        if (i._relayLeg && i._relayLeg.actionId) _aid = i._relayLeg.actionId + '__src_' + _rowAidHash(_shiftKeyX, i.name + '#ไม้' + i._relayLeg.i);
-        else if (_usedX) _aid = _usedX.actionId + '__src_' + _rowUniqX;
+        if (_usedX) _aid = _usedX.actionId + '__src_' + _rowUniqX;
         else if (_isGhostX && i._ghostActionId) _aid = i._ghostActionId + '__ghost_' + _rowUniqX;
         if (_aid) {
           // v3.42.9: also stash _pbSide on the row so rebuild-on-expand can pass it through
@@ -9069,7 +7700,7 @@ window.allPharmacistNames = [];
           const _calKey = _isGhostBadge ? s._ghostKey : makeShiftKey(s);
           const _calUsed = _calUsedMap[_calKey] || _calPBUsedMap[_calKey];  // v13/v3.41
           let _calExtraCls = '';
-          if (_calUsed || s._relayStruck) _calExtraCls = ' cal-badge-used';   // pt8: giver's struck ไม้ badge
+          if (_calUsed) _calExtraCls = ' cal-badge-used';
           else if (_isGhostBadge) {
             if (s._conflict === 'overlap') _calExtraCls = ' cal-badge-overlap';
             else if (s._conflict === 'adjacent') _calExtraCls = ' cal-badge-adjacent';
@@ -9087,9 +7718,6 @@ window.allPharmacistNames = [];
             _pairColor = OverlayManager.getSwapColor(_calMid, getCurrentUser(), s._ghostActionId)
                       || (typeof PBOverlays !== 'undefined' ? PBOverlays.getSwapColor(s._ghostActionId) : null);
           }
-          else if (_isGhostBadge && s._legSwapDot) _pairColor = s._legSwapDot;   // v3.45.3: leg-swap receive → dot
-          else if (s._relayLeg && s._relayLeg.swapDot) _pairColor = s._relayLeg.swapDot;   // v3.45.3 pt6: ไม้ received via แลกไม้
-          else if (s._relayStruck && s._relayStruck.dot) _pairColor = s._relayStruck.dot;   // v3.45.3 pt8: giver's struck ไม้ (แลก)
           if (_pairColor) _calDot = `<span class="cal-pair-dot" style="background:${_pairColor}"></span>`;
           // Patch ZZ3: VIEW mode trigger — hospital → Phase J, clinic → clinic note
           const _isHospitalBadge = s.room && s.room !== 'clinic';
@@ -9100,14 +7728,7 @@ window.allPharmacistNames = [];
           } else if (_isClinicBadge) {
             _badgeAttrs = ` data-phx-note-trigger="1" data-phx-note-date="${encodeURIComponent(s.date || '')}" data-phx-note-pos="${encodeURIComponent(s.pos || '')}" style="cursor:pointer;"`;
           }
-          // v3.45.2 relay: a split (ต่อเวร) leg badge shows "(ไม้ n)" on its OWN second line under
-          //   the pos code (Klui: the runner glyph was too small), tinted with the leg colour. On a
-          //   person's own calendar each shift shows only THEIR single leg, so the n is enough.
-          let _calLegSub = '';
-          if (s._relayLeg && typeof _relayLegColor === 'function') {
-            _calLegSub = `<span class="cal-leg-sub" style="color:${_relayLegColor(s._relayLeg.i - 1)}" title="ต่อเวร · ไม้ ${s._relayLeg.i}/${s._relayLeg.of}">(ไม้ ${s._relayLeg.i})</span>`;
-          }
-          return `<div class="cal-badge ${bc}${_calExtraCls}"${_badgeAttrs}>${_calDot}<span class="cal-text">${s.pos}</span>${_calLegSub}</div>`;
+          return `<div class="cal-badge ${bc}${_calExtraCls}"${_badgeAttrs}>${_calDot}<span class="cal-text">${s.pos}</span></div>`;
         }).join('');
 
         const dow = new Date(cell.yr, cell.mon - 1, day).getDay();
@@ -10025,8 +8646,6 @@ async function _exportCalendarPDF_v2(personList) {
       var cal = document.getElementById('fontSizeDisplay');
       if (tbl) tbl.innerText = currentTableFontSize.toFixed(1);
       if (cal) cal.innerText = currentFontSize.toFixed(1);
-      // v3.45.2: reflect the current (per-device) relay flag on the toggle each time it opens
-      var _rt = document.getElementById('relayModeToggle'); if (_rt) _rt.checked = !!window._relayEnabled;
       // B2: load backup email when popup opens
       if (!p.classList.contains('hidden') && typeof phxLoadBackupEmail === 'function') {
         phxLoadBackupEmail();
@@ -12727,21 +11346,6 @@ table.exp-tbl .tm{margin-left:3px;opacity:0.75;}
         ? buildGhostRows(rawData || [], mid, person).filter(function(g) { return !usedMap[g._ghostKey]; })
         : [];
       let shifts = ownShifts.concat(ghosts);
-      // v3.45 relay: export ไม้ too. _relayExpand replaces a legged shift's anchor with per-ไม้
-      //   rows — incl. the giver's KEPT ไม้ that usedMap dropped from ownShifts. Re-expand the
-      //   FULL picture (rawData + this person's ghosts) and keep only THIS person's rows/legs.
-      //   Same formula as the leg-aware banner count. Flag OFF → _relayExpand is a no-op → shifts
-      //   stays exactly ownShifts+ghosts (zero change to the default export).
-      try {
-        if (window._relayEnabled && typeof _relayExpand === 'function') {
-          shifts = _relayExpand((rawData || []).concat(ghosts), mid).filter(function(s) {
-            if (!s || s.name !== person) return false;
-            if (s._relayLeg) return true;
-            var _k = s._ghost ? s._ghostKey : makeShiftKey(s);
-            return !usedMap[_k];
-          });
-        }
-      } catch (e) { console.warn('[ICS] relay leg-expand skipped', e); }
 
       // Patch ZZ2: filter by selected shift keys (per-shift selection)
       if (selectedShifts && selectedShifts.size > 0) {
@@ -12898,32 +11502,14 @@ table.exp-tbl .tm{margin-left:3px;opacity:0.75;}
             } else {
               uid = 'sirx-' + year + '-' + pad(month) + pad(day) + '-' + safePosForUid(s.pos) + '@siriraj-rx-shift';
             }
-            // v3.45.2: two ไม้ of one shift share date+pos — salt the UID per leg so both events
-            //   can coexist in one calendar account (else last-import wins).
-            if (s._relayLeg) uid = uid.replace('@', '-l' + s._relayLeg.i + '@');
             let summary = (s.pos || '') + ' คลินิกพิเศษ';
             if (s._ghost && s._ghostPartnerName) {
               summary += ' จาก ' + stripPrefix(s._ghostPartnerName);
             }
-            // v3.45 clinic-split (idea C): a clinic ไม้ stays all-day (no clear head/tail) but
-            //   carries a note about the handoff seam. v3.45.2: NAME the neighbours — Klui:
-            //   "ต้องมีชื่อคนแบ่งไม้ไว้ด้วย จะได้รู้ว่าใครมาต่อเรา หรือเราไปต่อใคร".
-            let _rlNote = null;
-            if (s._relayLeg && s._relayLeg.clinic) {
-              summary += ' · ไม้ ' + s._relayLeg.i + '/' + s._relayLeg.of;
-              const _rs = s._relayLeg.start, _re = s._relayLeg.end;
-              const _rlPrev = s._relayLeg.prevOwner ? stripPrefix(s._relayLeg.prevOwner) : '';
-              const _rlNext = s._relayLeg.nextOwner ? stripPrefix(s._relayLeg.nextOwner) : '';
-              _rlNote = (!_rs && _re) ? ('แบ่งเวร — อยู่ช่วงแรก ' + (_rlNext || 'มีคน') + ' มาต่อเวลา ' + _re)
-                      : (_rs && !_re) ? ('แบ่งเวร — มารับต่อจาก ' + (_rlPrev || 'คนก่อน') + ' เวลา ' + _rs + ' แล้วอยู่จนจบ')
-                      : (_rs && _re) ? ('แบ่งเวร — อยู่ช่วง ' + _rs + '–' + _re + ' (รับต่อจาก ' + (_rlPrev || 'คนก่อน') + ' · ' + (_rlNext || 'มีคน') + ' มาต่อ)')
-                      : null;
-            }
             let descLines = [
               'เภสัชกร: ' + cleanPerson,
               'ตำแหน่ง: ' + (s.pos || ''),
-              _rlNote ? ('หมายเหตุ: ' + _rlNote + ' — โปรดตรวจสอบเวลาทำงานในระบบ')
-                      : 'หมายเหตุ: เวรคลินิกพิเศษ — โปรดตรวจสอบเวลาทำงานในระบบ'
+              'หมายเหตุ: เวรคลินิกพิเศษ — โปรดตรวจสอบเวลาทำงานในระบบ'
             ];
             if (s._ghost) {
               if (s._ghostType === 'swap' && s._ghostPartnerName) {
@@ -12983,9 +11569,6 @@ table.exp-tbl .tm{margin-left:3px;opacity:0.75;}
             uid = 'sirx-' + year + '-' + pad(month) + pad(day) + '-' + safePosForUid(s.pos) + '@siriraj-rx-shift';
           }
 
-          // v3.45.2: per-leg UID salt — two ไม้ of one shift share date+pos (see clinic branch)
-          if (s._relayLeg) uid = uid.replace('@', '-l' + s._relayLeg.i + '@');
-
           const shiftTypeLabel = normalizeShiftType(s.shift);
           // v3.28: SUMMARY = <pos> <shift_type> + ' จาก <partner>' for all ghosts with partner
           //         (both swap and add types have partner — 'add' = taking on someone's shift)
@@ -12993,7 +11576,6 @@ table.exp-tbl .tm{margin-left:3px;opacity:0.75;}
           if (s._ghost && s._ghostPartnerName) {
             summary += ' จาก ' + stripPrefix(s._ghostPartnerName);
           }
-          if (s._relayLeg) summary += ' · ไม้ ' + s._relayLeg.i + '/' + s._relayLeg.of;
 
           // DESCRIPTION: clean format like preferred file
           let descLines = [
@@ -13008,13 +11590,6 @@ table.exp-tbl .tm{margin-left:3px;opacity:0.75;}
               descLines.push('รับจาก: ' + stripPrefix(s._ghostPartnerName));
             }
             // No partner name → no extra description line (no "เพิ่มเอง" text)
-          }
-          // v3.45.2: timed ไม้ — name the neighbours (ใครมาต่อเรา / เราไปต่อใคร)
-          if (s._relayLeg) {
-            const _rlP = s._relayLeg.prevOwner ? stripPrefix(s._relayLeg.prevOwner) : '';
-            const _rlX = s._relayLeg.nextOwner ? stripPrefix(s._relayLeg.nextOwner) : '';
-            if (_rlP) descLines.push('รับต่อจาก: ' + _rlP + (s._relayLeg.start ? ' (เวลา ' + s._relayLeg.start + ')' : ''));
-            if (_rlX) descLines.push('ส่งต่อให้: ' + _rlX + (s._relayLeg.end ? ' (เวลา ' + s._relayLeg.end + ')' : ''));
           }
           if (isClinic(s)) {
             descLines.push('หมายเหตุ: โปรดตรวจสอบเวลาการทำงานอีกครั้ง');
