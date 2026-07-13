@@ -2808,19 +2808,9 @@ window.allPharmacistNames = [];
       try {
         const mid = getCurrentMonthId();
         const user = getCurrentUser();
-        // v3.47: the joint map is authoritative for co-owned shifts. For each ACTIVE joint we
-        //   suppress the underlying master/ghost row (returned array ONLY — never touch rawData,
-        //   which findShiftByKey/getShiftIndex + the synth's own base-resolve still read) and
-        //   replace it with one synth row per CURRENT member. This makes ownership follow the party:
-        //   the original owner's row vanishes when they leave, and the shift collapses to a normal
-        //   single-owner row when only one member remains.
-        const _jm = _combinedJointMap(mid, user || '');
-        const _suppress = _jointSuppressKeys(_jm);
         let ghosts = [];
-        let jointRows = [];
         if (user) {
           ghosts = buildGhostRows(rawData || [], mid, user);
-          jointRows = _jointRowsForPerson(user, mid, _jm);
         } else if (Array.isArray(pathBOverlays) && pathBOverlays.length > 0) {
           // v3.42.7: no name filter (room/date view) — collect ghosts for every recipient
           //          so the current holder shows up next to the giver's struck-out row.
@@ -2846,22 +2836,8 @@ window.allPharmacistNames = [];
               });
             } catch(e) {}
           });
-          // v3.47: ward view — ONE synth joint row per active joint (name = a current owner; the
-          //   display uses the full owner list anyway). Deduped by iterating each shiftKey once.
-          Object.keys(_jm).forEach(function(sk) {
-            var j = _jm[sk]; var cur = (j && j.currentOwners) || [];
-            if (!cur.length) return;
-            var who = String(cur[0]);
-            var base = (typeof _swfResolveShift === 'function') ? _swfResolveShift(sk, who) : findShiftByKey(sk);
-            if (!base) return;
-            jointRows.push(Object.assign({}, base, {
-              name: who, _ghost: 'joint', _jointRow: true, _ghostKey: sk, _jointActionId: j.actionId, _jointOwners: cur.slice()
-            }));
-          });
         }
-        const baseRows = (rawData || []).filter(function(r) { return !_suppress[makeShiftKey(r)]; });
-        ghosts = ghosts.filter(function(g) { return !(g && _suppress[g._ghostKey]); });
-        return baseRows.concat(ghosts).concat(jointRows);
+        return (rawData || []).concat(ghosts);
       } catch(err) {
         v10ShowError('getEffectiveData', err);
         return rawData || [];
@@ -2930,13 +2906,9 @@ window.allPharmacistNames = [];
               _retroBy: o._retroBy || null,
               _retroAt: o._retroAt || null,
               _retroFinal: o._retroFinal || false,
-              // v3.46: joint co-ownership fields — else a joint re-derived here (anonymous / non-bound
-              //   view) loses its owners/note and the reducer paints a single owner instead of "A + B".
-              owners: Array.isArray(o.owners) ? o.owners.slice() : null,
-              note: (o.note != null ? String(o.note) : null),
-              refActionId: String(o.refActionId || ''),
-              member: String(o.member || ''),
-              timeRange: String(o.timeRange || '')
+              // v3.48: per-shift note pass-through so a note re-derived here (anonymous / non-bound
+              //   view) keeps its text + visibility.
+              note: (o.note != null ? String(o.note) : null)
             }));
         }
 
@@ -3123,131 +3095,62 @@ window.allPharmacistNames = [];
       const pb = (typeof PBOverlays !== 'undefined') ? PBOverlays.getUsedMap(_pbGetLoggedInName()) : {};
       return Object.assign({}, pb, om);   // OverlayManager wins on key collision (own > public)
     }
-    // ═══ v3.46 joint co-ownership (ต่อเวรแบบเจ้าของร่วม) ═══════════════════════════════════════
-    //   A shift stays ONE indivisible unit (no time-split). A 'joint' action attaches a co-owner
-    //   list + a free-text note. Linked append-only records mutate it WITHOUT touching the base
-    //   (each writer signs their OWN row → sync-legal for non-authors + tamper-evident):
-    //     • joint_note  {refActionId, note}   → edits the note (latest by createdAt wins)
-    //     • joint_leave {refActionId}          → viewerName removes THEMSELVES from the owners
-    //   The reducer folds base + linked into one state per shiftKey. Reads BOTH the viewer's own
-    //   OverlayManager (incl. their drafts) AND public pathBOverlays (drafts dropped) — own wins on
-    //   id collision, exactly like _combinedUsedMap.
-    function _jointRecords(monthId, viewer) {
+    // ═══ v3.48 per-shift note (โน้ตเวร) — replaces joint co-ownership ═══════════════════════════
+    //   Each person attaches ONE free-text note to a shift they hold (their master row OR a shift
+    //   they received). A note is either PUBLIC (🌐 synced → everyone sees it on that shift) or
+    //   PRIVATE (🔒 stays on this device, never leaves via sync). No ownership change, no party, no
+    //   rules — just a sticky note. Append-only 'note' records; latest per shiftKey wins.
+    //     • write/edit → drop my old note record(s) for this shiftKey, then addAction a new one
+    //     • delete     → drop my note record(s) for this shiftKey
+    //   Reads BOTH the viewer's own OverlayManager (incl. private) AND public pathBOverlays (public
+    //   notes only) — own wins on id collision, exactly like _combinedUsedMap.
+    function _noteRecords(monthId, viewer) {
       var byId = {};
-      function isJoint(a) { var x = String(a || ''); return x === 'joint' || x === 'joint_note' || x === 'joint_leave' || x === 'joint_join' || x === 'joint_time'; }
       function norm(id, o) {
         return {
-          id: String(id || ''), action: String(o.action || ''), shiftKey: String(o.shiftKey || ''),
-          owners: Array.isArray(o.owners) ? o.owners.slice() : [],
+          id: String(id || ''), shiftKey: String(o.shiftKey || ''),
           note: (o.note != null ? String(o.note) : ''),
-          refActionId: String(o.refActionId || ''),
-          member: String(o.member || ''), timeRange: String(o.timeRange || ''),
           viewerName: String(o.viewerName || ''),
           createdAt: o.createdAt || '', _visibility: o._visibility || 'public'
         };
       }
-      // public side — everyone's PUBLISHED joint records from the server mirror (drop drafts)
+      // public side — everyone's PUBLISHED notes from the server mirror (drop drafts + private)
       var pb = (typeof pathBOverlays !== 'undefined' && Array.isArray(pathBOverlays)) ? pathBOverlays : [];
       pb.forEach(function(o) {
-        if (!o || !isJoint(o.action)) return;
-        if (String(o._visibility || 'public') === 'draft') return;
+        if (!o || String(o.action) !== 'note') return;
+        var vis = String(o._visibility || 'public');
+        if (vis === 'draft' || vis === 'private') return;   // only public notes reach other people
         var id = String(o.actionId || o.id || ''); if (!id) return;
         byId[id] = norm(id, o);
       });
-      // own side — the viewer's own joint records (incl. their own drafts) win on id collision
+      // own side — the viewer's own notes (incl. their private + drafts) win on id collision
       var own = (typeof OverlayManager !== 'undefined' && monthId && viewer) ? (OverlayManager.getActions(monthId, viewer) || []) : [];
       own.forEach(function(a) {
-        if (!a || !isJoint(a.action)) return;
+        if (!a || String(a.action) !== 'note') return;
         var id = String(a.id || ''); if (!id) return;
         byId[id] = norm(id, a);
       });
       return Object.keys(byId).map(function(k) { return byId[k]; });
     }
-    // shiftKey → { actionId, owners, currentOwners, currentNote, noteLog, viewerName, _visibility }.
-    //   ONE joint per shift (earliest createdAt wins). currentOwners = owners − everyone who left.
-    function _combinedJointMap(monthId, viewer) {
-      var recs = _jointRecords(monthId, viewer);
-      var bases = [], notes = [], leaves = [], joins = [], times = [];
-      recs.forEach(function(r) {
-        if (r.action === 'joint') bases.push(r);
-        else if (r.action === 'joint_note') notes.push(r);
-        else if (r.action === 'joint_leave') leaves.push(r);
-        else if (r.action === 'joint_join') joins.push(r);
-        else if (r.action === 'joint_time') times.push(r);
-      });
+    // shiftKey → { note, _visibility, by, _at }. Latest createdAt per shiftKey wins; empty note = none.
+    function _shiftNoteMap(monthId, viewer) {
+      var recs = _noteRecords(monthId, viewer);
       function cmpAt(a, b) { return String(a || '').localeCompare(String(b || '')); }
-      bases.sort(function(a, b) { return cmpAt(a.createdAt, b.createdAt); });
       var out = {};
-      bases.forEach(function(base) {
-        var sk = base.shiftKey; if (!sk || out[sk]) return;   // first joint on this shift wins
-        var bid = base.id;
-        // ── membership as a per-person in/out timeline (latest event wins; tie → 'out' beats 'in').
-        //    base owners = "in" @ base.createdAt; joint_join = member "in"; joint_leave = leaver "out".
-        //    This handles add, remove-self, AND leave-then-rejoin uniformly (unlike owners − leavers).
-        var ev = {}, firstIn = {};
-        function mark(name, kind, at) {
-          if (!name) return; name = String(name); at = String(at || '');
-          if (kind === 'in' && (!(name in firstIn) || cmpAt(at, firstIn[name]) < 0)) firstIn[name] = at;
-          var cur = ev[name];
-          if (!cur || cmpAt(at, cur.at) > 0 || (cmpAt(at, cur.at) === 0 && kind === 'out')) ev[name] = { at: at, kind: kind };
-        }
-        (base.owners || []).forEach(function(nm) { mark(nm, 'in', base.createdAt); });
-        joins.forEach(function(j) { if (j.refActionId === bid) mark(j.member, 'in', j.createdAt); });
-        leaves.forEach(function(l) { if (l.refActionId === bid) mark(l.viewerName, 'out', l.createdAt); });
-        var creator = (base.owners && base.owners[0]) ? String(base.owners[0]) : '';
-        var currentOwners = Object.keys(ev).filter(function(nm) { return ev[nm].kind === 'in'; });
-        currentOwners.sort(function(a, b) {
-          if (a === creator) return -1; if (b === creator) return 1;
-          return cmpAt(firstIn[a], firstIn[b]) || a.localeCompare(b);
-        });
-        // ── per-person descriptive work-time labels (latest joint_time per member wins) ──
-        var timeMap = {}, timeAt = {};
-        times.forEach(function(t) {
-          if (t.refActionId !== bid || !t.member) return;
-          if (!(t.member in timeAt) || cmpAt(t.createdAt, timeAt[t.member]) >= 0) {
-            timeMap[t.member] = String(t.timeRange || ''); timeAt[t.member] = String(t.createdAt || '');
-          }
-        });
-        var refNotes = notes.filter(function(n) { return n.refActionId === bid; }).sort(function(a, b) { return cmpAt(a.createdAt, b.createdAt); });
-        var noteLog = [{ note: base.note, by: base.viewerName, at: base.createdAt }]
-          .concat(refNotes.map(function(n) { return { note: n.note, by: n.viewerName, at: n.createdAt }; }));
-        out[sk] = {
-          actionId: bid, shiftKey: sk, owners: (base.owners || []).slice(), currentOwners: currentOwners,
-          currentNote: noteLog[noteLog.length - 1].note, noteLog: noteLog, timeMap: timeMap,
-          viewerName: base.viewerName, _visibility: base._visibility
-        };
+      recs.forEach(function(r) {
+        var sk = r.shiftKey; if (!sk) return;
+        var cur = out[sk];
+        if (!cur || cmpAt(r.createdAt, cur._at) >= 0) out[sk] = { note: r.note, _visibility: r._visibility, by: r.viewerName, _at: r.createdAt };
       });
+      Object.keys(out).forEach(function(sk) { if (!out[sk].note) delete out[sk]; });
       return out;
     }
-    // v3.47: keys of shifts carrying an ACTIVE joint (>=1 current owner). getEffectiveData + ICS
-    //   suppress the underlying master/ghost row for these keys and replace it with one synth row
-    //   per current member — so the original owner's row vanishes when they leave, and the shift
-    //   collapses to a normal single-owner row when only one member remains.
-    function _jointSuppressKeys(jm) {
-      var s = {};
-      Object.keys(jm || {}).forEach(function(sk) { if (((jm[sk] && jm[sk].currentOwners) || []).length >= 1) s[sk] = 1; });
-      return s;
-    }
-    // v3.47: synth ONE joint row for `person` for each active joint they currently belong to.
-    //   Ghost-shaped (name=person, _ghostKey=sk) so the name-filter/banner/count treat it as theirs,
-    //   but marked _jointRow so renderTable shows the owners concat + 🤝 (or a single name when the
-    //   party has collapsed to 1) and routes taps to the manage overlay. Reused by getEffectiveData
-    //   (mode-1) and the ICS export enum. Base shift resolved via _swfResolveShift (handles _g_ keys).
-    function _jointRowsForPerson(person, mid, jm) {
-      if (!person) return [];
-      jm = jm || _combinedJointMap(mid, person);
-      var rows = [];
-      Object.keys(jm).forEach(function(sk) {
-        var j = jm[sk]; var cur = (j && j.currentOwners) || [];
-        if (!cur.some(function(n) { return String(n) === String(person); })) return;
-        var base = (typeof _swfResolveShift === 'function') ? _swfResolveShift(sk, person) : findShiftByKey(sk);
-        if (!base) return;
-        rows.push(Object.assign({}, base, {
-          name: person, _ghost: 'joint', _jointRow: true, _ghostKey: sk,
-          _jointActionId: j.actionId, _jointOwners: cur.slice()
-        }));
-      });
-      return rows;
+    // Who am I (note author / can-edit check)? Prefer the authenticated identity.
+    function _noteMe() {
+      try { if (typeof _pbGetLoggedInName === 'function') { var n = _pbGetLoggedInName(); if (n) return String(n); } } catch (e) {}
+      try { if (typeof phxAuthGetUser === 'function') { var u = phxAuthGetUser(); if (u && u.name) return String(u.name); } } catch (e) {}
+      try { if (typeof getCurrentUser === 'function') { var g = getCurrentUser(); if (g) return String(g); } } catch (e) {}
+      return '';
     }
     // v3.44: current holder of a master slot after gives/swaps. Reads the same used-map the
     //   table strikes with (newOwner field), so the picker/confirm agree with what everyone sees.
@@ -5025,12 +4928,6 @@ window.allPharmacistNames = [];
     function openActionModalForKey(key) {
       if (!editModeActive) return;
       const mid = getCurrentMonthId();
-      // v3.47: a joint shift has NO give/swap — route any tap straight to the manage overlay
-      //   (add people / set my time / edit note / leave, or "join" for a non-member). Must run
-      //   BEFORE the bound-name guard below, which would reject a co-owner because the resolved
-      //   shift's name is the creator, not them.
-      var _jkJoint = _combinedJointMap(mid, getCurrentUser() || '')[key];
-      if (_jkJoint && typeof _jointShowNote === 'function') { _jointShowNote(_jkJoint.actionId); return; }
       // v3.42.10: include PB marks so user can't re-give a shift someone else already took
       const usedMap = _combinedUsedMap(mid, getCurrentUser());
       const shift = findShiftByKey(key);
@@ -5316,7 +5213,7 @@ window.allPharmacistNames = [];
       return '<div class="act-prompt">ต้องการทำอะไรกับเวรนี้?</div>' +
              '<button class="act-btn act-btn-primary" onclick="actionGoTo(\'swap\')">สลับเวรกับ...</button>' +
              '<button class="act-btn act-btn-danger" onclick="actionGoTo(\'give\')">ยกเวรให้คนอื่น</button>' +
-             '<button class="act-btn" style="background:#f0fdfa; color:#0f766e; border-color:#99f6e4;" onclick="_jointStartFromMenu()">🤝 ต่อเวรแบบเจ้าของร่วม</button>' +
+             '<button class="act-btn" style="background:#eef2ff; color:#3730a3; border-color:#c7d2fe;" onclick="_noteEditFromMenu()">📝 โน้ตเวรนี้</button>' +
              clinicBtn +
              '<button class="act-btn act-btn-cancel" onclick="closeActionModal()">ยกเลิก</button>';
     }
@@ -5331,7 +5228,7 @@ window.allPharmacistNames = [];
       return '<div class="act-prompt">เวรนี้คุณรับมาจากคนอื่น — ต้องการทำอะไรต่อ?</div>' +
              '<button class="act-btn act-btn-primary" onclick="actionGoTo(\'swap\')">สลับเวรนี้กับคนอื่น</button>' +
              '<button class="act-btn" style="background:#fef3c7; color:#92400e; border-color:#fcd34d;" onclick="actionGoTo(\'give\')">ยกเวรนี้ให้คนอื่น</button>' +
-             '<button class="act-btn" style="background:#f0fdfa; color:#0f766e; border-color:#99f6e4;" onclick="_jointStartFromMenu()">🤝 ต่อเวรแบบเจ้าของร่วม</button>' +
+             '<button class="act-btn" style="background:#eef2ff; color:#3730a3; border-color:#c7d2fe;" onclick="_noteEditFromMenu()">📝 โน้ตเวรนี้</button>' +
              clinicBtn +
              '<button class="act-btn act-btn-danger" onclick="confirmUndo()">ยกเลิกการรับเวร</button>' +
              '<button class="act-btn act-btn-cancel" onclick="closeActionModal()">ปิด</button>';
@@ -5661,12 +5558,6 @@ window.allPharmacistNames = [];
         const mine = findShiftByKey(actionState.shiftKey);
         if (!mine) return;
         const myKey = actionState.shiftKey, mineName = mine.name;
-        // v3.46: mutual exclusion — a jointly-owned shift can't also be swapped whole.
-        if (typeof _combinedJointMap === 'function' && _combinedJointMap(mid, getCurrentUser())[myKey]) {
-          closeActionModal();
-          if (typeof _p2bShowToast === 'function') _p2bShowToast('เวรนี้มีเจ้าของร่วมอยู่ — สลับทั้งเวรไม่ได้ (ต้องออกจากเวรร่วมก่อน)', 'warn');
-          return;
-        }
         _lwwTransferConfirm({ kind: 'swap', targetKey: targetKey, targetShift: targetShift, defaultFrom: _curHolder,
           onConfirm: function(fromName) {
             var stored = OverlayManager.addAction(mid, { action: 'swap', shiftKey: myKey, partnerShiftKey: targetKey, partnerName: fromName, originalOwner: mineName });
@@ -5693,12 +5584,6 @@ window.allPharmacistNames = [];
       if (actionState.step === 'give' && actionState.shiftKey) {
         const mid = getCurrentMonthId();
         const _giveKey = actionState.shiftKey;
-        // v3.46: mutual exclusion — a jointly-owned shift can't also be given away whole.
-        if (typeof _combinedJointMap === 'function' && _combinedJointMap(mid, getCurrentUser())[_giveKey]) {
-          closeActionModal();
-          if (typeof _p2bShowToast === 'function') _p2bShowToast('เวรนี้มีเจ้าของร่วมอยู่ — ยกทั้งเวรไม่ได้ (ต้องออกจากเวรร่วมก่อน)', 'warn');
-          return;
-        }
         const stored = OverlayManager.addAction(mid, {
           action: 'give',
           shiftKey: _giveKey,
@@ -5863,371 +5748,122 @@ window.allPharmacistNames = [];
         '<td><span class="swf-badge ' + _swfBadgeClass(s) + '">' + badgeInner + '</span></td>' +
         '</tr>';
     }
-    // ═══ v3.46 joint co-ownership — multi-person picker + note (clone of _lwwNamePicker, but
-    //   toggle-select into a Set + a note textarea + a "ยืนยัน (N คน)" commit, instead of tap-to-close).
-    function _jointCoOwnerPickerClose() { var e = document.getElementById('jointPickerOverlay'); if (e) e.remove(); }
-    function _jointCoOwnerPicker(creator, preNames, preNote, onCommit, opts) {
-      opts = opts || {};
-      var _excl = {}; (opts.excludeNames || []).forEach(function(n) { if (n) _excl[String(n)] = 1; });
-      var names = (window.allPharmacistNames || []).slice().filter(function(n) { return n && String(n) !== String(creator) && !_excl[String(n)]; });
-      var esc = (typeof _pbEsc === 'function') ? _pbEsc
-        : function (s) { return String(s == null ? '' : s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;'); };
-      var dn = (typeof displayName === 'function') ? displayName : function (n) { return n; };
-      var matches = (typeof _nkNameMatches === 'function') ? _nkNameMatches
-        : function (n, q) { return !q || String(n).toLowerCase().indexOf(String(q).toLowerCase()) >= 0; };
-      var picked = {};
-      (preNames || []).forEach(function(n) { if (n) picked[n] = 1; });
-      var _pkTitle = opts.title || '🤝 เลือกผู้ร่วมเวร (เจ้าของร่วม)';
-      var _pkSub = opts.subtitle || ('เวรนี้ยังเป็นของ <b>' + esc(dn(creator)) + '</b> — เลือกคนที่มาร่วมรับผิดชอบ (ได้หลายคน) แล้วเขียนโน้ตกำกับ');
-      var _pkNoteHtml = opts.hideNote ? '' : '<textarea id="jointNote" placeholder="📝 โน้ต — เช่น มารับช่วง 14:00, แบ่งกันดูแลคนไข้ ICU" rows="2" style="width:100%; margin-top:8px; padding:9px; border:1px solid var(--border); border-radius:8px; font-family:inherit; font-size:14px; box-sizing:border-box; resize:vertical;"></textarea>';
-      var ov = document.createElement('div');
-      ov.id = 'jointPickerOverlay';
-      ov.style.cssText = 'position:fixed; inset:0; background:rgba(0,0,0,0.5); z-index:10002; display:flex; align-items:center; justify-content:center; padding:16px;';
-      ov.innerHTML = '<div style="background:var(--surface); width:100%; max-width:400px; height:80vh; border-radius:14px; padding:14px; font-family:inherit; display:flex; flex-direction:column;">' +
-        '<div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:4px;"><div style="font-weight:700; font-size:15px;">' + _pkTitle + '</div>' +
-        '<button type="button" onclick="_jointCoOwnerPickerClose()" style="border:none;background:none;font-size:18px;cursor:pointer;color:var(--sub);">✕</button></div>' +
-        '<div style="font-size:11.5px; color:var(--sub); margin-bottom:8px; line-height:1.5;">' + _pkSub + '</div>' +
-        '<input id="jointSearch" placeholder="พิมพ์ค้นหาชื่อ / ชื่อเล่น…" autocomplete="off" style="width:100%; padding:9px; border:1px solid var(--border); border-radius:8px; font-family:inherit; font-size:14px; box-sizing:border-box; margin-bottom:8px;" />' +
-        '<div id="jointChips" style="display:flex; flex-wrap:wrap; gap:5px; margin-bottom:8px; min-height:26px; align-items:center;"></div>' +
-        '<div id="jointNameList" style="overflow-y:auto; flex:1; -webkit-overflow-scrolling:touch; border:1px solid var(--border); border-radius:8px;"></div>' +
-        _pkNoteHtml +
-        '<button type="button" id="jointConfirm" class="swf-btn swf-primary" style="margin-top:8px;">ยืนยัน (0 คน)</button>' +
-        '</div>';
-      document.body.appendChild(ov);
-      try { document.getElementById('jointNote').value = String(preNote || ''); } catch (e) {}
-      ov.addEventListener('click', function(e) { if (e.target === ov) _jointCoOwnerPickerClose(); });
-      var search = document.getElementById('jointSearch');
-      var list = document.getElementById('jointNameList');
-      var confirmBtn = document.getElementById('jointConfirm');
-      function refreshCount() {
-        var n = Object.keys(picked).length;
-        confirmBtn.textContent = (opts.confirmLabel || 'ยืนยัน') + ' (' + n + ' คน)';
-        confirmBtn.style.opacity = n ? '1' : '0.55';
-      }
-      function render() {
-        var qt = (search.value || '').trim();
-        var filtered = names.filter(function(n) { return matches(n, qt); });
-        list.innerHTML = filtered.slice(0, 120).map(function(n) {
-          var d = dn(n);
-          var sel = !!picked[n];
-          var sub = (d && d !== n) ? '<span style="color:var(--sub); font-size:12px; margin-left:6px;">(' + esc(n) + ')</span>' : '';
-          return '<div class="joint-name-row" data-name="' + esc(n) + '" style="display:flex; align-items:center; gap:8px; padding:11px 10px; border-bottom:1px solid var(--border); cursor:pointer; font-size:15px;' + (sel ? ' background:var(--accent-bg);' : '') + '">' +
-            '<span style="width:20px; text-align:center; color:var(--accent); font-weight:800;">' + (sel ? '✓' : '') + '</span>' +
-            '<span style="font-weight:600;">' + esc(d) + '</span>' + sub + '</div>';
-        }).join('') || '<div style="padding:14px; color:var(--sub); font-size:13px;">ไม่พบชื่อในระบบ</div>';
-        Array.prototype.forEach.call(list.querySelectorAll('.joint-name-row'), function(row) {
-          row.addEventListener('click', function() {
-            var nm = row.getAttribute('data-name');
-            if (picked[nm]) delete picked[nm]; else picked[nm] = 1;
-            render(); refreshCount();
-          });
-        });
-        // selected-people chips — see who's picked at a glance, tap × to remove
-        var chipsEl = document.getElementById('jointChips');
-        if (chipsEl) {
-          var pk = Object.keys(picked);
-          chipsEl.innerHTML = pk.length ? pk.map(function(n) {
-            return '<span style="display:inline-flex; align-items:center; gap:3px; background:var(--accent); color:#fff; border-radius:999px; padding:3px 5px 3px 11px; font-size:12.5px; font-weight:700;">' + esc(dn(n)) + '<span data-unpick="' + esc(n) + '" style="cursor:pointer; font-size:15px; line-height:1; padding:0 3px;">×</span></span>';
-          }).join('') : '<span style="color:var(--sub); font-size:11.5px;">ยังไม่ได้เลือกใคร — แตะชื่อด้านล่าง</span>';
-          Array.prototype.forEach.call(chipsEl.querySelectorAll('[data-unpick]'), function(x) {
-            x.addEventListener('click', function() { delete picked[x.getAttribute('data-unpick')]; render(); refreshCount(); });
-          });
-        }
-      }
-      confirmBtn.addEventListener('click', function() {
-        var chosen = Object.keys(picked);
-        if (!chosen.length) { if (typeof _p2bShowToast === 'function') _p2bShowToast('เลือกผู้ร่วมเวรอย่างน้อย 1 คน', 'warn'); return; }
-        var note = '';
-        try { note = document.getElementById('jointNote').value || ''; } catch (e) {}
-        _jointCoOwnerPickerClose();
-        if (typeof onCommit === 'function') onCommit(chosen, note);
+    // ═══ v3.48 per-shift note UI (โน้ตเวร) ═══════════════════════════════════════════════════════
+    //   Reuses the append-only OverlayManager record layer + the public/private = _visibility split.
+    //   No password, no audit, no log — a note is the owner's own low-stakes reminder/announcement.
+    function _noteCloseEdit() { var e = document.getElementById('noteEditOverlay'); if (e) e.remove(); }
+    function _noteCloseView() { var e = document.getElementById('noteViewOverlay'); if (e) e.remove(); }
+    // Current note for a shiftKey (or null).
+    function _noteForKey(shiftKey) {
+      var m = _shiftNoteMap(getCurrentMonthId(), getCurrentUser());
+      return m[String(shiftKey)] || null;
+    }
+    // Does the current user OWN this shift (→ may add/edit a note on it)?
+    function _noteCanEdit(shiftKey, existing) {
+      var me = _noteMe(); if (!me) return false;
+      if (existing && existing.by && String(existing.by) === String(me)) return true;
+      var base = (typeof _swfResolveShift === 'function') ? _swfResolveShift(shiftKey, me)
+               : (typeof findShiftByKey === 'function' ? findShiftByKey(shiftKey) : null);
+      return !!(base && String(base.name) === String(me));
+    }
+    // Upsert: drop my existing note(s) on this shift (retracts public ones from the server too),
+    //   then write the new one. Empty text = delete.
+    function _noteSave(shiftKey, text, isPublic) {
+      var mid = getCurrentMonthId();
+      var me = (typeof getCurrentUser === 'function') ? getCurrentUser() : '';
+      var mine = (typeof OverlayManager !== 'undefined') ? (OverlayManager.getActions(mid, me) || []) : [];
+      mine.forEach(function(a) {
+        if (a && String(a.action) === 'note' && String(a.shiftKey) === String(shiftKey)) OverlayManager.removeAction(mid, a.id);
       });
-      search.addEventListener('input', render);
-      render(); refreshCount();
-      setTimeout(function() { try { search.focus(); } catch (e) {} }, 60);
-    }
-    // Entry point from the shift action-menu: guard mutual-exclusion, then open the picker.
-    function _jointStartFromMenu() {
-      var key = actionState.shiftKey;
-      var shift = key ? findShiftByKey(key) : null;
-      if (!shift) { closeActionModal(); return; }
-      var mid = getCurrentMonthId();
-      var _used = _combinedUsedMap(mid, getCurrentUser())[key];
-      if (_used) { if (typeof _p2bShowToast === 'function') _p2bShowToast('เวรนี้ถูกยก/แลกไปแล้ว — ต่อเวรร่วมไม่ได้', 'warn'); return; }
-      if (_combinedJointMap(mid, getCurrentUser())[key]) { if (typeof _p2bShowToast === 'function') _p2bShowToast('เวรนี้มีเจ้าของร่วมอยู่แล้ว', 'warn'); return; }
-      var creator = shift.name;
-      closeActionModal();
-      _jointCoOwnerPicker(creator, [], '', function(coOwners, note) { confirmPickJoint(key, creator, coOwners, note); });
-    }
-    // Commit: create the base 'joint' action (draft) → open the confirm/publish dialog (like give/swap).
-    function confirmPickJoint(shiftKey, creator, coOwners, note) {
-      var mid = getCurrentMonthId();
-      var owners = [creator].concat((coOwners || []).filter(function(n) { return String(n) !== String(creator); }));
-      if (owners.length < 2) { if (typeof _p2bShowToast === 'function') _p2bShowToast('เลือกผู้ร่วมเวรอย่างน้อย 1 คน', 'warn'); return; }
-      var stored = OverlayManager.addAction(mid, { action: 'joint', shiftKey: shiftKey, owners: owners, note: String(note || '') });
+      text = String(text == null ? '' : text).trim();
+      if (text) OverlayManager.addAction(mid, { action: 'note', shiftKey: shiftKey, note: text, _visibility: isPublic ? 'public' : 'private' });
       if (typeof triggerUpdate === 'function') triggerUpdate();
-      if (stored && typeof swfOpenConfirm === 'function') swfOpenConfirm(mid, stored);
     }
-    // v3.46: read-only note/owners/log viewer (tap the 📝 marker on a joint row). The note history
-    //   IS the joint's timeline — each entry names who wrote it + when (tamper-evident). v1.1 adds
-    //   "แก้โน้ต" + "ออกจากเวรร่วม" buttons to this same overlay.
-    function _jointFindByActionId(actionId) {
-      var jm = _combinedJointMap(getCurrentMonthId(), getCurrentUser());
-      var keys = Object.keys(jm);
-      for (var i = 0; i < keys.length; i++) { if (String(jm[keys[i]].actionId) === String(actionId)) return jm[keys[i]]; }
-      return null;
+    function _noteDelete(shiftKey) {
+      _noteSave(shiftKey, '', false);
+      _noteCloseView();
+      if (typeof _p2bShowToast === 'function') _p2bShowToast('ลบโน้ตแล้ว', 'ok');
     }
-    function _jointCloseNote() { var e = document.getElementById('jointNoteOverlay'); if (e) e.remove(); }
-    // Who am I (for owner-only edit/leave)? Prefer the authenticated identity.
-    function _jointMe() {
-      try { if (typeof _pbGetLoggedInName === 'function') { var n = _pbGetLoggedInName(); if (n) return String(n); } } catch (e) {}
-      try { if (typeof phxAuthGetUser === 'function') { var u = phxAuthGetUser(); if (u && u.name) return String(u.name); } } catch (e) {}
-      try { if (typeof getCurrentUser === 'function') { var g = getCurrentUser(); if (g) return String(g); } } catch (e) {}
-      return '';
-    }
-    function _jointShowNote(actionId) {
-      var st = _jointFindByActionId(actionId);
-      if (!st) { if (typeof _p2bShowToast === 'function') _p2bShowToast('ไม่พบข้อมูลเวรร่วม', 'warn'); return; }
+    // Read view — public notes: everyone; private notes: only the author sees them at all.
+    function _noteView(shiftKey) {
       var esc = (typeof _pbEsc === 'function') ? _pbEsc : function (s) { return String(s == null ? '' : s); };
-      var me = _jointMe();
-      var iAmOwner = !!me && (st.currentOwners || []).some(function(n) { return String(n) === String(me); });
-      var owners = (st.currentOwners || []).map(function(n) {
-        var isMe = String(n) === String(me);
-        return '<span style="display:inline-block; background:' + (isMe ? 'var(--accent)' : 'var(--accent-bg)') + '; color:' + (isMe ? '#fff' : 'var(--accent)') + '; border-radius:999px; padding:4px 12px; margin:3px 4px 3px 0; font-size:13px; font-weight:700;">' + esc(displayName(n)) + (isMe ? ' (คุณ)' : '') + '</span>';
-      }).join('');
-      var log = (st.noteLog || []).slice().reverse().map(function(en) {
-        var t = en.at ? new Date(en.at).toLocaleString('th-TH', { dateStyle: 'short', timeStyle: 'short' }) : '';
-        var body = en.note ? esc(en.note) : '<span style="color:var(--sub);">(ไม่มีข้อความ)</span>';
-        return '<div style="padding:8px 0; border-bottom:1px solid var(--border); font-size:13px; line-height:1.55;"><div>“' + body + '”</div>' +
-               '<div style="color:var(--sub); font-size:11.5px; margin-top:3px;">✎ <b>' + esc(displayName(en.by || '?')) + '</b>' + (t ? ' · ' + t : '') + '</div></div>';
-      }).join('');
-      var _canLeave = (st.currentOwners || []).length > 1;   // last owner can't leave — a shift must always have an owner
-      var actions;
-      if (iAmOwner) {
-        actions =
-          '<div style="display:flex; gap:8px; margin-top:14px;">' +
-            '<button type="button" class="swf-btn swf-primary" style="flex:1;" onclick="_jointEditNote(\'' + esc(actionId) + '\')">✏️ แก้โน้ต</button>' +
-            '<button type="button" class="swf-btn" style="flex:1;" onclick="_jointOpenAddPicker(\'' + esc(actionId) + '\')">➕ เพิ่มคน</button>' +
-          '</div>' +
-          (_canLeave
-            ? '<button type="button" class="swf-btn swf-danger" style="width:100%; margin-top:8px;" onclick="_jointLeave(\'' + esc(actionId) + '\')">🚪 ออกจากเวรร่วม</button>'
-            : '<div style="font-size:11px; color:var(--sub); margin-top:10px; text-align:center;">คุณเป็นเจ้าของคนเดียว — เพิ่มคนก่อนถึงจะออกได้ (เวรต้องมีเจ้าของเสมอ)</div>');
-      } else if (me) {
-        actions = '<button type="button" class="swf-btn swf-primary" style="width:100%; margin-top:14px;" onclick="_jointSelfJoin(\'' + esc(actionId) + '\')">➕ เข้าร่วมเวรนี้</button>';
-      } else {
-        actions = '<div style="font-size:11.5px; color:var(--sub); margin-top:12px; text-align:center;">เข้าสู่ระบบเพื่อจัดการเวรร่วม</div>';
-      }
+      var n = _noteForKey(shiftKey);
+      if (!n) { if (_noteCanEdit(shiftKey)) return _noteEdit(shiftKey); return; }
+      var canEdit = _noteCanEdit(shiftKey, n);
+      var t = n._at ? new Date(n._at).toLocaleString('th-TH', { dateStyle: 'short', timeStyle: 'short' }) : '';
+      var isPriv = String(n._visibility) === 'private';
+      var visLabel = isPriv ? '🔒 เห็นเฉพาะฉัน' : '🌐 ทุกคนเห็น';
+      var actions = canEdit
+        ? '<div style="display:flex; gap:8px; margin-top:14px;">' +
+            '<button type="button" id="noteViewEdit" class="swf-btn swf-primary" style="flex:1;">✏️ แก้ไข</button>' +
+            '<button type="button" id="noteViewDel" class="swf-btn swf-danger" style="flex:1;">🗑️ ลบ</button>' +
+          '</div>'
+        : '';
       var ov = document.createElement('div');
-      ov.id = 'jointNoteOverlay';
+      ov.id = 'noteViewOverlay';
       ov.style.cssText = 'position:fixed; inset:0; background:rgba(0,0,0,0.5); z-index:10004; display:flex; align-items:center; justify-content:center; padding:16px;';
       ov.innerHTML = '<div style="background:var(--surface); width:100%; max-width:400px; max-height:86vh; overflow-y:auto; border-radius:16px; padding:18px; font-family:inherit;">' +
-        '<div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px;"><div style="font-weight:700; font-size:16px;">🤝 เวรเจ้าของร่วม</div>' +
-        '<button type="button" onclick="_jointCloseNote()" style="border:none;background:none;font-size:18px;cursor:pointer;color:var(--sub);">✕</button></div>' +
-        '<div style="font-size:12px; color:var(--sub); margin-bottom:6px;">ผู้รับผิดชอบร่วมกัน (' + (st.currentOwners || []).length + ' คน)</div>' +
-        '<div style="margin-bottom:14px;">' + (owners || '<span style="color:var(--sub);">—</span>') + '</div>' +
-        '<div style="font-size:12px; color:var(--sub); margin-bottom:2px;">📋 โน้ต + ประวัติการแก้ (ล่าสุดบนสุด)</div>' +
-        '<div style="border:1px solid var(--border); border-radius:10px; padding:2px 12px;">' + (log || '<div style="color:var(--sub); font-size:13px; padding:10px 0;">ยังไม่มีโน้ต</div>') + '</div>' +
+        '<div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px;"><div style="font-weight:700; font-size:16px;">📝 โน้ตเวร</div>' +
+        '<button type="button" onclick="_noteCloseView()" style="border:none;background:none;font-size:18px;cursor:pointer;color:var(--sub);">✕</button></div>' +
+        '<div style="border:1px solid var(--border); border-radius:10px; padding:12px 14px; font-size:14px; line-height:1.6; white-space:pre-wrap; word-break:break-word;">' + esc(n.note) + '</div>' +
+        '<div style="color:var(--sub); font-size:11.5px; margin-top:8px;">' + visLabel + ' · ✎ <b>' + esc(displayName(n.by || '?')) + '</b>' + (t ? ' · ' + t : '') + '</div>' +
         actions +
-        '<button type="button" onclick="_jointCloseNote()" class="swf-btn" style="margin-top:8px; width:100%;">ปิด</button>' +
+        '<button type="button" onclick="_noteCloseView()" class="swf-btn" style="margin-top:8px; width:100%;">ปิด</button>' +
         '</div>';
       document.body.appendChild(ov);
-      ov.addEventListener('click', function(e) { if (e.target === ov) _jointCloseNote(); });
+      ov.addEventListener('click', function(e) { if (e.target === ov) _noteCloseView(); });
+      var be = document.getElementById('noteViewEdit'); if (be) be.addEventListener('click', function() { _noteCloseView(); _noteEdit(shiftKey); });
+      var bd = document.getElementById('noteViewDel'); if (bd) bd.addEventListener('click', function() { _noteDelete(shiftKey); });
     }
-    // ── Join / add-member (reason + audit, NO password — "easy in, strict out") ──
-    var _JOINT_JOIN_REASONS = ['ตกลงกันแล้ว มาช่วยดูแล', 'มารับช่วงบางเวลา', 'อีกฝ่ายขอให้มาช่วย'];
-    function _jointCloseReason() { var e = document.getElementById('jointReasonOverlay'); if (e) e.remove(); }
-    function _jointReasonModal(title, subtitle, okLabel, onOk) {
-      var esc = (typeof _pbEsc === 'function') ? _pbEsc : function (s) { return String(s == null ? '' : s); };
-      var choices = _JOINT_JOIN_REASONS.map(function(r, i) {
-        return '<label class="swf-choice"><input type="radio" name="jjRz" value="' + i + '"> ' + esc(r) + '</label>';
-      }).join('') + '<label class="swf-choice"><input type="radio" name="jjRz" value="other"> อื่นๆ (ระบุเอง)</label>';
+    // Compose / edit — owner only. Text + public/private choice.
+    function _noteEdit(shiftKey) {
+      if (!_noteCanEdit(shiftKey)) { if (typeof _p2bShowToast === 'function') _p2bShowToast('เพิ่มโน้ตได้เฉพาะเวรของตัวเอง', 'warn'); return; }
+      var n = _noteForKey(shiftKey);
+      var curText = n ? n.note : '';
+      var curPriv = n ? (String(n._visibility) === 'private') : false;
       var ov = document.createElement('div');
-      ov.id = 'jointReasonOverlay';
-      ov.style.cssText = 'position:fixed; inset:0; background:rgba(0,0,0,0.55); z-index:10008; display:flex; align-items:center; justify-content:center; padding:16px;';
-      ov.innerHTML = '<div style="background:var(--surface); width:100%; max-width:420px; max-height:88vh; overflow-y:auto; border-radius:16px; padding:18px; font-family:inherit;">' +
-        '<div style="display:flex; align-items:center; gap:7px;"><div style="font-weight:700; font-size:16px;">' + esc(title) + '</div>' +
-        '<button type="button" id="jjX" style="margin-left:auto; border:none; background:none; color:var(--sub); font-size:18px; cursor:pointer;">✕</button></div>' +
-        (subtitle ? '<div style="font-size:12px; color:var(--sub); margin:3px 0 10px;">' + subtitle + '</div>' : '') +
-        '<div class="swf-field-label">เหตุผล (จำเป็น)</div>' +
-        '<div id="jjChoices">' + choices + '</div>' +
-        '<textarea id="jjOther" class="swf-input" rows="2" placeholder="ระบุเหตุผล…" style="display:none; margin-top:4px; resize:vertical;"></textarea>' +
-        '<div id="jjErr" style="color:#dc2626; font-size:12px; min-height:16px; margin:6px 2px 0;"></div>' +
-        '<div class="swf-btns">' +
-        '<button type="button" id="jjClose" class="swf-btn">ยกเลิก</button>' +
-        '<button type="button" id="jjOk" class="swf-btn swf-primary">' + esc(okLabel || 'ยืนยัน') + '</button>' +
-        '</div></div>';
-      document.body.appendChild(ov);
-      ov.addEventListener('click', function(e) { if (e.target === ov) _jointCloseReason(); });
-      document.getElementById('jjX').addEventListener('click', _jointCloseReason);
-      document.getElementById('jjClose').addEventListener('click', _jointCloseReason);
-      Array.prototype.forEach.call(ov.querySelectorAll('#jjChoices input'), function(r) {
-        r.addEventListener('change', function() {
-          Array.prototype.forEach.call(ov.querySelectorAll('#jjChoices .swf-choice'), function(c) { c.classList.toggle('sel', c.querySelector('input').checked); });
-          var box = document.getElementById('jjOther'); box.style.display = (r.value === 'other' && r.checked) ? 'block' : 'none';
-        });
-      });
-      document.getElementById('jjOk').addEventListener('click', function() {
-        var errEl = document.getElementById('jjErr');
-        var sel = ov.querySelector('#jjChoices input:checked');
-        if (!sel) { errEl.textContent = 'กรุณาเลือกเหตุผลก่อน'; return; }
-        var reason = sel.value === 'other' ? (document.getElementById('jjOther').value || '').trim() : _JOINT_JOIN_REASONS[parseInt(sel.value, 10)];
-        if (!reason) { errEl.textContent = 'กรุณาระบุเหตุผล'; return; }
-        _jointCloseReason();
-        if (typeof onOk === 'function') onOk(reason);
-      });
-    }
-    // Append-only joint_join under the ACTOR's own name (sync-legal) + audit-before-write.
-    function _jointWriteJoin(actionId, memberName, reason) {
-      var st = _jointFindByActionId(actionId); if (!st) return false;
-      var me = _jointMe(); if (!me) { if (typeof _p2bShowToast === 'function') _p2bShowToast('เข้าสู่ระบบก่อน', 'warn'); return false; }
-      if (String(st._visibility) === 'draft') { if (typeof _p2bShowToast === 'function') _p2bShowToast('เผยแพร่เวรร่วมก่อน', 'warn'); return false; }
-      if ((st.currentOwners || []).some(function(n) { return String(n) === String(memberName); })) return false;   // already a member
-      try { phxAuditLog('joint_join', st.shiftKey, { member: memberName, by: me }, { reason: reason }, 'web'); } catch (e) {}
-      OverlayManager.addAction(getCurrentMonthId(), { action: 'joint_join', _visibility: 'public', refActionId: actionId, shiftKey: st.shiftKey, member: memberName, viewerName: me });
-      return true;
-    }
-    // ➕ เพิ่มคน — a current member adds others.
-    function _jointOpenAddPicker(actionId) {
-      var st = _jointFindByActionId(actionId); if (!st) return;
-      var me = _jointMe();
-      if (!me || !(st.currentOwners || []).some(function(n) { return String(n) === String(me); })) { if (typeof _p2bShowToast === 'function') _p2bShowToast('เพิ่มคนได้เฉพาะสมาชิก', 'warn'); return; }
-      if (String(st._visibility) === 'draft') { if (typeof _p2bShowToast === 'function') _p2bShowToast('เผยแพร่เวรร่วมก่อนจึงจะเพิ่มคนได้', 'warn'); return; }
-      _jointCloseNote();
-      _jointCoOwnerPicker(me, [], '', function(names) {
-        _jointReasonModal('เพิ่มผู้ร่วมเวร ' + names.length + ' คน', 'เพิ่ม: ' + names.map(function(n) { return displayName(n); }).join(', '), 'เพิ่ม', function(reason) {
-          var added = 0; names.forEach(function(nm) { if (_jointWriteJoin(actionId, nm, reason)) added++; });
-          if (typeof triggerUpdate === 'function') triggerUpdate();
-          if (typeof _p2bShowToast === 'function') _p2bShowToast('เพิ่ม ' + added + ' คนแล้ว', 'ok');
-          _jointShowNote(actionId);
-        });
-      }, { title: '➕ เพิ่มผู้ร่วมเวร', subtitle: 'เลือกคนที่จะเพิ่มเข้าเวรร่วม (ได้หลายคน)', hideNote: true, confirmLabel: 'ถัดไป', excludeNames: (st.currentOwners || []) });
-    }
-    // ➕ เข้าร่วมเวรนี้ — a non-member joins themselves.
-    function _jointSelfJoin(actionId) {
-      var st = _jointFindByActionId(actionId); if (!st) return;
-      var me = _jointMe();
-      if (!me) { if (typeof _p2bShowToast === 'function') _p2bShowToast('เข้าสู่ระบบก่อนจึงจะเข้าร่วมได้', 'warn'); return; }
-      if (String(st._visibility) === 'draft') { if (typeof _p2bShowToast === 'function') _p2bShowToast('เวรร่วมนี้ยังไม่เผยแพร่', 'warn'); return; }
-      if ((st.currentOwners || []).some(function(n) { return String(n) === String(me); })) { _jointShowNote(actionId); return; }
-      _jointReasonModal('เข้าร่วมเวรร่วม', 'คุณกำลังเข้าร่วมรับผิดชอบเวรนี้ร่วมกับคนอื่น — บันทึกลงประวัติ', 'เข้าร่วม', function(reason) {
-        if (_jointWriteJoin(actionId, me, reason)) {
-          if (typeof triggerUpdate === 'function') triggerUpdate();
-          if (typeof _p2bShowToast === 'function') _p2bShowToast('เข้าร่วมเวรร่วมแล้ว', 'ok');
-        }
-        _jointCloseNote(); _jointShowNote(actionId);
-      });
-    }
-    // ✏️ Edit note — any CURRENT owner. Append-only joint_note under the editor's OWN name
-    //   (sync-legal) + audit BEFORE the write (tamper-evident). No password (own choice, low-stakes).
-    function _jointCloseEdit() { var e = document.getElementById('jointEditOverlay'); if (e) e.remove(); }
-    function _jointEditNote(actionId) {
-      var st = _jointFindByActionId(actionId);
-      if (!st) return;
-      var me = _jointMe();
-      if (!me) { if (typeof _p2bShowToast === 'function') _p2bShowToast('เข้าสู่ระบบก่อนจึงจะแก้โน้ตได้', 'warn'); return; }
-      if (!(st.currentOwners || []).some(function(n) { return String(n) === String(me); })) { if (typeof _p2bShowToast === 'function') _p2bShowToast('แก้โน้ตได้เฉพาะเจ้าของร่วม', 'warn'); return; }
-      var ov = document.createElement('div');
-      ov.id = 'jointEditOverlay';
+      ov.id = 'noteEditOverlay';
       ov.style.cssText = 'position:fixed; inset:0; background:rgba(0,0,0,0.55); z-index:10007; display:flex; align-items:center; justify-content:center; padding:16px;';
       ov.innerHTML = '<div style="background:var(--surface); width:100%; max-width:400px; border-radius:16px; padding:18px; font-family:inherit;">' +
-        '<div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;"><div style="font-weight:700; font-size:15px;">✏️ แก้โน้ต</div>' +
-        '<button type="button" onclick="_jointCloseEdit()" style="border:none;background:none;font-size:18px;cursor:pointer;color:var(--sub);">✕</button></div>' +
-        '<div style="font-size:11.5px; color:var(--sub); margin-bottom:8px;">การแก้จะถูกบันทึกว่าใครแก้ เมื่อไหร่ (กันแกล้ง) — โน้ตเดิมยังเก็บในประวัติ</div>' +
-        '<textarea id="jointEditText" rows="3" class="swf-input" style="width:100%; box-sizing:border-box; resize:vertical;" placeholder="โน้ต…"></textarea>' +
-        '<div class="swf-btns" style="margin-top:12px;">' +
-        '<button type="button" onclick="_jointCloseEdit()" class="swf-btn">ยกเลิก</button>' +
-        '<button type="button" id="jointEditOk" class="swf-btn swf-primary">บันทึกโน้ต</button>' +
+        '<div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;"><div style="font-weight:700; font-size:15px;">📝 ' + (n ? 'แก้โน้ตเวร' : 'เพิ่มโน้ตเวร') + '</div>' +
+        '<button type="button" onclick="_noteCloseEdit()" style="border:none;background:none;font-size:18px;cursor:pointer;color:var(--sub);">✕</button></div>' +
+        '<textarea id="noteEditText" rows="3" class="swf-input" style="width:100%; box-sizing:border-box; resize:vertical;" placeholder="เช่น สลับช่วงเช้ากับพี่บี, มาสายครึ่ง ชม., ฝากดูคนไข้ ICU…"></textarea>' +
+        '<div style="font-size:12px; color:var(--sub); margin:12px 2px 6px;">ใครเห็นโน้ตนี้?</div>' +
+        '<label class="swf-choice" style="display:flex; gap:9px; align-items:flex-start;"><input type="radio" name="noteVis" value="public" style="margin-top:3px;"> <span><b>🌐 ทุกคนเห็น</b><br><span style="font-size:11.5px; color:var(--sub);">โชว์บนเวรให้เพื่อนร่วมงานเห็น (ซิงค์ขึ้น server)</span></span></label>' +
+        '<label class="swf-choice" style="display:flex; gap:9px; align-items:flex-start; margin-top:6px;"><input type="radio" name="noteVis" value="private" style="margin-top:3px;"> <span><b>🔒 เห็นเฉพาะฉัน</b><br><span style="font-size:11.5px; color:var(--sub);">โน้ตเตือนความจำส่วนตัว อยู่แค่เครื่องนี้</span></span></label>' +
+        '<div class="swf-btns" style="margin-top:14px;">' +
+        '<button type="button" onclick="_noteCloseEdit()" class="swf-btn">ยกเลิก</button>' +
+        '<button type="button" id="noteEditOk" class="swf-btn swf-primary">บันทึกโน้ต</button>' +
         '</div></div>';
       document.body.appendChild(ov);
-      try { document.getElementById('jointEditText').value = String(st.currentNote || ''); } catch (e) {}
-      ov.addEventListener('click', function(e) { if (e.target === ov) _jointCloseEdit(); });
-      document.getElementById('jointEditOk').addEventListener('click', function() {
-        var newNote = (document.getElementById('jointEditText').value || '').trim();
-        var before = String(st.currentNote || '');
-        if (newNote === before) { _jointCloseEdit(); return; }
-        try { phxAuditLog('joint_note_edit', st.shiftKey, { note: before }, { note: newNote }, 'web'); } catch (e) {}
-        OverlayManager.addAction(getCurrentMonthId(), { action: 'joint_note', _visibility: 'public', refActionId: actionId, shiftKey: st.shiftKey, note: newNote, viewerName: me });
-        _jointCloseEdit();
-        if (typeof triggerUpdate === 'function') triggerUpdate();
-        if (typeof _p2bShowToast === 'function') _p2bShowToast('แก้โน้ตแล้ว', 'ok');
-        _jointCloseNote(); _jointShowNote(actionId);
+      try { document.getElementById('noteEditText').value = String(curText || ''); } catch (e) {}
+      try { ov.querySelector('input[name="noteVis"][value="' + (curPriv ? 'private' : 'public') + '"]').checked = true; } catch (e) {}
+      function syncSel() { Array.prototype.forEach.call(ov.querySelectorAll('.swf-choice'), function(c) { var inp = c.querySelector('input'); c.classList.toggle('sel', !!(inp && inp.checked)); }); }
+      Array.prototype.forEach.call(ov.querySelectorAll('input[name="noteVis"]'), function(r) { r.addEventListener('change', syncSel); });
+      syncSel();
+      ov.addEventListener('click', function(e) { if (e.target === ov) _noteCloseEdit(); });
+      document.getElementById('noteEditOk').addEventListener('click', function() {
+        var text = (document.getElementById('noteEditText').value || '').trim();
+        var selEl = ov.querySelector('input[name="noteVis"]:checked');
+        var isPublic = !selEl || selEl.value === 'public';
+        _noteSave(shiftKey, text, isPublic);
+        _noteCloseEdit();
+        if (typeof _p2bShowToast === 'function') _p2bShowToast(text ? (isPublic ? 'บันทึกโน้ต — ทุกคนเห็น' : 'บันทึกโน้ต — ส่วนตัว') : 'ลบโน้ตแล้ว', 'ok');
       });
-      setTimeout(function() { try { document.getElementById('jointEditText').focus(); } catch (e) {} }, 60);
+      setTimeout(function() { try { document.getElementById('noteEditText').focus(); } catch (e) {} }, 60);
     }
-    // 🚪 Leave — remove YOURSELF from the owners. Password + reason (like cancelling a published
-    //   record), audit BEFORE the write. Append-only joint_leave under your own name.
-    function _jointCloseLeave() { var e = document.getElementById('jointLeaveOverlay'); if (e) e.remove(); }
-    function _jointLeave(actionId) {
-      var st = _jointFindByActionId(actionId);
-      if (!st) return;
-      var u = (typeof phxAuthGetUser === 'function') ? phxAuthGetUser() : null;
-      if (!u || !u.name || !u.hash) { if (typeof _p2bShowToast === 'function') _p2bShowToast('เข้าสู่ระบบก่อนจึงจะออกจากเวรร่วมได้', 'warn'); return; }
-      if (!(st.currentOwners || []).some(function(n) { return String(n) === String(u.name); })) { if (typeof _p2bShowToast === 'function') _p2bShowToast('คุณไม่ได้เป็นเจ้าของร่วมของเวรนี้', 'warn'); return; }
-      // v3.47: the LAST remaining owner cannot leave — a shift must always have an owner (collapse rule).
-      if ((st.currentOwners || []).length <= 1) { if (typeof _p2bShowToast === 'function') _p2bShowToast('คุณเป็นเจ้าของคนเดียว — เพิ่มคนก่อนถึงจะออกได้ (เวรต้องมีเจ้าของเสมอ)', 'warn'); return; }
-      var esc = (typeof _pbEsc === 'function') ? _pbEsc : function (s) { return String(s == null ? '' : s); };
-      var choices = '';
-      _SWF_CANCEL_REASONS.forEach(function(r, i) { choices += '<label class="swf-choice"><input type="radio" name="jlRz" value="' + i + '"> ' + esc(r) + '</label>'; });
-      choices += '<label class="swf-choice"><input type="radio" name="jlRz" value="other"> อื่นๆ (ระบุเอง)</label>';
-      var ov = document.createElement('div');
-      ov.id = 'jointLeaveOverlay';
-      ov.style.cssText = 'position:fixed; inset:0; background:rgba(0,0,0,0.55); z-index:10007; display:flex; align-items:center; justify-content:center; padding:16px;';
-      ov.innerHTML = '<div style="background:var(--surface); width:100%; max-width:440px; max-height:88vh; overflow-y:auto; border-radius:16px; padding:18px; font-family:inherit;">' +
-        '<div style="display:flex; align-items:center; gap:7px;"><div style="font-weight:700; font-size:16px;">🚪 ออกจากเวรร่วม</div>' +
-        '<button type="button" id="jlX" style="margin-left:auto; border:none; background:none; color:var(--sub); font-size:18px; cursor:pointer;">✕</button></div>' +
-        '<div style="font-size:12px; color:var(--sub); margin:3px 0 10px;">เอาชื่อ <b>' + esc(displayName(u.name)) + '</b> ออกจากผู้รับผิดชอบร่วม — คนอื่นยังอยู่ครบ. บันทึกลงประวัติถาวรว่าใครออก เมื่อไหร่ เพราะอะไร (กันแกล้ง)</div>' +
-        '<div class="swf-field-label">เหตุผล (จำเป็น)</div>' +
-        '<div id="jlChoices">' + choices + '</div>' +
-        '<textarea id="jlOther" class="swf-input" rows="2" placeholder="ระบุเหตุผล…" style="display:none; margin-top:4px; resize:vertical;"></textarea>' +
-        '<div class="swf-field-label">รหัสผ่านของคุณ (ยืนยันตัวตน)</div>' +
-        '<input id="jlPw" class="swf-input" type="password" autocomplete="current-password" placeholder="••••••••">' +
-        '<div id="jlErr" style="color:#dc2626; font-size:12px; min-height:16px; margin:6px 2px 0;"></div>' +
-        '<div class="swf-btns">' +
-        '<button type="button" id="jlClose" class="swf-btn">ปิด</button>' +
-        '<button type="button" id="jlOk" class="swf-btn swf-danger">ยืนยันออก</button>' +
-        '</div></div>';
-      document.body.appendChild(ov);
-      ov.addEventListener('click', function(e) { if (e.target === ov) _jointCloseLeave(); });
-      document.getElementById('jlX').addEventListener('click', _jointCloseLeave);
-      document.getElementById('jlClose').addEventListener('click', _jointCloseLeave);
-      Array.prototype.forEach.call(ov.querySelectorAll('#jlChoices input'), function(r) {
-        r.addEventListener('change', function() {
-          Array.prototype.forEach.call(ov.querySelectorAll('#jlChoices .swf-choice'), function(c) { c.classList.toggle('sel', c.querySelector('input').checked); });
-          var isOther = r.value === 'other' && r.checked;
-          var box = document.getElementById('jlOther');
-          box.style.display = isOther ? 'block' : 'none';
-          if (isOther) setTimeout(function() { try { box.focus(); } catch (e) {} }, 40);
-        });
-      });
-      document.getElementById('jlOk').addEventListener('click', function() {
-        var errEl = document.getElementById('jlErr');
-        var sel = ov.querySelector('#jlChoices input:checked');
-        if (!sel) { errEl.textContent = 'กรุณาเลือกเหตุผลก่อน'; return; }
-        var reason = sel.value === 'other' ? (document.getElementById('jlOther').value || '').trim() : _SWF_CANCEL_REASONS[parseInt(sel.value, 10)];
-        if (!reason) { errEl.textContent = 'กรุณาระบุเหตุผล'; return; }
-        var pw = document.getElementById('jlPw').value || '';
-        if (!pw) { errEl.textContent = 'กรุณาใส่รหัสผ่าน'; return; }
-        var okBtn = this; okBtn.disabled = true; okBtn.textContent = 'กำลังตรวจสอบ...'; errEl.textContent = '';
-        function fail(msg) { okBtn.disabled = false; okBtn.textContent = 'ยืนยันออก'; errEl.textContent = msg || 'เกิดข้อผิดพลาด'; }
-        try {
-          google.script.run
-            .withSuccessHandler(function(res) {
-              if (!res || !res.success) return fail(res && res.error);
-              if (!res.valid) return fail(res.error || 'รหัสผ่านไม่ถูกต้อง');
-              var before = (st.currentOwners || []).slice();
-              var after = before.filter(function(n) { return String(n) !== String(u.name); });
-              try { phxAuditLog('joint_leave', st.shiftKey, { owners: before }, { owners: after, left: u.name, reason: reason }, 'web'); } catch (e) {}
-              OverlayManager.addAction(getCurrentMonthId(), { action: 'joint_leave', _visibility: 'public', refActionId: actionId, shiftKey: st.shiftKey, viewerName: u.name });
-              _jointCloseLeave(); _jointCloseNote();
-              if (typeof triggerUpdate === 'function') triggerUpdate();
-              if (typeof _p2bShowToast === 'function') _p2bShowToast('ออกจากเวรร่วมแล้ว — บันทึกลงประวัติ', 'ok');
-            })
-            .withFailureHandler(function(err) { fail('เชื่อมต่อไม่ได้: ' + ((err && err.message) || err)); })
-            .phxVerifyPassword(u.name, pw);
-        } catch (e) { fail('เชื่อมต่อ server ไม่ได้'); }
-      });
-      setTimeout(function() { try { document.getElementById('jlPw').focus(); } catch (e) {} }, 60);
+    // Entry from the shift action-menu (own OR received shift).
+    function _noteEditFromMenu() {
+      var key = actionState.shiftKey;
+      if (typeof closeActionModal === 'function') closeActionModal();
+      if (key) _noteEdit(key);
     }
+    // Tap a 📝 marker anywhere (table / calendar) → open the note (read for others, edit for owner).
+    //   data-note-key carries the shiftKey; a capture-phase delegate beats the row's own tap handler.
+    document.addEventListener('click', function(e) {
+      var m = (e.target && e.target.closest) ? e.target.closest('[data-note-key]') : null;
+      if (m) { e.stopPropagation(); e.preventDefault(); _noteView(m.getAttribute('data-note-key')); }
+    }, true);
     // Centered action summary — same wording the timeline uses.
     function _swfSummaryHtml(act, viewer, myShift, tgtShift) {
       var me = '<span style="font-weight:700;">' + _pbEsc(displayName(viewer)) + '</span>';
@@ -6237,12 +5873,6 @@ window.allPharmacistNames = [];
       }
       if (act.action === 'give') {
         return me + ' ยก <b>' + _pbEsc(myShift ? myShift.pos : '?') + '</b> ให้ ' + partner;
-      }
-      if (act.action === 'joint') {
-        var _co = (Array.isArray(act.owners) ? act.owners : []).filter(function(n) { return String(n) !== String(viewer); });
-        var _coStr = _co.length ? _co.map(function(n) { return '<b>' + _pbEsc(displayName(n)) + '</b>'; }).join(', ') : '<b>?</b>';
-        var _nt = act.note ? ('<br><span style="color:var(--sub);">📝 ' + _pbEsc(act.note) + '</span>') : '';
-        return me + ' ต่อเวรร่วม <b>' + _pbEsc(myShift ? myShift.pos : '?') + '</b> กับ ' + _coStr + _nt;
       }
       return me + ' รับ <b>' + _pbEsc(tgtShift ? tgtShift.pos : '?') + '</b> จาก ' + partner;
     }
@@ -6263,10 +5893,6 @@ window.allPharmacistNames = [];
         myShift = _swfResolveShift(action.shiftKey, viewer);
         rowsHtml = _swfRowHtml(myShift, true);
         miniLabel = 'เวรที่ยกให้';
-      } else if (kind === 'joint') {
-        myShift = _swfResolveShift(action.shiftKey, viewer);
-        rowsHtml = _swfRowHtml(myShift, true);
-        miniLabel = 'เวรที่ต่อเวรร่วม';
       } else {  // add
         tgtShift = _swfResolveShift(action.shiftKey, action.partnerName || '');
         rowsHtml = _swfRowHtml(tgtShift, false);
@@ -6274,8 +5900,7 @@ window.allPharmacistNames = [];
       }
       var title = kind === 'swap' ? '🔄 ยืนยันการแลกเวร'
                 : (kind === 'give' ? '🎁 ยืนยันการยกเวร'
-                : (kind === 'joint' ? '🤝 ยืนยันการต่อเวรร่วม'
-                : '🤝 ยืนยันการรับเวร'));
+                : '🤝 ยืนยันการรับเวร');
       var tableHtml = rowsHtml
         ? '<div class="swf-mini-label">' + miniLabel + '</div>' +
           '<div class="swf-tbl-wrap"><table class="swf-tbl">' +
@@ -7155,12 +6780,10 @@ window.allPharmacistNames = [];
     function _pbOverlaySignature(pb) {
       if (!Array.isArray(pb)) return '';
       return pb.length + ':' + pb.map(function(o) {
-        // v3.46: fold joint co-ownership fields so a note-edit / self-removal / new joint forces a
-        //   repaint even when the overlay COUNT is unchanged (the live-poll compares this signature).
-        var jointFp = (o && (Array.isArray(o.owners) || o.note != null || o.refActionId))
-          ? ('|' + (Array.isArray(o.owners) ? o.owners.join('/') : '') + '|' + (o.note != null ? String(o.note) : '') + '|' + (o.refActionId || ''))
-          : '';
-        return (o && o.actionId || '') + '~' + (o && o._visibility || 'public') + '~' + (o && o.partnerName || '') + jointFp;
+        // v3.48: fold the note text so a public note edit forces a repaint for other viewers even
+        //   when the overlay COUNT is unchanged (the live-poll compares this signature).
+        var noteFp = (o && o.note != null) ? ('|' + String(o.note)) : '';
+        return (o && o.actionId || '') + '~' + (o && o._visibility || 'public') + '~' + (o && o.partnerName || '') + noteFp;
       }).sort().join(',');
     }
     // v3.44: adopt fresh overlays + re-render in place (shared by the poll and manual refresh).
@@ -7903,9 +7526,9 @@ window.allPharmacistNames = [];
       const _usedMap = window._lwwEngine ? _lwwBackedUsedMap(_mid, _curUser) : OverlayManager.getUsedMap(_mid, _curUser);
       // v3.41: PB usedMap for anonymous / non-owner chevron+dot
       const _pbUsedMap = window._lwwEngine ? {} : ((typeof PBOverlays !== 'undefined') ? PBOverlays.getUsedMap(_pbGetLoggedInName()) : {});
-      // v3.46: joint co-ownership map (shiftKey → {currentOwners, currentNote, ...}). Computed once
-      //   per render like the used-map; painted on the intact master row (see below).
-      const _jointMap = (typeof _combinedJointMap === 'function') ? _combinedJointMap(_mid, _curUser) : {};
+      // v3.48: per-shift note map (shiftKey → {note, _visibility, by}). Computed once per render like
+      //   the used-map; painted as a 📝 marker on the row (public notes on any row, private on own).
+      const _noteMap = (typeof _shiftNoteMap === 'function') ? _shiftNoteMap(_mid, _curUser) : {};
       const _rowsHtml = [];
       // v3.43: show the inline 🌐 publish button once per draft action. Real rows precede ghosts
       //   in `items`, so the struck source row wins the button; a pure 'add' lands it on the ghost.
@@ -7915,14 +7538,9 @@ window.allPharmacistNames = [];
         const _isGhost = !!i._ghost;
         const _shiftKey = _isGhost ? i._ghostKey : makeShiftKey(i);
         const _used = _usedMap[_shiftKey] || _pbUsedMap[_shiftKey];  // v13/v3.41
-        // v3.46: joint co-ownership applies to a row the viewer HOLDS — their own master shift OR a
-        //   shift they received (ghost row, keyed by its stable _g_<actionId>). Never a struck row.
-        const _joint = (!_used) ? _jointMap[_shiftKey] : null;
-        const _jointOwners = (_joint && Array.isArray(_joint.currentOwners) && _joint.currentOwners.length >= 2) ? _joint.currentOwners : null;
+        // v3.48: a note shows on a row the viewer HOLDS (own master OR received ghost) — not a struck row.
+        const _noteInfo = (!_used) ? _noteMap[_shiftKey] : null;
         const _isOwn = !_isGhost && i.name === _curUser;
-        // v3.47: a joint row is tappable in edit mode → openActionModalForKey intercepts joint keys
-        //   and opens the manage overlay (a joint shift has no give/swap). Covered by _isGhost since
-        //   joint rows carry _ghost:'joint'.
         const _tappable = editModeActive && (_isOwn || _isGhost || !!_used);
         let badge = "badge-other"; let s = i.shift.toLowerCase();
         if (s.includes("⚠️")) badge = "badge-purple";
@@ -7986,16 +7604,15 @@ window.allPharmacistNames = [];
         const _nameBase = i.isNew ? 'text-orange-600 font-bold leading-none' : 'text-blue-900 font-bold leading-none';
         const _cnwCls = 'col-name-wrap';
         const _ncwLeft = '<span class="ncw-left"></span>';
-        // v3.46: a jointly-owned shift shows every current owner "A + B" + a 🤝 handshake marker (tap = view/edit).
-        const _nameInner = _jointOwners ? _jointOwners.map(n => displayName(n)).join(' + ') : displayName(i.name);
-        // 🤝 only when the party has >=2 current owners; a collapsed (1-owner) joint renders as a
-        //   normal single-name shift (still tappable → manage, so the sole owner can re-add people).
-        const _jointMark = _jointOwners
-          ? ` <span class="joint-note-mark" onclick="event.stopPropagation(); _jointShowNote('${_joint.actionId}')" title="ต่อเวรร่วม — แตะดูรายละเอียด/จัดการ" role="button" style="cursor:pointer;">🤝</span>`
+        const _nameInner = displayName(i.name);
+        // v3.48: 📝 note marker — tap to read (owner can edit/delete). data-note-key routes via the
+        //   delegated capture-phase handler so it works on any row regardless of edit mode.
+        const _noteMark = (_noteInfo && _noteInfo.note)
+          ? ` <span class="shift-note-mark" data-note-key="${_pbEsc(_shiftKey)}" title="${String(_noteInfo._visibility) === 'private' ? 'โน้ตส่วนตัว (เห็นเฉพาะคุณ)' : 'โน้ต'} — แตะดู" role="button" style="cursor:pointer;">📝${String(_noteInfo._visibility) === 'private' ? '<span style="font-size:0.8em; opacity:0.75;">🔒</span>' : ''}</span>`
           : '';
-        const nameDisplay = `<span class="${_cnwCls}">${_ncwLeft}<span class="ncw-center"><span class="${_nameBase} ${_strike}">${i.isNew?'⚠️ ':''}${_nameInner}</span>${_jointMark}${_pencil}${_pubInline}</span><span class="ncw-right">${_suffix}</span></span>`;
+        const nameDisplay = `<span class="${_cnwCls}">${_ncwLeft}<span class="ncw-center"><span class="${_nameBase} ${_strike}">${i.isNew?'⚠️ ':''}${_nameInner}</span>${_noteMark}${_pencil}${_pubInline}</span><span class="ncw-right">${_suffix}</span></span>`;
         let _ghostCls = '';
-        if (_isGhost && !i._jointRow) {   // joint rows render as normal shifts (no received/conflict border)
+        if (_isGhost) {
           if (i._conflict === 'overlap') _ghostCls = 'shift-ghost-overlap';
           else if (i._conflict === 'adjacent') _ghostCls = 'shift-ghost-adjacent';
           else _ghostCls = 'shift-ghost-received';
@@ -8237,7 +7854,7 @@ window.allPharmacistNames = [];
       const _calUser = getCurrentUser();
       const _calUsedMap = OverlayManager.getUsedMap(_calMid, _calUser);
       const _calPBUsedMap = (typeof PBOverlays !== 'undefined') ? PBOverlays.getUsedMap(_pbGetLoggedInName()) : {};
-      const _calJointMap = (typeof _combinedJointMap === 'function') ? _combinedJointMap(_calMid, _calUser) : {};
+      const _calNoteMap = (typeof _shiftNoteMap === 'function') ? _shiftNoteMap(_calMid, _calUser) : {};
       for (let _ci = 0; _ci < _calCells.length; _ci++) {
         const cell = _calCells[_ci];
         const day = cell.day;
@@ -8270,7 +7887,7 @@ window.allPharmacistNames = [];
           const _isGhostBadge = !!s._ghost;
           const _calKey = _isGhostBadge ? s._ghostKey : makeShiftKey(s);
           const _calUsed = _calUsedMap[_calKey] || _calPBUsedMap[_calKey];  // v13/v3.41
-          const _calJoint = (!_calUsed && _calJointMap[_calKey] && (_calJointMap[_calKey].currentOwners || []).length >= 2) ? _calJointMap[_calKey] : null;
+          const _calNote = (!_calUsed && _calNoteMap[_calKey] && _calNoteMap[_calKey].note) ? _calNoteMap[_calKey] : null;
           let _calExtraCls = '';
           if (_calUsed) _calExtraCls = ' cal-badge-used';
           else if (_isGhostBadge) {
@@ -8300,8 +7917,8 @@ window.allPharmacistNames = [];
           } else if (_isClinicBadge) {
             _badgeAttrs = ` data-phx-note-trigger="1" data-phx-note-date="${encodeURIComponent(s.date || '')}" data-phx-note-pos="${encodeURIComponent(s.pos || '')}" style="cursor:pointer;"`;
           }
-          const _calJointMark = _calJoint ? ` <span class="cal-joint-mark" onclick="event.stopPropagation(); _jointShowNote('${_calJoint.actionId}')" title="ต่อเวรร่วม — แตะดูรายละเอียด" style="cursor:pointer; font-size:0.9em;">🤝</span>` : '';
-          return `<div class="cal-badge ${bc}${_calExtraCls}"${_badgeAttrs}>${_calDot}<span class="cal-text">${s.pos}</span>${_calJointMark}</div>`;
+          const _calNoteMark = _calNote ? ` <span class="cal-note-mark" data-note-key="${_pbEsc(_calKey)}" title="โน้ต — แตะดู" style="cursor:pointer; font-size:0.9em;">📝</span>` : '';
+          return `<div class="cal-badge ${bc}${_calExtraCls}"${_badgeAttrs}>${_calDot}<span class="cal-text">${s.pos}</span>${_calNoteMark}</div>`;
         }).join('');
 
         const dow = new Date(cell.yr, cell.mon - 1, day).getDay();
