@@ -51,8 +51,8 @@ draft ไม่รั่วขึ้นจอคนอื่น · picker toggle
 
 ## ⏭️ NEXT SESSION
 
-1. **Klui live-test v1 ก่อน** — ⚠️ ต้อง **สร้าง GAS deployment version ใหม่** (แก้
-   `Phase_PathB_Global.js` — `/exec` เสิร์ฟ version ที่ pin ไว้; ไม่ deploy = คนอื่นไม่เห็นชื่อร่วม)
+1. **Klui live-test v1** — ✅ **DEPLOYED แล้ว** (2026-07-13): `clasp push` (verified via pull =
+   remote==local) + `clasp deploy -i <@335 prod>` → **`@339`** live ที่ /exec เดิม. พี่ลองได้เลย
    - เครื่อง A: เมนูเวรตัวเอง → 🤝 → เลือก 2 คน + โน้ต → เผยแพร่ → ช่องโชว์ `A + B` + 📝
    - เครื่อง B (login คนละคน): เห็น `A + B` + แตะ 📝 เห็นโน้ต ภายใน ~1 poll
    - ยก/แลกเวรปกติยังทำงาน · เวรที่มี joint กดยก/แลกแล้วโดน toast บล็อก
