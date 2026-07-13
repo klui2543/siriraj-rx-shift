@@ -2128,7 +2128,22 @@
     <div id="phxViewSwap" class="phx-tabview">
       <div class="phx-tv-title">แลกเวร</div>
       <div class="phx-tv-sub">เวรของคุณในเดือนนี้ — แตะที่เวรเพื่อ <b>ยก / แลก / ใส่โน้ต</b></div>
-      <div id="phxSwapBody"></div>
+      <!-- v3.47: ปุ่มสลับ ตาราง/ปฏิทิน (เหมือนหน้าตารางเวร) -->
+      <div class="tab-bar" id="phxSwapModeSwitch" style="margin:6px 0 10px;">
+        <button id="phxSwapBtnTable" type="button" class="tab-btn active" onclick="phxSwapMode('table')">ตาราง</button>
+        <button id="phxSwapBtnCal" type="button" class="tab-btn" onclick="phxSwapMode('calendar')">ปฏิทิน</button>
+      </div>
+      <div id="phxSwapTablePanel">
+        <div id="phxSwapBody"></div>
+      </div>
+      <div id="phxSwapCalPanel" class="hidden">
+        <div style="overflow-x:auto;" class="custom-scrollbar">
+          <div style="min-width:350px;">
+            <div id="phxSwapCalHeaderRow" class="cal-header-row"></div>
+            <div id="phxSwapCalGrid"></div>
+          </div>
+        </div>
+      </div>
     </div>
 
     <!-- ===== v3.47: TAB VIEW — ฉัน (profile) ===== -->
@@ -7861,9 +7876,19 @@ window.allPharmacistNames = [];
         return mIdx >= 0 ? mIdx + 1 : null;
       } catch (e) { return null; }
     }
-    function renderCalendar(name) {
-      document.getElementById('calendarNotice').classList.add('hidden');
-      document.getElementById('calendarGridWrapper').classList.remove('hidden');
+    function renderCalendar(name, opts) {
+      // v3.47: optional targets so the แลกเวร tab can render a personal calendar into its OWN
+      //   containers. All default to the main schedule calendar → existing 1-arg callers unchanged.
+      opts = opts || {};
+      var _gridEl   = opts.gridEl   || document.getElementById('calendarGrid');
+      var _headerEl = ('headerEl'  in opts) ? opts.headerEl  : document.querySelector('.cal-header-row');
+      var _noticeEl = ('noticeEl'  in opts) ? opts.noticeEl  : document.getElementById('calendarNotice');
+      var _wrapEl   = ('wrapperEl' in opts) ? opts.wrapperEl : document.getElementById('calendarGridWrapper');
+      var _viewer   = ('viewer'    in opts) ? opts.viewer    : getCurrentUser();
+      var _midOv    = ('mid'       in opts) ? opts.mid       : getCurrentMonthId();
+      var _swapTap  = !!opts.swapTap;
+      if (_noticeEl) _noticeEl.classList.add('hidden');
+      if (_wrapEl)   _wrapEl.classList.remove('hidden');
       const label = document.getElementById('mainMonthSelector').options[document.getElementById('mainMonthSelector').selectedIndex].text;
       const thaiMonths = ["มกราคม", "กุมภาพันธ์", "มีนาคม", "เมษายน", "พฤษภาคม", "มิถุนายน", "กรกฎาคม", "สิงหาคม", "กันยายน", "ตุลาคม", "พฤศจิกายน", "ธันวาคม"];
       const parts = label.split(' ');
@@ -7892,8 +7917,8 @@ window.allPharmacistNames = [];
         rotated.push(allDays[(startDowNum + i) % 7]);
       }
 
-      // Update header row
-      const headerRow = document.querySelector('.cal-header-row');
+      // Update header row (v3.47: use the resolved target, not the first .cal-header-row in the DOM)
+      const headerRow = _headerEl;
       if (headerRow) {
         headerRow.innerHTML = rotated.map(d =>
           `<div class="cal-header-cell ${d.cls}">${d.short}</div>`
@@ -7957,8 +7982,8 @@ window.allPharmacistNames = [];
         cellIndex++;
       }
 
-      const _calMid = getCurrentMonthId();
-      const _calUser = getCurrentUser();
+      const _calMid = _midOv;
+      const _calUser = _viewer;
       const _calUsedMap = OverlayManager.getUsedMap(_calMid, _calUser);
       const _calPBUsedMap = (typeof PBOverlays !== 'undefined') ? PBOverlays.getUsedMap(_pbGetLoggedInName()) : {};
       const _calNoteMap = (typeof _shiftNoteMap === 'function') ? _shiftNoteMap(_calMid, _calUser) : {};
@@ -8011,7 +8036,7 @@ window.allPharmacistNames = [];
           if (_calUsed && _calUsed.color) _pairColor = _calUsed.color;
           else if (_isGhostBadge && s._ghostType === 'swap' && s._ghostActionId) {
             // v3.42.4: fall back to PBOverlays for bilateral swap ghosts
-            _pairColor = OverlayManager.getSwapColor(_calMid, getCurrentUser(), s._ghostActionId)
+            _pairColor = OverlayManager.getSwapColor(_calMid, _calUser, s._ghostActionId)
                       || (typeof PBOverlays !== 'undefined' ? PBOverlays.getSwapColor(s._ghostActionId) : null);
           }
           if (_pairColor) _calDot = `<span class="cal-pair-dot" style="background:${_pairColor}"></span>`;
@@ -8019,7 +8044,11 @@ window.allPharmacistNames = [];
           const _isHospitalBadge = s.room && s.room !== 'clinic';
           const _isClinicBadge = s.room === 'clinic' || s.range === 'ตรวจสอบ' || (s.shift && s.shift.indexOf('⚠️') >= 0);
           let _badgeAttrs = '';
-          if (_isHospitalBadge) {
+          if (_swapTap) {
+            // v3.47: แลกเวร calendar → the badge IS the tap target; route to the same action menu
+            //   as a swap-table row. Suppress the Phase-J/clinic view triggers so they don't compete.
+            _badgeAttrs = ` data-swap-cal-key="${encodeURIComponent(_calKey)}" style="cursor:pointer;"`;
+          } else if (_isHospitalBadge) {
             _badgeAttrs = ` data-phx-shift-trigger="1" data-phx-pos="${encodeURIComponent(s.pos || '')}" data-phx-room="${encodeURIComponent(s.room || '')}" data-phx-date="${encodeURIComponent(s.date || '')}"`;
           } else if (_isClinicBadge) {
             _badgeAttrs = ` data-phx-note-trigger="1" data-phx-note-date="${encodeURIComponent(s.date || '')}" data-phx-note-pos="${encodeURIComponent(s.pos || '')}" style="cursor:pointer;"`;
@@ -8043,7 +8072,10 @@ window.allPharmacistNames = [];
         let _cellData = '';
         let _cellCls = '';
         let _cellPlus = '';
-        if (editModeActive) {
+        if (_swapTap) {
+          // v3.47: แลกเวร calendar → taps happen on the badge (data-swap-cal-key), not the cell;
+          //   skip the edit-mode / view-picker cell attributes so the global handlers don't engage.
+        } else if (editModeActive) {
           _cellData = ` data-cal-day="${day}" data-cal-month="${cell.mon}"`;
           _cellCls = ' cal-cell-tappable';
           // ZZ4: นับเฉพาะ shift ที่ยัง alive (ไม่ใช่ struck) — ถ้าทั้งหมดถูกยก/แลกไปแล้ว ให้แสดง "+"
@@ -8065,7 +8097,7 @@ window.allPharmacistNames = [];
         cellIndex++;
       }
 
-      document.getElementById('calendarGrid').innerHTML = html;
+      _gridEl.innerHTML = html;
     }
 
     function changeFontSize(delta) {
@@ -17410,8 +17442,11 @@ table.exp-tbl .tm{margin-left:3px;opacity:0.75;}
       var pesc = (typeof _pbEsc === 'function') ? _pbEsc : esc;
       var shiftName = (s.shift && s.shift !== '-') ? s.shift : '';
       var rng = (s.range && s.range !== '-') ? s.range : '';
+      // v3.47: badge markup mirrors renderTable() exactly (font-bold/font-light + tracking) so the
+      //   แลกเวร badge is identical weight/size to the main schedule table (was thinner via .swf-badge).
       var badgeInner = (rng === 'ตรวจสอบ') ? 'ตรวจสอบ'
-        : esc(shiftName) + (rng ? '<span class="swf-rng">'+esc(rng)+'</span>' : '');
+        : (shiftName ? '<span class="font-bold tracking-tight">'+esc(shiftName)+'</span>' : '')
+          + (rng ? '<span class="font-light opacity-90 tracking-tighter ml-1">'+esc(rng)+'</span>' : '');
       var badgeCls = (typeof _swfBadgeClass === 'function') ? _swfBadgeClass(s) : 'badge-other';
       var tag = opts.tag ? ' <span class="phx-swap-tag '+(opts.tagCls||'')+'">'+esc(opts.tag)+'</span>' : '';
       var ni = opts.noteMap ? opts.noteMap[String(key)] : null;
@@ -17425,7 +17460,7 @@ table.exp-tbl .tm{margin-left:3px;opacity:0.75;}
           '<td class="swf-c-date" style="'+strike+'">'+esc(s.date||'')+'</td>' +
           '<td class="swf-c-name">'+esc(nm)+tag+noteMark+'</td>' +
           '<td class="swf-c-pos" style="'+strike+'">'+esc(s.pos||'')+'</td>' +
-          '<td><span class="swf-badge '+badgeCls+'" style="'+strike+'">'+badgeInner+'</span></td>' +
+          '<td><div class="inline-flex items-center justify-center '+badgeCls+' px-1.5 py-1 rounded font-bold shadow-2xs whitespace-nowrap text-center box-border leading-none" style="'+strike+'">'+badgeInner+'</div></td>' +
         '</tr>';
     }
     function _swapTable(rowsHtml){
@@ -17438,6 +17473,9 @@ table.exp-tbl .tm{margin-left:3px;opacity:0.75;}
       if (!body) return;
       var me = curName();
       if (!me){
+        var sw0 = document.getElementById('phxSwapModeSwitch'); if (sw0) sw0.style.display = 'none';
+        var cp0 = document.getElementById('phxSwapCalPanel'); if (cp0) cp0.classList.add('hidden');
+        var tp0 = document.getElementById('phxSwapTablePanel'); if (tp0) tp0.classList.remove('hidden');
         body.innerHTML = '<div class="phx-tv-empty">ยังไม่ได้เลือกชื่อของคุณ<br>' +
           'ไปที่แท็บ <b>ตารางเวร</b> แล้วพิมพ์ชื่อ (หรือเข้าสู่ระบบ) เพื่อจัดการเวรของคุณ' +
           '<div style="margin-top:18px;"><button class="phx-me-cta" style="max-width:220px;margin:0 auto;" onclick="phxSetTab(\'schedule\')">ไปที่ตารางเวร</button></div></div>';
@@ -17474,6 +17512,9 @@ table.exp-tbl .tm{margin-left:3px;opacity:0.75;}
         }).join(''));
       }
       body.innerHTML = html;
+      // v3.47: show the toggle + re-apply the current panel (repaints the calendar if it's active)
+      var sw = document.getElementById('phxSwapModeSwitch'); if (sw) sw.style.display = '';
+      if (typeof phxSwapMode === 'function') phxSwapMode(_phxSwapMode);
     };
 
     // tap a shift row on the แลกเวร tab → ensure edit mode → open the action menu (stay on this tab)
@@ -17495,6 +17536,46 @@ table.exp-tbl .tm{margin-left:3px;opacity:0.75;}
       if (e.target.closest('[data-note-key]')) return;
       e.stopPropagation();
       phxSwapRowTap(decodeURIComponent(tr.getAttribute('data-swap-key') || ''));
+    });
+
+    // ========= v3.47: แลกเวร table/calendar toggle + personal calendar =========
+    var _phxSwapMode = 'table';
+    window.phxSwapMode = function(m){
+      _phxSwapMode = (m === 'calendar') ? 'calendar' : 'table';
+      var tp = document.getElementById('phxSwapTablePanel');
+      var cp = document.getElementById('phxSwapCalPanel');
+      var bt = document.getElementById('phxSwapBtnTable');
+      var bc = document.getElementById('phxSwapBtnCal');
+      if (tp) tp.classList.toggle('hidden', _phxSwapMode !== 'table');
+      if (cp) cp.classList.toggle('hidden', _phxSwapMode !== 'calendar');
+      if (bt) bt.classList.toggle('active', _phxSwapMode === 'table');
+      if (bc) bc.classList.toggle('active', _phxSwapMode === 'calendar');
+      if (_phxSwapMode === 'calendar') _phxRenderSwapCalendar();
+    };
+    // Render the current user's PERSONAL calendar into the swap tab (reuses renderCalendar via opts).
+    function _phxRenderSwapCalendar(){
+      var grid = document.getElementById('phxSwapCalGrid');
+      if (!grid) return;
+      var me = curName();
+      if (!me){ grid.innerHTML = ''; return; }
+      if (typeof renderCalendar === 'function'){
+        try {
+          renderCalendar(me, {
+            gridEl: grid,
+            headerEl: document.getElementById('phxSwapCalHeaderRow'),
+            noticeEl: null, wrapperEl: null,   // panel visibility handled by phxSwapMode, not renderCalendar
+            viewer: me, swapTap: true          // decorations keyed to me; badges get data-swap-cal-key
+          });
+        } catch(e){ grid.innerHTML = '<div class="phx-tv-empty" style="padding:24px 12px;">แสดงปฏิทินไม่ได้</div>'; }
+      }
+    }
+    // tap a shift badge in the แลกเวร calendar → same path as a swap-table row tap
+    document.addEventListener('click', function(e){
+      var b = (e.target && e.target.closest) ? e.target.closest('[data-swap-cal-key]') : null;
+      if (!b) return;
+      if (e.target.closest('[data-note-key]')) return;   // 📝 note marker wins
+      e.stopPropagation();
+      phxSwapRowTap(decodeURIComponent(b.getAttribute('data-swap-cal-key') || ''));
     });
 
     // ========= quick-note FAB (replaces the old edit pencil) =========
