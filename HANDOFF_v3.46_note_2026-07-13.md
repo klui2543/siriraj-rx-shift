@@ -37,7 +37,7 @@ Klui live-tested joint v2.0 แล้วบอก *"ไม่เวิร์ค 
 
 ## TODO ถัดไป
 - [ ] Klui live-test `/dev`: เขียน public+private → 📝/📝🔒 → อ่าน → แก้/ลบ → เพื่อนเห็น public ไม่เห็น private
-- [ ] Klui ตั้งชื่อรุ่นใน `APP_CHANGELOG` (ตอนนี้ใส่ placeholder "โน้ตเวร — จดโน้ตบนเวรตัวเอง" ไว้ก่อน)
+- [x] Klui ตั้งชื่อรุ่นใน `APP_CHANGELOG` = **"เพิ่มโน้ตในตารางเวร"** (2026-07-13)
 - [ ] สร้าง deployment version ใหม่เพื่อขึ้น /exec
 - DEFERRED เดิม (ไม่เกี่ยว): bottom nav 3 tabs · swap-flow view redesign
 
