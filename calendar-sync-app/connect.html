@@ -1,0 +1,171 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+  <base target="_top">
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <style>
+    * { box-sizing: border-box; }
+    body {
+      font-family: "Noto Sans Thai", "Segoe UI", system-ui, sans-serif;
+      margin: 0; padding: 20px; background: #f4f6fb; color: #1a1f2e;
+      line-height: 1.6;
+    }
+    .card {
+      max-width: 460px; margin: 0 auto; background: #fff; border-radius: 14px;
+      box-shadow: 0 4px 20px rgba(0,0,0,.08); padding: 24px; overflow: hidden;
+    }
+    h1 { font-size: 1.2rem; margin: 0 0 4px; }
+    .sub { color: #6b7280; font-size: .85rem; margin: 0 0 18px; }
+    .row { display: flex; justify-content: space-between; padding: 8px 0; border-bottom: 1px solid #eef0f4; font-size: .9rem; }
+    .row .k { color: #6b7280; }
+    .row .v { font-weight: 600; text-align: right; }
+    button {
+      width: 100%; border: none; border-radius: 10px; padding: 12px; font-size: .95rem;
+      font-weight: 600; cursor: pointer; margin-top: 12px; font-family: inherit;
+    }
+    .primary { background: #1e40af; color: #fff; }
+    .primary:disabled { background: #9aa7cf; cursor: default; }
+    .danger { background: #fff; color: #dc2626; border: 1px solid #f0c4c4; }
+    .ghost { background: #f1f3f9; color: #374151; }
+    .status { margin-top: 16px; padding: 12px; border-radius: 10px; font-size: .88rem; display: none; }
+    .status.ok { background: #ecfdf5; color: #065f46; display: block; }
+    .status.err { background: #fef2f2; color: #991b1b; display: block; }
+    .status.info { background: #eff6ff; color: #1e40af; display: block; }
+    .muted { color: #9ca3af; font-size: .78rem; margin-top: 14px; text-align: center; }
+    .spinner { display: inline-block; width: 14px; height: 14px; border: 2px solid #fff;
+      border-top-color: transparent; border-radius: 50%; animation: spin .7s linear infinite; vertical-align: -2px; margin-right: 6px; }
+    @keyframes spin { to { transform: rotate(360deg); } }
+  </style>
+</head>
+<body>
+  <div class="card">
+    <h1>เชื่อมต่อ Google Calendar</h1>
+    <p class="sub">Siriraj Rx Shift — ซิงค์เวรของคุณเข้าปฏิทินอัตโนมัติ</p>
+
+    <div id="info">
+      <div class="row"><span class="k">บัญชี Google</span><span class="v" id="v-email">…</span></div>
+      <div class="row"><span class="k">ปฏิทินปลายทาง</span><span class="v" id="v-cal">…</span></div>
+      <div class="row"><span class="k">เวรที่ซิงค์แล้ว</span><span class="v" id="v-count">…</span></div>
+    </div>
+
+    <button class="primary" id="btn-sync" disabled>ซิงค์เวรเดี๋ยวนี้</button>
+    <button class="danger" id="btn-revoke">ยกเลิกการเชื่อมต่อ (ถอนสิทธิ์)</button>
+
+    <div class="status" id="status"></div>
+    <p class="muted">ยินยอมครั้งเดียว · เวรใหม่จะซิงค์อัตโนมัติ · ถอนสิทธิ์ได้ตลอดเวลา</p>
+  </div>
+
+<script>
+  // ผู้ส่งข้อมูลเวร = แอปหลัก (เปิดหน้านี้เป็น popup แล้ว postMessage เข้ามา)
+  // ดู README §การเชื่อมกับแอปหลัก สำหรับโค้ดฝั่งแอปหลัก
+  var MSG_READY  = 'RXSHIFT_CAL_READY';   // หน้านี้ → แอปหลัก: พร้อมแล้ว
+  var MSG_SYNC   = 'RXSHIFT_CAL_SYNC';    // แอปหลัก → หน้านี้: {monthValue, shifts}
+  var MSG_RESULT = 'RXSHIFT_CAL_RESULT';  // หน้านี้ → แอปหลัก: ผลลัพธ์
+
+  var lastPayload = null;
+  var $ = function (id) { return document.getElementById(id); };
+
+  function setStatus(kind, html) {
+    var el = $('status');
+    el.className = 'status ' + kind;
+    el.innerHTML = html;
+  }
+  function busy(on, label) {
+    $('btn-sync').disabled = on;
+    if (on) $('btn-sync').innerHTML = '<span class="spinner"></span>' + (label || 'กำลังทำงาน…');
+    else $('btn-sync').innerHTML = 'ซิงค์เวรเดี๋ยวนี้';
+  }
+
+  // 1) โหลดสถานะ (จุดนี้เองที่ Google จะถามยินยอมครั้งแรก)
+  function loadStatus() {
+    google.script.run
+      .withSuccessHandler(function (r) {
+        if (!r || !r.ok) { setStatus('err', 'โหลดสถานะไม่สำเร็จ'); return; }
+        $('v-email').textContent = r.email || '-';
+        $('v-cal').textContent = r.calendarName || 'ปฏิทินหลัก';
+        $('v-count').textContent = (r.syncedCount || 0) + ' รายการ';
+        $('btn-sync').disabled = false;
+      })
+      .withFailureHandler(function (e) {
+        setStatus('err', 'เกิดข้อผิดพลาด: ' + (e && e.message ? e.message : e));
+      })
+      .getStatus();
+  }
+
+  // 2) รับข้อมูลเวรจากแอปหลัก
+  window.addEventListener('message', function (e) {
+    var d = e.data || {};
+    if (d.type === MSG_SYNC && d.payload) {
+      lastPayload = d.payload;
+      doSync(lastPayload);
+    }
+  });
+
+  // 3) ซิงค์
+  function doSync(payload) {
+    if (!payload) {
+      setStatus('info', 'ยังไม่มีข้อมูลเวรส่งเข้ามา — กรุณากดซิงค์จากแอปหลัก');
+      return;
+    }
+    busy(true, 'กำลังซิงค์…');
+    google.script.run
+      .withSuccessHandler(function (r) {
+        busy(false);
+        if (r && r.ok) {
+          setStatus('ok', 'ซิงค์สำเร็จ · เพิ่ม ' + r.created + ' · แก้ ' + r.updated +
+                          ' · ลบ ' + r.deleted + ' (ปฏิทิน: ' + (r.calendarName || '-') + ')');
+          loadStatus();
+          postToOpener(MSG_RESULT, r);
+        } else {
+          setStatus('err', 'ซิงค์ไม่สำเร็จ: ' + ((r && r.message) || (r && r.error) || 'unknown'));
+          postToOpener(MSG_RESULT, r || { ok: false });
+        }
+      })
+      .withFailureHandler(function (e) {
+        busy(false);
+        setStatus('err', 'ซิงค์ล้มเหลว: ' + (e && e.message ? e.message : e));
+      })
+      .syncEffectiveShifts(payload);
+  }
+
+  // 4) ถอนสิทธิ์
+  function doRevoke() {
+    if (!confirm('ยกเลิกการเชื่อมต่อ?\n\nระบบจะลบ event เวรที่สร้างไว้ทั้งหมดออกจากปฏิทินของคุณ และเพิกถอนสิทธิ์ — ครั้งหน้าต้องยินยอมใหม่ถ้าจะใช้อีก')) return;
+    setStatus('info', '<span class="spinner" style="border-color:#1e40af;border-top-color:transparent"></span>กำลังลบ event และถอนสิทธิ์…');
+    google.script.run
+      .withSuccessHandler(function (r) {
+        if (r && r.ok) {
+          var note = r.note ? ('<br><small>' + r.note + '</small>') : '';
+          setStatus('ok', 'ถอนสิทธิ์เรียบร้อย · ลบ ' + r.removed + ' event' + note +
+                          '<br><small>ถอนเพิ่มได้ที่ myaccount.google.com/permissions</small>');
+          $('v-count').textContent = '0 รายการ';
+          $('btn-sync').disabled = true;
+          postToOpener(MSG_RESULT, r);
+        } else {
+          setStatus('err', 'ถอนสิทธิ์ไม่สำเร็จ');
+        }
+      })
+      .withFailureHandler(function (e) {
+        setStatus('err', 'ถอนสิทธิ์ล้มเหลว: ' + (e && e.message ? e.message : e));
+      })
+      .disconnectAndRevoke();
+  }
+
+  function postToOpener(type, data) {
+    try {
+      // targetOrigin '*' เพราะ origin ของ Apps Script sandbox แปรผัน — ข้อมูลเป็นตารางเวร
+      // ของผู้ใช้เอง ไม่ใช่ความลับ และฝั่งรับตรวจ type อยู่แล้ว (ดู README ถ้าต้องการล็อก origin)
+      if (window.opener) window.opener.postMessage({ type: type, data: data }, '*');
+      if (window.parent && window.parent !== window) window.parent.postMessage({ type: type, data: data }, '*');
+    } catch (e) {}
+  }
+
+  $('btn-sync').addEventListener('click', function () { doSync(lastPayload); });
+  $('btn-revoke').addEventListener('click', doRevoke);
+
+  loadStatus();
+  postToOpener(MSG_READY, { ok: true });
+</script>
+</body>
+</html>

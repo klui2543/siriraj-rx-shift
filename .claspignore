@@ -17,3 +17,8 @@
 #    GAS parse ไม่ได้ "Unexpected token ILLEGAL" → clasp push พังทั้งชุด)
 #    ต้องอยู่หลัง !*.js เพราะ pattern ทีหลังชนะ (gitignore semantics)
 generate-index.js
+
+# 4) กันโปรเจกต์ Calendar ที่แยกออกไป (มี scriptId/clasp ของตัวเอง) ไม่ให้ถูกดูดเข้า
+#    โปรเจกต์หลักโดย Stop-hook clasp push — ต้องอยู่ท้ายสุดเพื่อชนะ !*.js/!*.html
+#    (โปรเจกต์นี้ push แยกจากในโฟลเดอร์ calendar-sync-app/ ด้วย clasp ของมันเอง)
+calendar-sync-app/**

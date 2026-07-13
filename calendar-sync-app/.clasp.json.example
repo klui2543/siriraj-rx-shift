@@ -1,0 +1,5 @@
+{
+  "_comment": "คัดลอกไฟล์นี้เป็น .clasp.json แล้วใส่ scriptId ของโปรเจกต์ Calendar ที่สร้างใหม่ (คนละตัวกับแอปหลัก) — อย่าใช้ scriptId ของแอปหลักเด็ดขาด มิฉะนั้น scope จะรวมกันอีก",
+  "scriptId": "<<PUT_NEW_CALENDAR_SCRIPT_ID_HERE>>",
+  "rootDir": ""
+}
