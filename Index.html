@@ -1048,7 +1048,7 @@
        ============================================================ */
     .phx-fab {
       position: fixed;
-      bottom: 22px; right: 18px;
+      bottom: 78px; right: 18px;   /* v3.47: lifted above bottom-nav bar */
       width: 56px; height: 56px;
       border-radius: 50%;
       background: #2563eb; color: white;
@@ -1068,7 +1068,7 @@
 
     .phx-fab-cluster {
       position: fixed;
-      bottom: 22px; right: 18px;
+      bottom: 78px; right: 18px;   /* v3.47: lifted above bottom-nav bar */
       display: none;
       gap: 8px;
       align-items: center;
@@ -1122,6 +1122,104 @@
     }
     .phx-fab-done:hover { background: #15803d; transform: scale(1.03); }
     .phx-fab-done:active { transform: scale(0.97); }
+
+    /* ===================================================================
+       v3.47 — BOTTOM NAVIGATION (3 tabs) + tab-view switching
+       =================================================================== */
+    .phx-bottomnav {
+      position: fixed; left: 0; right: 0; bottom: 0;
+      margin: 0 auto; max-width: 520px;
+      height: 58px;
+      display: flex; align-items: stretch;
+      background: var(--surface);
+      border-top: 1px solid var(--border);
+      box-shadow: 0 -2px 12px rgba(0,0,0,0.06);
+      z-index: 4400;
+    }
+    .phx-bn-item {
+      flex: 1; display: flex; flex-direction: column;
+      align-items: center; justify-content: center; gap: 3px;
+      background: none; border: 0; cursor: pointer;
+      color: var(--muted); font-family: 'Kanit', sans-serif;
+      font-size: 10.5px; font-weight: 600; padding: 6px 0 4px;
+      position: relative; transition: color 0.15s;
+    }
+    .phx-bn-item svg { width: 22px; height: 22px; }
+    .phx-bn-item.active { color: var(--accent); }
+    .phx-bn-item.active::before {
+      content: ''; position: absolute; top: 0; left: 50%; transform: translateX(-50%);
+      width: 30px; height: 3px; border-radius: 0 0 3px 3px; background: var(--accent);
+    }
+
+    /* clear space so schedule content isn't hidden behind the fixed bar */
+    .app-wrap { padding-bottom: 76px; }
+
+    /* tab views — hidden by default; shown when their tab is active */
+    .phx-tabview { display: none; padding: 16px 14px 24px; }
+    body[data-tab="swap"] #phxViewSwap { display: block; }
+    body[data-tab="me"]   #phxViewMe   { display: block; }
+    body[data-tab="swap"] .phx-schedule-only,
+    body[data-tab="me"]   .phx-schedule-only { display: none !important; }
+
+    .phx-tv-title { font-size: 17px; font-weight: 800; color: var(--text); margin: 2px 0 3px; }
+    .phx-tv-sub { font-size: 11.5px; color: var(--sub); margin-bottom: 14px; line-height: 1.55; }
+    .phx-tv-empty { text-align: center; color: var(--muted); font-size: 12.5px; padding: 38px 16px; line-height: 1.75; }
+
+    /* "my shifts" cards on the แลกเวร tab */
+    .phx-mycard {
+      display: flex; align-items: center; gap: 11px;
+      padding: 11px 13px; margin-bottom: 9px;
+      background: var(--surface); border: 1px solid var(--border);
+      border-radius: 13px; cursor: pointer;
+      transition: border-color 0.15s, transform 0.1s, box-shadow 0.15s;
+    }
+    .phx-mycard:active { transform: scale(0.985); }
+    .phx-mycard:hover { border-color: var(--accent-border); box-shadow: 0 2px 10px rgba(37,99,235,0.07); }
+    .phx-mycard-date {
+      flex-shrink: 0; width: 46px; height: 46px; border-radius: 11px;
+      background: var(--accent-bg); color: var(--accent);
+      display: flex; align-items: center; justify-content: center;
+      font-weight: 800; font-size: 18px;
+    }
+    .phx-mycard.is-ghost .phx-mycard-date { background: #f0fdf4; color: #15803d; }
+    .phx-mycard-main { flex: 1; min-width: 0; }
+    .phx-mycard-pos { font-size: 13.5px; font-weight: 700; color: var(--text); }
+    .phx-mycard-shift { font-size: 11.5px; color: var(--sub); margin-top: 2px; }
+    .phx-mycard-arrow { flex-shrink: 0; color: var(--muted); }
+
+    /* profile rows on the ฉัน tab */
+    .phx-me-hero { display: flex; align-items: center; gap: 13px; padding: 4px 2px 16px; }
+    .phx-me-avatar {
+      width: 56px; height: 56px; border-radius: 50%;
+      background: var(--navy); color: #fff;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 22px; font-weight: 800; flex-shrink: 0;
+    }
+    .phx-me-name { font-size: 18px; font-weight: 800; color: var(--text); line-height: 1.2; }
+    .phx-me-role { font-size: 11.5px; color: var(--sub); margin-top: 3px; }
+    .phx-me-section-label {
+      font-size: 10.5px; font-weight: 700; color: var(--muted);
+      letter-spacing: 0.04em; margin: 18px 2px 8px;
+    }
+    .phx-me-row {
+      display: flex; align-items: center; gap: 12px; width: 100%;
+      padding: 13px 14px; margin-bottom: 8px;
+      background: var(--surface); border: 1px solid var(--border);
+      border-radius: 12px; cursor: pointer; text-align: left;
+      font-family: 'Kanit', sans-serif; font-size: 13.5px; font-weight: 600; color: var(--text);
+      transition: background 0.15s, border-color 0.15s;
+    }
+    .phx-me-row:hover { border-color: var(--accent-border); background: var(--accent-bg); }
+    .phx-me-row .ic { flex-shrink: 0; color: var(--accent); display: flex; }
+    .phx-me-row .tx { flex: 1; }
+    .phx-me-row .ch { color: var(--muted); flex-shrink: 0; }
+    .phx-me-row.danger { color: #dc2626; }
+    .phx-me-row.danger .ic { color: #dc2626; }
+    .phx-me-cta {
+      display: block; width: 100%; padding: 14px;
+      background: var(--accent); color: #fff; border: 0; border-radius: 12px;
+      font-family: 'Kanit', sans-serif; font-size: 14px; font-weight: 700; cursor: pointer;
+    }
 
     /* LocalStorage notice in settings */
     .overlay-storage-notice {
@@ -1712,7 +1810,7 @@
   /* ============================================================================== */
   </style>
 </head>
-<body>
+<body data-tab="schedule">
   <div class="app-wrap">
 
     <!-- ===== BRAND HEADER ===== -->
@@ -1801,7 +1899,7 @@
     <div id="phxBcastBannerHost" style="margin-top: 10px;"></div>
 
     <!-- ===== MONTH SELECTOR ROW ===== -->
-    <div class="month-row">
+    <div class="month-row phx-schedule-only">
       <div style="position:relative; display:inline-block;">
         <div class="month-chip">
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
@@ -1818,12 +1916,12 @@
       <a id="sheetLinkBtn" href="#" target="_blank" style="display:none;"></a>
     </div>
 
-    <div id="extraSheetNotice" class="hidden"></div>
+    <div id="extraSheetNotice" class="hidden phx-schedule-only"></div>
 
     <!-- ===== LOADING / CONTENT ===== -->
-    <div id="loading"><div class="loader"></div></div>
+    <div id="loading" class="phx-schedule-only"><div class="loader"></div></div>
 
-    <div id="content" class="hidden">
+    <div id="content" class="hidden phx-schedule-only">
 
       <!-- ===== FILTER SECTION ===== -->
       <div class="filter-section">
@@ -2031,6 +2129,19 @@
 
       </div>
     </div>
+
+    <!-- ===== v3.47: TAB VIEW — แลกเวร (my shifts) ===== -->
+    <div id="phxViewSwap" class="phx-tabview">
+      <div class="phx-tv-title">แลกเวร</div>
+      <div class="phx-tv-sub">เวรของคุณในเดือนนี้ — แตะที่เวรเพื่อ <b>ยก / แลก / ใส่โน้ต</b></div>
+      <div id="phxSwapBody"></div>
+    </div>
+
+    <!-- ===== v3.47: TAB VIEW — ฉัน (profile) ===== -->
+    <div id="phxViewMe" class="phx-tabview">
+      <div id="phxMeBody"></div>
+    </div>
+
   </div>
 
   <!-- ===== EXPORT CHOICE MODAL ===== -->
@@ -15018,6 +15129,22 @@ table.exp-tbl .tm{margin-left:3px;opacity:0.75;}
 
   
 
+  <!-- ===== v3.47: BOTTOM NAVIGATION (3 tabs) ===== -->
+  <nav class="phx-bottomnav" id="phxBottomNav">
+    <button class="phx-bn-item active" data-tab="schedule" onclick="phxSetTab('schedule')" type="button">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
+      <span>ตารางเวร</span>
+    </button>
+    <button class="phx-bn-item" data-tab="swap" onclick="phxSetTab('swap')" type="button">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="17 1 21 5 17 9"/><path d="M3 11V9a4 4 0 0 1 4-4h14"/><polyline points="7 23 3 19 7 15"/><path d="M21 13v2a4 4 0 0 1-4 4H3"/></svg>
+      <span>แลกเวร</span>
+    </button>
+    <button class="phx-bn-item" data-tab="me" onclick="phxSetTab('me')" type="button">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+      <span>ฉัน</span>
+    </button>
+  </nav>
+
   <!-- Toast notification container (v3.5) -->
   <div id="phxToastContainer" class="phx-toast-container"></div>
 
@@ -17223,6 +17350,155 @@ table.exp-tbl .tm{margin-left:3px;opacity:0.75;}
   <!-- 🔖 v3.45: version moved OUT of the fixed footer → plain-text line under the
        "บันทึกลงปฏิทิน / Export" button (opens openChangelog() with the update history).
        Deploy-verification page ?action=version still exists (reach by URL). -->
+
+  <!-- ===================================================================
+       v3.47 — Bottom-nav tab controller (ตารางเวร / แลกเวร / ฉัน)
+       Frontend-only. Reuses existing globals: rawData, makeShiftKey,
+       buildGhostRows, getCurrentUser, P2B, displayName, toggleEditMode,
+       openActionModalForKey, and the existing account-modal openers.
+       =================================================================== -->
+  <script>
+  (function(){
+    function esc(s){ return String(s==null?'':s).replace(/[&<>"]/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c];}); }
+    function curName(){
+      try {
+        if (typeof P2B !== 'undefined' && P2B && P2B.boundName) return String(P2B.boundName);
+        if (typeof getCurrentUser === 'function') { var g = getCurrentUser(); if (g) return String(g); }
+      } catch(e){}
+      return null;
+    }
+    function isLoggedIn(){ return !!(typeof P2B !== 'undefined' && P2B && P2B.boundName); }
+    function isAdmin(){ var el = document.getElementById('adminShortcut'); return !!(el && el.style.display && el.style.display !== 'none'); }
+    function disp(n){ try { return (typeof displayName === 'function') ? displayName(n) : n; } catch(e){ return n; } }
+
+    // ---- icons (18px) ----
+    var IC = {
+      tag:'<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M20.59 13.41l-7.17 7.17a2 2 0 01-2.83 0L2 12V2h10l8.59 8.59a2 2 0 010 2.82z"/><line x1="7" y1="7" x2="7.01" y2="7"/></svg>',
+      key:'<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><circle cx="9" cy="14" r="5"/><path d="M13 14l7-7"/><path d="M17 5l3 3"/></svg>',
+      mail:'<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="4" width="20" height="16" rx="2"/><polyline points="2,7 12,13 22,7"/></svg>',
+      bell:'<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 8A6 6 0 006 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 01-3.46 0"/></svg>',
+      cal:'<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>',
+      history:'<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3v5h5"/><path d="M3.05 13A9 9 0 106 5.3L3 8"/><path d="M12 7v5l4 2"/></svg>',
+      shield:'<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/><path d="M9 12l2 2 4-4"/></svg>',
+      logout:'<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M9 21H5a2 2 0 01-2-2V5a2 2 0 012-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>',
+      chev:'<svg class="ch" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><path d="M9 18l6-6-6-6"/></svg>'
+    };
+
+    // ========= tab switcher =========
+    window.phxSetTab = function(tab){
+      if (tab !== 'swap' && tab !== 'me') tab = 'schedule';
+      document.body.setAttribute('data-tab', tab);
+      var items = document.querySelectorAll('#phxBottomNav .phx-bn-item');
+      for (var i=0;i<items.length;i++){ items[i].classList.toggle('active', items[i].getAttribute('data-tab') === tab); }
+      if (tab === 'swap') phxRenderSwapView();
+      else if (tab === 'me') phxRenderMeView();
+      try { window.scrollTo(0,0); } catch(e){}
+    };
+
+    // ========= แลกเวร (my shifts) =========
+    window.phxRenderSwapView = function(){
+      var body = document.getElementById('phxSwapBody');
+      if (!body) return;
+      var me = curName();
+      if (!me){
+        body.innerHTML = '<div class="phx-tv-empty">ยังไม่ได้เลือกชื่อของคุณ<br>' +
+          'ไปที่แท็บ <b>ตารางเวร</b> แล้วพิมพ์ชื่อ (หรือเข้าสู่ระบบ) เพื่อดูเวรของคุณ' +
+          '<div style="margin-top:18px;"><button class="phx-me-cta" style="max-width:220px;margin:0 auto;" onclick="phxSetTab(\'schedule\')">ไปที่ตารางเวร</button></div></div>';
+        return;
+      }
+      var rows = [];
+      try {
+        if (typeof rawData !== 'undefined' && rawData) rawData.forEach(function(r){ if (r && r.name === me) rows.push(r); });
+        if (typeof buildGhostRows === 'function' && typeof getCurrentMonthId === 'function') {
+          var ghosts = buildGhostRows(rawData, getCurrentMonthId(), me) || [];
+          ghosts.forEach(function(g){ rows.push(g); });
+        }
+      } catch(e){}
+      rows.sort(function(a,b){
+        var da = parseInt(String(a.date||'').replace(/[^0-9]/g,''),10)||0;
+        var db = parseInt(String(b.date||'').replace(/[^0-9]/g,''),10)||0;
+        return da - db;
+      });
+      if (!rows.length){
+        body.innerHTML = '<div class="phx-tv-empty">ไม่มีเวรของ <b>'+esc(disp(me))+'</b> ในเดือนนี้</div>';
+        return;
+      }
+      var html = '';
+      rows.forEach(function(r){
+        var isGhost = !!r._ghost;
+        var key = isGhost ? r._ghostKey : ((typeof makeShiftKey === 'function') ? makeShiftKey(r) : '');
+        var shiftLbl = (r.shift && r.shift !== '-') ? r.shift : '';
+        var range = (r.range && r.range !== '-') ? r.range : '';
+        var line2 = (shiftLbl + ' ' + range).trim() || '—';
+        html += '<div class="phx-mycard'+(isGhost?' is-ghost':'')+'" onclick="phxSwapTapShift(\''+encodeURIComponent(key)+'\')">' +
+            '<div class="phx-mycard-date">'+esc(r.date)+'</div>' +
+            '<div class="phx-mycard-main">' +
+              '<div class="phx-mycard-pos">'+esc(r.pos||'')+(isGhost?' <span style="font-size:10px;color:#15803d;font-weight:700;">· รับมา</span>':'')+'</div>' +
+              '<div class="phx-mycard-shift">'+esc(line2)+'</div>' +
+            '</div>' +
+            '<svg class="phx-mycard-arrow" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><path d="M9 18l6-6-6-6"/></svg>' +
+          '</div>';
+      });
+      body.innerHTML = html;
+    };
+
+    // tap a shift on the แลกเวร tab → jump to schedule, enter edit mode, open action menu
+    window.phxSwapTapShift = function(encKey){
+      var key = decodeURIComponent(encKey || '');
+      phxSetTab('schedule');
+      setTimeout(function(){
+        try {
+          if (typeof editModeActive !== 'undefined' && !editModeActive && typeof toggleEditMode === 'function') toggleEditMode();
+        } catch(e){}
+        setTimeout(function(){ try { if (typeof openActionModalForKey === 'function') openActionModalForKey(key); } catch(e){} }, 140);
+      }, 60);
+    };
+
+    // ========= ฉัน (profile) =========
+    function meRow(js, label, svg, danger){
+      return '<button class="phx-me-row'+(danger?' danger':'')+'" onclick="'+js+'" type="button">' +
+        '<span class="ic">'+svg+'</span><span class="tx">'+esc(label)+'</span>'+IC.chev+'</button>';
+    }
+    window.phxRenderMeView = function(){
+      var body = document.getElementById('phxMeBody');
+      if (!body) return;
+      var me = curName(), logged = isLoggedIn(), html = '';
+      if (me){
+        var initial = (String(disp(me)||'?').trim().charAt(0)) || '?';
+        html += '<div class="phx-me-hero"><div class="phx-me-avatar">'+esc(initial)+'</div>' +
+          '<div><div class="phx-me-name">'+esc(disp(me))+'</div>' +
+          '<div class="phx-me-role">'+(logged ? ('เข้าสู่ระบบแล้ว'+(isAdmin()?' · แอดมิน':'')) : 'กำลังดูในชื่อนี้ (ยังไม่เข้าสู่ระบบ)')+'</div></div></div>';
+        if (!logged) html += '<button class="phx-me-cta" onclick="phxOpenLoginModal(\'login\')" type="button">เข้าสู่ระบบ</button>';
+      } else {
+        html += '<div class="phx-me-hero"><div class="phx-me-avatar" style="background:var(--muted);">?</div>' +
+          '<div><div class="phx-me-name">ยังไม่ได้เข้าสู่ระบบ</div>' +
+          '<div class="phx-me-role">เข้าสู่ระบบเพื่อ sync และแก้เวรของคุณ</div></div></div>' +
+          '<button class="phx-me-cta" onclick="phxOpenLoginModal(\'login\')" type="button">เข้าสู่ระบบ</button>';
+      }
+      if (logged){
+        html += '<div class="phx-me-section-label">บัญชีของฉัน</div>';
+        html += meRow('nkOpenModal()', 'ตั้งชื่อเล่น', IC.tag);
+        html += meRow('phxOpenChangePwModal()', 'เปลี่ยนรหัสผ่าน', IC.key);
+        html += meRow('phxOpenBackupEmailModal()', 'อีเมลสำรอง', IC.mail);
+        html += meRow('phxOpenEmailNotifModal()', 'การแจ้งเตือนผ่านอีเมล', IC.bell);
+      }
+      html += '<div class="phx-me-section-label">ปฏิทิน & เตือนความจำ</div>';
+      html += meRow('phxOpenIcsReminderModal()', 'เตือนเวรลงปฏิทิน (ICS)', IC.cal);
+      html += '<div class="phx-me-section-label">ทั่วไป</div>';
+      html += meRow('openChangelog()', 'ประวัติการอัปเดต', IC.history);
+      if (typeof openAuditModal === 'function') html += meRow('openAuditModal()', 'ตรวจสอบคุณภาพข้อมูล', IC.shield);
+      if (logged){ html += '<div style="height:8px;"></div>'; html += meRow('phxLogout()', 'ออกจากระบบ', IC.logout, true); }
+      body.innerHTML = html;
+    };
+
+    // keep the active view fresh when the schedule data refreshes underneath us
+    window.phxRefreshActiveTab = function(){
+      var t = document.body.getAttribute('data-tab');
+      if (t === 'swap') phxRenderSwapView();
+      else if (t === 'me') phxRenderMeView();
+    };
+  })();
+  </script>
 
 
 </body>
