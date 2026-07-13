@@ -2,6 +2,8 @@
 
 ทำตามลำดับนี้ใน [Google Cloud Console](https://console.cloud.google.com) — แต่ละข้อมี checkbox ให้ติ๊กเมื่อทำเสร็จ อ้างอิงเนื้อหาที่ต้อง copy-paste จาก [`oauth-verification-summary.md`](oauth-verification-summary.md) และ [`privacy-policy.md`](privacy-policy.md)
 
+> 🔴 **อ่านก่อนเริ่ม — สำคัญที่สุด:** checklist นี้ต้องทำกับ **โปรเจกต์ Calendar ที่แยกออกมา** (ขอแค่ `calendar.events`) **ไม่ใช่** โปรเจกต์แอปหลัก — เพราะแอปหลักถือ restricted scope (Gmail/Drive) ที่ถ้าเอามา verify จะต้องผ่าน CASA security assessment (แพง/นาน) เหตุผลเต็มดูใน [`oauth-verification-summary.md`](oauth-verification-summary.md) §2.5 ทำการแยกโปรเจกต์ให้เสร็จก่อน แล้วค่อยเริ่มข้อ 1
+
 ---
 
 ## ก่อนเริ่ม — สิ่งที่ต้องมีให้พร้อม
