@@ -5241,6 +5241,7 @@ window.allPharmacistNames = [];
       return '<div class="act-prompt">เวรนี้คุณรับมาจากคนอื่น — ต้องการทำอะไรต่อ?</div>' +
              '<button class="act-btn act-btn-primary" onclick="actionGoTo(\'swap\')">สลับเวรนี้กับคนอื่น</button>' +
              '<button class="act-btn" style="background:#fef3c7; color:#92400e; border-color:#fcd34d;" onclick="actionGoTo(\'give\')">ยกเวรนี้ให้คนอื่น</button>' +
+             '<button class="act-btn" style="background:#f0fdfa; color:#0f766e; border-color:#99f6e4;" onclick="_jointStartFromMenu()">🤝 ต่อเวรแบบเจ้าของร่วม</button>' +
              clinicBtn +
              '<button class="act-btn act-btn-danger" onclick="confirmUndo()">ยกเลิกการรับเวร</button>' +
              '<button class="act-btn act-btn-cancel" onclick="closeActionModal()">ปิด</button>';
@@ -7585,8 +7586,9 @@ window.allPharmacistNames = [];
         const _isGhost = !!i._ghost;
         const _shiftKey = _isGhost ? i._ghostKey : makeShiftKey(i);
         const _used = _usedMap[_shiftKey] || _pbUsedMap[_shiftKey];  // v13/v3.41
-        // v3.46: joint co-ownership applies to the intact master row only (never a ghost/struck row).
-        const _joint = (!_isGhost && !_used) ? _jointMap[_shiftKey] : null;
+        // v3.46: joint co-ownership applies to a row the viewer HOLDS — their own master shift OR a
+        //   shift they received (ghost row, keyed by its stable _g_<actionId>). Never a struck row.
+        const _joint = (!_used) ? _jointMap[_shiftKey] : null;
         const _jointOwners = (_joint && Array.isArray(_joint.currentOwners) && _joint.currentOwners.length >= 2) ? _joint.currentOwners : null;
         const _isOwn = !_isGhost && i.name === _curUser;
         const _tappable = editModeActive && (_isOwn || _isGhost || !!_used);
