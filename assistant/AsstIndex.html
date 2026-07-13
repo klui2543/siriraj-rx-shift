@@ -1,0 +1,285 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<base target="_top">
+<title>ตารางเวรผู้ช่วย</title>
+<link href="https://fonts.googleapis.com/css2?family=Kanit:wght@300;400;500;600&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#f4f6fb; --card:#fff; --ink:#1e293b; --sub:#64748b; --line:#e2e8f0;
+  --brand:#2563eb; --brand-ink:#1e40af;
+  --clinic:#2563eb; --night:#7c3aed; --daytime:#0d9488; --u30b:#d97706; --closed:#dc2626;
+  --shadow:0 1px 3px rgba(15,23,42,.08),0 1px 2px rgba(15,23,42,.04);
+}
+:root[data-theme="dark"], body.dark{
+  --bg:#0b1120; --card:#131c2e; --ink:#e6edf7; --sub:#93a1b5; --line:#243149;
+  --brand:#3b82f6; --brand-ink:#93c5fd;
+  --shadow:0 1px 3px rgba(0,0,0,.4);
+}
+*{box-sizing:border-box}
+body{margin:0;font-family:"Kanit",system-ui,sans-serif;background:var(--bg);color:var(--ink);font-weight:400;font-size:15px}
+.wrap{max-width:1100px;margin:0 auto;padding:14px}
+header.top{display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:14px}
+header.top h1{font-size:19px;font-weight:600;margin:0;display:flex;align-items:center;gap:8px}
+.badge{font-size:11px;font-weight:500;background:var(--brand);color:#fff;padding:2px 8px;border-radius:999px}
+.spacer{flex:1}
+select,input,button{font-family:inherit;font-size:14px;color:var(--ink)}
+select,input[type=text]{background:var(--card);border:1px solid var(--line);border-radius:9px;padding:8px 10px;outline:none}
+input[type=text]{min-width:180px}
+.iconbtn{background:var(--card);border:1px solid var(--line);border-radius:9px;padding:8px 11px;cursor:pointer;color:var(--ink)}
+.iconbtn:hover{border-color:var(--brand)}
+.controls{display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin-bottom:12px}
+.tabs{display:inline-flex;background:var(--card);border:1px solid var(--line);border-radius:10px;overflow:hidden}
+.tabs button{border:0;background:transparent;padding:8px 16px;cursor:pointer;color:var(--sub);font-weight:500}
+.tabs button.on{background:var(--brand);color:#fff}
+.chips{display:flex;gap:6px;flex-wrap:wrap}
+.chip{border:1px solid var(--line);background:var(--card);border-radius:999px;padding:5px 12px;cursor:pointer;font-size:13px;color:var(--sub);display:flex;align-items:center;gap:6px;user-select:none}
+.chip .dot{width:9px;height:9px;border-radius:50%}
+.chip.on{color:var(--ink);border-color:currentColor;font-weight:500}
+.chip[data-src=clinic].on{color:var(--clinic)} .chip[data-src=night].on{color:var(--night)}
+.chip[data-src=daytimeOK].on{color:var(--daytime)} .chip[data-src=unit30B].on{color:var(--u30b)}
+.card{background:var(--card);border:1px solid var(--line);border-radius:14px;box-shadow:var(--shadow)}
+.pad{padding:14px 16px}
+.muted{color:var(--sub)}
+.small{font-size:12.5px}
+/* calendar */
+.cal{display:grid;grid-template-columns:repeat(7,1fr);gap:7px}
+.cal .dow{text-align:center;font-size:12px;color:var(--sub);font-weight:500;padding-bottom:2px}
+.cell{background:var(--card);border:1px solid var(--line);border-radius:10px;min-height:70px;padding:6px 7px;cursor:pointer;transition:.12s;display:flex;flex-direction:column;gap:4px}
+.cell:hover{border-color:var(--brand);transform:translateY(-1px)}
+.cell.empty{background:transparent;border:0;cursor:default}
+.cell.sel{outline:2px solid var(--brand)}
+.cell .d{font-weight:600;font-size:14px}
+.cell .d small{font-weight:400;color:var(--sub)}
+.cnts{display:flex;gap:3px;flex-wrap:wrap;margin-top:auto}
+.pill{font-size:10.5px;padding:1px 6px;border-radius:999px;color:#fff;font-weight:500}
+.pill.clinic{background:var(--clinic)} .pill.night{background:var(--night)}
+.pill.daytimeOK{background:var(--daytime)} .pill.unit30B{background:var(--u30b)}
+.cell .closed{font-size:10.5px;color:var(--closed);font-weight:500}
+/* detail / list */
+.grp{margin:14px 0 4px;font-weight:600;font-size:14px;display:flex;align-items:center;gap:8px}
+.grp .tag{font-size:11px;color:#fff;padding:2px 9px;border-radius:999px}
+.row{display:flex;gap:8px;padding:7px 0;border-top:1px solid var(--line);align-items:flex-start;flex-wrap:wrap}
+.row:first-child{border-top:0}
+.who{font-weight:500;min-width:150px}
+.who .nick{color:var(--brand-ink)}
+.meta{color:var(--sub);font-size:13px;flex:1}
+.seqbadge{font-size:11px;background:var(--line);color:var(--ink);border-radius:6px;padding:1px 7px;margin-right:6px}
+.sub{font-size:11px;border-radius:6px;padding:1px 7px;margin-left:4px}
+.sub.ยา{background:#dbeafe;color:#1e40af} .sub.อุปกรณ์{background:#fef3c7;color:#92400e}
+:root[data-theme=dark] .sub.ยา{background:#1e3a5f;color:#bfdbfe} :root[data-theme=dark] .sub.อุปกรณ์{background:#4a3410;color:#fde68a}
+.person-item{padding:9px 11px;border:1px solid var(--line);border-radius:10px;cursor:pointer;margin-bottom:7px;display:flex;justify-content:space-between;align-items:center}
+.person-item:hover{border-color:var(--brand)}
+.person-item .n{font-size:13px;color:var(--sub)}
+.warn{background:#fef2f2;border:1px solid #fecaca;color:#991b1b;border-radius:10px;padding:8px 12px;font-size:13px;margin-bottom:10px}
+:root[data-theme=dark] .warn{background:#2a1416;border-color:#7f1d1d;color:#fca5a5}
+.empty-note{text-align:center;color:var(--sub);padding:40px 10px}
+@media(max-width:640px){.who{min-width:120px}.cell{min-height:58px}}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header class="top">
+    <h1>🗓️ ตารางเวรผู้ช่วย <span class="badge">PHX-Assistant</span></h1>
+    <div class="spacer"></div>
+    <select id="monthSel"></select>
+    <button class="iconbtn" id="themeBtn" title="สลับธีม">🌓</button>
+  </header>
+
+  <div class="controls">
+    <div class="tabs">
+      <button data-view="day" class="on">รายวัน</button>
+      <button data-view="person">รายคน</button>
+    </div>
+    <input type="text" id="search" placeholder="🔎 ค้นหาชื่อ / ชื่อเล่น…">
+    <div class="chips" id="srcChips">
+      <div class="chip on" data-src="clinic"><span class="dot" style="background:var(--clinic)"></span>คลินิก</div>
+      <div class="chip on" data-src="night"><span class="dot" style="background:var(--night)"></span>กลางคืน</div>
+      <div class="chip on" data-src="daytimeOK"><span class="dot" style="background:var(--daytime)"></span>กลางวัน</div>
+      <div class="chip on" data-src="unit30B"><span class="dot" style="background:var(--u30b)"></span>30B</div>
+    </div>
+  </div>
+
+  <div id="warnBox"></div>
+  <div id="content"><div class="empty-note">กำลังโหลด…</div></div>
+</div>
+
+<script>
+var SRC_LABEL={clinic:'คลินิก',night:'กลางคืน',daytimeOK:'กลางวัน (OK)',unit30B:'30B'};
+var DOW=['อา.','จ.','อ.','พ.','พฤ.','ศ.','ส.'];
+var ASST={months:[],key:null,label:'',data:[],closed:{},nick:{},validation:null,
+          view:'day',srcOn:{clinic:1,night:1,daytimeOK:1,unit30B:1},search:'',selDay:null,selPerson:null};
+
+function hasGSR(){return typeof google!=='undefined'&&google.script&&google.script.run;}
+
+// ---------- data loading ----------
+function init(){
+  if(hasGSR()){
+    google.script.run.withSuccessHandler(function(list){
+      ASST.months=list||[]; buildMonthSel();
+      if(ASST.months.length) loadMonth(ASST.months[0].key);
+      else setContent('<div class="empty-note">ยังไม่มีข้อมูลเดือนใด — อัปโหลดผ่านหน้า Admin ก่อน</div>');
+    }).withFailureHandler(fail).getAvailableMonths();
+  }else if(window.__ASST_DEMO__){
+    var d=window.__ASST_DEMO__; ASST.months=d.months; buildMonthSel();
+    loadMonth(d.months[0].key);
+  }else{
+    setContent('<div class="empty-note">โหมดตัวอย่างไม่พร้อม</div>');
+  }
+}
+function loadMonth(key){
+  ASST.selDay=null; ASST.selPerson=null;
+  if(hasGSR()){
+    setContent('<div class="empty-note">กำลังโหลด '+key+'…</div>');
+    google.script.run.withSuccessHandler(applyMonth).withFailureHandler(fail).getScheduleData(key);
+  }else{
+    applyMonth(window.__ASST_DEMO__.byKey[key]);
+  }
+}
+function applyMonth(res){
+  if(!res||res.error){setContent('<div class="empty-note">'+((res&&res.error)||'โหลดไม่สำเร็จ')+'</div>');return;}
+  ASST.key=res.key; ASST.label=res.label; ASST.data=res.data||[];
+  ASST.closed=res.closed||{}; ASST.nick=res.nicknames||{}; ASST.validation=res.validation||null;
+  document.getElementById('monthSel').value=res.key;
+  renderWarn(); render();
+}
+function fail(e){setContent('<div class="empty-note">เกิดข้อผิดพลาด: '+(e&&e.message||e)+'</div>');}
+function setContent(h){document.getElementById('content').innerHTML=h;}
+
+function buildMonthSel(){
+  var s=document.getElementById('monthSel');
+  s.innerHTML=ASST.months.map(function(m){return '<option value="'+m.key+'">'+m.label+'</option>';}).join('');
+}
+function renderWarn(){
+  var v=ASST.validation,box=document.getElementById('warnBox');
+  if(v&&v.errors&&v.errors.length){
+    box.innerHTML='<div class="warn">⚠️ ข้อมูลเดือนนี้ validator พบปัญหา '+v.errors.length+' รายการ (อาจไม่ครบถ้วน) — โปรดตรวจสอบกับ Admin</div>';
+  }else box.innerHTML='';
+}
+
+// ---------- helpers ----------
+function disp(pk){var n=ASST.nick[pk];return n?('<span class="nick">'+esc(n)+'</span> '+esc(pk)):esc(pk);}
+function dispText(pk){var n=ASST.nick[pk];return n?(n+' '+pk):pk;}
+function esc(s){return String(s==null?'':s).replace(/[&<>"]/g,function(c){return{'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c];});}
+function dayOf(rec){return rec.timestamp%100;} // yyyymmdd → dd
+function activeRecs(){
+  return ASST.data.filter(function(r){
+    if(!ASST.srcOn[r.source])return false;
+    if(ASST.search){var q=ASST.search.toLowerCase();if(dispText(r.personKey).toLowerCase().indexOf(q)===-1)return false;}
+    return true;
+  });
+}
+function dutyText(d){
+  if(!d)return'';
+  if(d.morning!==undefined||d.afternoon!==undefined){
+    var p=[];if(d.morning)p.push('เช้า: '+d.morning);if(d.afternoon)p.push('บ่าย: '+d.afternoon);return p.join('  ·  ');
+  }
+  return [d.main,d.other].filter(Boolean).join('  ·  ');
+}
+
+// ---------- render dispatch ----------
+function render(){ASST.view==='day'?renderDay():renderPerson();}
+
+// ===== DAY VIEW (calendar + detail) =====
+function renderDay(){
+  var recs=activeRecs();
+  var y=parseInt(ASST.key.split('-')[0],10),m=parseInt(ASST.key.split('-')[1],10);
+  var first=new Date(y,m-1,1),ndays=new Date(y,m,0).getDate(),lead=first.getDay();
+  // counts per day per source
+  var byDay={};
+  recs.forEach(function(r){var d=dayOf(r);(byDay[d]=byDay[d]||{})[r.source]=(byDay[d][r.source]||0)+1;});
+  var closedByDay={};
+  Object.keys(ASST.closed).forEach(function(sheet){var g=ASST.closed[sheet];Object.keys(g).forEach(function(grp){(g[grp]||[]).forEach(function(dd){(closedByDay[dd]=closedByDay[dd]||[]).push(grp);});});});
+
+  var h='<div class="card pad"><div class="cal">';
+  DOW.forEach(function(d){h+='<div class="dow">'+d+'</div>';});
+  for(var i=0;i<lead;i++)h+='<div class="cell empty"></div>';
+  for(var day=1;day<=ndays;day++){
+    var c=byDay[day]||{},sel=ASST.selDay===day?' sel':'';
+    var pills=Object.keys(SRC_LABEL).filter(function(s){return c[s]&&ASST.srcOn[s];})
+      .map(function(s){return '<span class="pill '+s+'">'+c[s]+'</span>';}).join('');
+    var cl=closedByDay[day]?'<span class="closed">✕ '+closedByDay[day].join(',')+' หยุด</span>':'';
+    var dow=new Date(y,m-1,day).getDay();
+    h+='<div class="cell'+sel+'" onclick="pickDay('+day+')"><div class="d">'+day+' <small>'+DOW[dow]+'</small></div>'+cl+'<div class="cnts">'+pills+'</div></div>';
+  }
+  h+='</div></div><div id="dayDetail"></div>';
+  setContent(h);
+  if(ASST.selDay)renderDayDetail(ASST.selDay);
+}
+function pickDay(d){ASST.selDay=(ASST.selDay===d?null:d);renderDay();
+  if(ASST.selDay){var el=document.getElementById('dayDetail');if(el)el.scrollIntoView({behavior:'smooth',block:'nearest'});}}
+function renderDayDetail(day){
+  var recs=activeRecs().filter(function(r){return dayOf(r)===day;});
+  var el=document.getElementById('dayDetail');if(!el)return;
+  if(!recs.length){el.innerHTML='<div class="card pad muted">ไม่มีเวรในวันนี้ (ตามตัวกรอง)</div>';return;}
+  // group by source then group
+  var order=['clinic','night','daytimeOK','unit30B'];
+  var h='<div class="card pad"><div class="grp" style="margin-top:0">📌 วันที่ '+day+' — '+recs.length+' รายการ</div>';
+  order.forEach(function(src){
+    var sr=recs.filter(function(r){return r.source===src;});if(!sr.length)return;
+    var groups={};sr.forEach(function(r){(groups[r.group||'-']=groups[r.group||'-']||[]).push(r);});
+    h+='<div class="grp"><span class="tag pill '+src+'" style="background:var(--'+(src==='daytimeOK'?'daytime':src==='unit30B'?'u30b':src)+')">'+SRC_LABEL[src]+'</span></div>';
+    Object.keys(groups).forEach(function(g){
+      h+='<div class="small muted" style="margin:6px 0 2px">'+esc(g)+(src==='night'?' น.':'')+'</div>';
+      groups[g].sort(function(a,b){return (a.seq||99)-(b.seq||99);}).forEach(function(r){
+        var sub=r.subGroup?'<span class="sub '+r.subGroup+'">'+r.subGroup+'</span>':'';
+        var seq=r.seq?'<span class="seqbadge">'+r.seq+'</span>':'';
+        var extra=r.timeSlot&&src==='unit30B'?(' · '+r.timeSlot):'';
+        h+='<div class="row"><div class="who">'+seq+disp(r.personKey)+sub+'</div><div class="meta">'+esc(dutyText(r.duty))+extra+'</div></div>';
+      });
+    });
+  });
+  h+='</div>';el.innerHTML=h;
+}
+
+// ===== PERSON VIEW =====
+function renderPerson(){
+  var recs=activeRecs();
+  var byPerson={};recs.forEach(function(r){(byPerson[r.personKey]=byPerson[r.personKey]||[]).push(r);});
+  var keys=Object.keys(byPerson).sort(function(a,b){return dispText(a).localeCompare(dispText(b),'th');});
+  if(ASST.selPerson&&byPerson[ASST.selPerson]){renderPersonDetail(ASST.selPerson,byPerson[ASST.selPerson]);return;}
+  if(!keys.length){setContent('<div class="empty-note">ไม่พบชื่อตามตัวกรอง</div>');return;}
+  var h='<div class="card pad"><div class="muted small" style="margin-bottom:8px">'+keys.length+' คน — คลิกเพื่อดูตารางรายเดือน</div>';
+  keys.forEach(function(pk){
+    h+='<div class="person-item" onclick="pickPerson(\''+esc(pk).replace(/'/g,"\\'")+'\')"><div>'+disp(pk)+'</div><div class="n">'+byPerson[pk].length+' เวร</div></div>';
+  });
+  h+='</div>';setContent(h);
+}
+function pickPerson(pk){ASST.selPerson=pk;renderPerson();}
+function renderPersonDetail(pk,recs){
+  recs=recs.slice().sort(function(a,b){return a.timestamp-b.timestamp;});
+  var h='<div class="card pad"><button class="iconbtn" onclick="ASST.selPerson=null;renderPerson()">← กลับ</button>'
+    +'<div class="grp" style="margin-top:12px">👤 '+disp(pk)+' <span class="muted small">('+recs.length+' เวร · '+ASST.label+')</span></div>';
+  recs.forEach(function(r){
+    var sub=r.subGroup?'<span class="sub '+r.subGroup+'">'+r.subGroup+'</span>':'';
+    var srcColor=r.source==='daytimeOK'?'daytime':r.source==='unit30B'?'u30b':r.source;
+    h+='<div class="row"><div class="who">'+esc(r.date)+'</div>'
+      +'<div class="meta"><span class="pill '+r.source+'" style="background:var(--'+srcColor+')">'+SRC_LABEL[r.source]+'</span> '
+      +esc(r.group||'')+(r.source==='night'?' น.':'')+sub
+      +(r.timeSlot&&r.source==='unit30B'?(' · '+r.timeSlot):'')
+      +'<div class="small muted">'+esc(dutyText(r.duty))+'</div></div></div>';
+  });
+  h+='</div>';setContent(h);
+}
+
+// ---------- events ----------
+document.querySelectorAll('.tabs button').forEach(function(b){
+  b.onclick=function(){document.querySelectorAll('.tabs button').forEach(function(x){x.classList.remove('on');});
+    b.classList.add('on');ASST.view=b.dataset.view;ASST.selPerson=null;render();};
+});
+document.getElementById('srcChips').addEventListener('click',function(e){
+  var c=e.target.closest('.chip');if(!c)return;var s=c.dataset.src;
+  ASST.srcOn[s]=ASST.srcOn[s]?0:1;c.classList.toggle('on');render();
+});
+document.getElementById('search').addEventListener('input',function(e){ASST.search=e.target.value.trim();ASST.selPerson=null;render();});
+document.getElementById('monthSel').addEventListener('change',function(e){loadMonth(e.target.value);});
+document.getElementById('themeBtn').addEventListener('click',function(){
+  var r=document.documentElement,cur=r.getAttribute('data-theme');
+  r.setAttribute('data-theme',cur==='dark'?'light':'dark');
+});
+init();
+</script>
+</body>
+</html>
