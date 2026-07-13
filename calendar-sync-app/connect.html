@@ -50,6 +50,7 @@
     </div>
 
     <button class="primary" id="btn-sync" disabled>ซิงค์เวรเดี๋ยวนี้</button>
+    <button class="ghost" id="btn-test">🧪 ทดสอบ: สร้าง event ตัวอย่าง (พรุ่งนี้)</button>
     <button class="danger" id="btn-revoke">ยกเลิกการเชื่อมต่อ (ถอนสิทธิ์)</button>
 
     <div class="status" id="status"></div>
@@ -160,6 +161,22 @@
       if (window.parent && window.parent !== window) window.parent.postMessage({ type: type, data: data }, '*');
     } catch (e) {}
   }
+
+  // ปุ่มทดสอบ — สร้างเวรตัวอย่างวันพรุ่งนี้ 08:00–16:00 (ไม่ต้องพึ่งแอปหลัก)
+  // ใช้ยืนยันว่า consent → สร้าง event → ถอนสิทธิ์ ครบวงจร ก่อน wire แอปหลักจริง
+  function _sampleShift() {
+    var d = new Date(); d.setDate(d.getDate() + 1);
+    var y = d.getFullYear();
+    var m = ('0' + (d.getMonth() + 1)).slice(-2);
+    var day = ('0' + d.getDate()).slice(-2);
+    return {
+      date: day + '/' + m + '/' + y, timestamp: '' + y + m + day, range: '08:00-16:00',
+      name: '(ทดสอบ)', pos: 'ทดสอบ', shift: 'เวรเช้า', room: '-'
+    };
+  }
+  $('btn-test').addEventListener('click', function () {
+    doSync({ monthValue: 'TEST', shifts: [_sampleShift()] });
+  });
 
   $('btn-sync').addEventListener('click', function () { doSync(lastPayload); });
   $('btn-revoke').addEventListener('click', doRevoke);
