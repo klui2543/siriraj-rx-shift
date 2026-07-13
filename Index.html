@@ -1165,8 +1165,8 @@
     .phx-tv-sub { font-size: 11.5px; color: var(--sub); margin-bottom: 14px; line-height: 1.55; }
     .phx-tv-empty { text-align: center; color: var(--muted); font-size: 12.5px; padding: 38px 16px; line-height: 1.75; }
 
-    /* v3.47b: แลกเวร tab = edit portal → pencil FAB removed (this tab replaces it) */
-    #phxFab { display: none !important; }
+    /* v3.47c: FAB repurposed as a quick-note button (was the edit pencil; edit is entered
+       from the แลกเวร tab now). #phxFab now opens the note-shift picker. */
     /* แลกเวร tab uses the schedule-style .swf-tbl template (see swap-confirm) */
     .phx-swap-sec-label { font-size: 10.5px; font-weight: 700; color: var(--muted); letter-spacing: 0.04em; margin: 18px 2px 8px; }
     .phx-swap-sec-label:first-child { margin-top: 4px; }
@@ -2058,12 +2058,8 @@
             </button>
           </div>
           <div id="tableWrapper" class="hidden">
-            <!-- v3.44 Step 4a: view toggle — หลังแลก (existing view, default) vs ต้นฉบับ (raw master) -->
+            <!-- v3.47: "ต้นฉบับ (ตามอัพโหลด)" toggle removed per Klui — always the after-swap view -->
             <div id="lwwViewToggle" style="display:flex; gap:6px; align-items:center; margin-bottom:8px; font-size:12px; flex-wrap:wrap;">
-              <span style="color:var(--sub);">มุมมอง:</span>
-              <button type="button" id="lwwBtnLegacy" onclick="setOrigView(false)" style="padding:4px 10px; border-radius:6px; border:1px solid #2563eb; background:#2563eb; color:#fff; font-family:inherit; font-size:12px; cursor:pointer;">หลังแลก</button>
-              <button type="button" id="lwwBtnOrig" onclick="setOrigView(true)" style="padding:4px 10px; border-radius:6px; border:1px solid var(--border); background:var(--surface); color:var(--text); font-family:inherit; font-size:12px; cursor:pointer;">ต้นฉบับ (ตามอัพโหลด)</button>
-              <span id="lwwViewNote" style="font-size:10px; color:var(--sub);"></span>
               <button id="phxRefreshBtn" onclick="phxManualRefresh()" title="รีเฟรชข้อมูลล่าสุด" aria-label="รีเฟรช" style="margin-left:auto; display:inline-flex; align-items:center; gap:4px; padding:4px 10px; border-radius:6px; border:1px solid var(--border); background:var(--surface); color:var(--text); font-family:inherit; font-size:12px; cursor:pointer;">
                 <svg id="phxRefreshIcon" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></svg>
                 รีเฟรช
@@ -2108,8 +2104,16 @@
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M6 9l6 6 6-6"/></svg>
           </button>
 
+          <!-- v3.47: Audit link (low-traffic) moved here — small link above the version -->
+          <div style="text-align:center; margin-top:14px;">
+            <button type="button" onclick="openAuditModal()"
+              style="background:none; border:none; color:var(--sub); font-size:11px; font-family:inherit; cursor:pointer; text-decoration:underline; text-underline-offset:2px;">
+              ตรวจสอบคุณภาพข้อมูล
+            </button>
+          </div>
+
           <!-- 🔖 v3.45: version → tap for the update history (openChangelog) -->
-          <div style="text-align:center; margin-top:10px;">
+          <div style="text-align:center; margin-top:8px;">
             <button type="button" onclick="openChangelog()"
               style="background:none; border:none; color:var(--sub); font-size:11px; font-family:inherit; cursor:pointer; text-decoration:underline; text-underline-offset:2px;">
               เวอร์ชัน v3.46
@@ -12096,6 +12100,8 @@ table.exp-tbl .tm{margin-left:3px;opacity:0.75;}
       phxUpdateSyncStatusUI();
       phxUpdatePrefsSyncUI();
       if (typeof triggerUpdate === 'function') triggerUpdate();
+      // v3.47: login must refresh the ฉัน/แลกเวร tab views immediately (schedule may be hidden → no renderTable)
+      try { if (typeof phxRefreshActiveTab === 'function') phxRefreshActiveTab(); } catch(e) {}
       // Feature 2 (B4a): prime reminder settings cache for ICS export
       if (typeof _phxFetchAndCacheReminderSettings === 'function') {
         setTimeout(_phxFetchAndCacheReminderSettings, 800);
@@ -12145,6 +12151,8 @@ table.exp-tbl .tm{margin-left:3px;opacity:0.75;}
       phxUpdateSyncStatusUI();
       phxUpdatePrefsSyncUI();
       if (typeof triggerUpdate === 'function') triggerUpdate();
+      // v3.47: logout must refresh the ฉัน/แลกเวร tab views immediately
+      try { if (typeof phxRefreshActiveTab === 'function') phxRefreshActiveTab(); } catch(e) {}
     }
 
     function phxUpdateAuthPill() {
@@ -15141,8 +15149,8 @@ table.exp-tbl .tm{margin-left:3px;opacity:0.75;}
   <div id="phxToastContainer" class="phx-toast-container"></div>
 
   <!-- v3.13 FAB — Floating pencil + edit-mode cluster -->
-  <button id="phxFab" class="phx-fab" onclick="toggleEditMode()" style="display:none;" title="แก้ไขเวร">
-    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M17 3a2.83 2.83 0 114 4L7.5 20.5 2 22l1.5-5.5L17 3z"/></svg>
+  <button id="phxFab" class="phx-fab" onclick="phxNoteFabTap()" style="display:none;" title="ใส่โน้ตเวร">
+    <svg width="23" height="23" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="8" y1="13" x2="16" y2="13"/><line x1="8" y1="17" x2="13" y2="17"/></svg>
   </button>
   <div id="phxFabCluster" class="phx-fab-cluster">
     <button id="phxFabUndo" class="phx-fab-action" onclick="phxUndoAction()" disabled title="ย้อนกลับ (Ctrl+Z)">
@@ -17489,6 +17497,51 @@ table.exp-tbl .tm{margin-left:3px;opacity:0.75;}
       phxSwapRowTap(decodeURIComponent(tr.getAttribute('data-swap-key') || ''));
     });
 
+    // ========= quick-note FAB (replaces the old edit pencil) =========
+    // Tap the 📝 FAB → pick one of your shifts → open the SAME note editor as the action menu.
+    window.phxNotePickClose = function(){ var e = document.getElementById('phxNotePickOverlay'); if (e) e.remove(); };
+    window.phxNoteFabTap = function(){
+      var me = curName();
+      if (!me){
+        if (typeof _p2bShowToast === 'function') _p2bShowToast('เลือกชื่อของคุณก่อนใส่โน้ต','warn'); else alert('เลือกชื่อของคุณก่อนใส่โน้ต');
+        return;
+      }
+      var mid = (typeof getCurrentMonthId === 'function') ? getCurrentMonthId() : '';
+      var usedMap = {}, mine = [], ghosts = [];
+      try { if (typeof _combinedUsedMap === 'function') usedMap = _combinedUsedMap(mid, me) || {}; } catch(e){}
+      try { if (typeof rawData !== 'undefined' && rawData) rawData.forEach(function(r){ if (r && r.name === me) mine.push(r); }); } catch(e){}
+      try { if (typeof buildGhostRows === 'function') ghosts = buildGhostRows(rawData, mid, me) || []; } catch(e){}
+      var items = mine.filter(function(r){ return !usedMap[makeShiftKey(r)]; }).concat(ghosts).sort(_swapByDate);
+      var inner = items.length
+        ? _swapTable(items.map(function(s){
+            var k = _swapRowKey(s);
+            return _swapRow(s, {}).replace('<tr>', '<tr class="phx-note-pick" data-note-pick-key="'+encodeURIComponent(k)+'" style="cursor:pointer;">');
+          }).join(''))
+        : '<div class="phx-tv-empty" style="padding:24px 12px;">ไม่มีเวรของคุณให้ใส่โน้ต</div>';
+      var ov = document.createElement('div');
+      ov.id = 'phxNotePickOverlay';
+      ov.style.cssText = 'position:fixed; inset:0; background:rgba(0,0,0,0.5); z-index:10006; display:flex; align-items:flex-end; justify-content:center;';
+      ov.innerHTML = '<div style="background:var(--surface); width:100%; max-width:520px; border-radius:16px 16px 0 0; padding:16px 14px 24px; max-height:78vh; overflow-y:auto;">' +
+        '<div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:4px;">' +
+          '<div style="font-weight:800; font-size:16px;">📝 เลือกเวรที่จะใส่โน้ต</div>' +
+          '<button type="button" onclick="phxNotePickClose()" style="border:none; background:none; font-size:18px; cursor:pointer; color:var(--sub);">✕</button>' +
+        '</div>' +
+        '<div style="font-size:11.5px; color:var(--sub); margin:0 2px 12px;">แตะเวรของคุณ 1 อัน เพื่อเขียน / แก้โน้ต</div>' +
+        inner +
+      '</div>';
+      document.body.appendChild(ov);
+      ov.addEventListener('click', function(e){ if (e.target === ov) phxNotePickClose(); });
+    };
+    document.addEventListener('click', function(e){
+      var tr = (e.target && e.target.closest) ? e.target.closest('tr.phx-note-pick[data-note-pick-key]') : null;
+      if (!tr) return;
+      e.stopPropagation();
+      var key = decodeURIComponent(tr.getAttribute('data-note-pick-key') || '');
+      phxNotePickClose();
+      if (typeof _noteEdit === 'function') _noteEdit(key);
+      else if (typeof _noteView === 'function') _noteView(key);
+    });
+
     // ========= ฉัน (profile) =========
     function meRow(js, label, svg, danger){
       return '<button class="phx-me-row'+(danger?' danger':'')+'" onclick="'+js+'" type="button">' +
@@ -17521,7 +17574,7 @@ table.exp-tbl .tm{margin-left:3px;opacity:0.75;}
       html += meRow('phxOpenIcsReminderModal()', 'เตือนเวรลงปฏิทิน (ICS)', IC.cal);
       html += '<div class="phx-me-section-label">ทั่วไป</div>';
       html += meRow('openChangelog()', 'ประวัติการอัปเดต', IC.history);
-      if (typeof openAuditModal === 'function') html += meRow('openAuditModal()', 'ตรวจสอบคุณภาพข้อมูล', IC.shield);
+      // ตรวจสอบคุณภาพข้อมูล (Audit) ย้ายไปเป็นลิงก์เล็กเหนือ Version ที่ท้ายตารางเวรแล้ว
       if (logged){ html += '<div style="height:8px;"></div>'; html += meRow('phxLogout()', 'ออกจากระบบ', IC.logout, true); }
       body.innerHTML = html;
     };
