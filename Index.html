@@ -2905,7 +2905,12 @@ window.allPharmacistNames = [];
               _visibility: o._visibility || 'public',
               _retroBy: o._retroBy || null,
               _retroAt: o._retroAt || null,
-              _retroFinal: o._retroFinal || false
+              _retroFinal: o._retroFinal || false,
+              // v3.46: joint co-ownership fields — else a joint re-derived here (anonymous / non-bound
+              //   view) loses its owners/note and the reducer paints a single owner instead of "A + B".
+              owners: Array.isArray(o.owners) ? o.owners.slice() : null,
+              note: (o.note != null ? String(o.note) : null),
+              refActionId: String(o.refActionId || '')
             }));
         }
 
@@ -3091,6 +3096,74 @@ window.allPharmacistNames = [];
       const om = (typeof OverlayManager !== 'undefined') ? OverlayManager.getUsedMap(monthId, viewerName) : {};
       const pb = (typeof PBOverlays !== 'undefined') ? PBOverlays.getUsedMap(_pbGetLoggedInName()) : {};
       return Object.assign({}, pb, om);   // OverlayManager wins on key collision (own > public)
+    }
+    // ═══ v3.46 joint co-ownership (ต่อเวรแบบเจ้าของร่วม) ═══════════════════════════════════════
+    //   A shift stays ONE indivisible unit (no time-split). A 'joint' action attaches a co-owner
+    //   list + a free-text note. Linked append-only records mutate it WITHOUT touching the base
+    //   (each writer signs their OWN row → sync-legal for non-authors + tamper-evident):
+    //     • joint_note  {refActionId, note}   → edits the note (latest by createdAt wins)
+    //     • joint_leave {refActionId}          → viewerName removes THEMSELVES from the owners
+    //   The reducer folds base + linked into one state per shiftKey. Reads BOTH the viewer's own
+    //   OverlayManager (incl. their drafts) AND public pathBOverlays (drafts dropped) — own wins on
+    //   id collision, exactly like _combinedUsedMap.
+    function _jointRecords(monthId, viewer) {
+      var byId = {};
+      function isJoint(a) { var x = String(a || ''); return x === 'joint' || x === 'joint_note' || x === 'joint_leave'; }
+      function norm(id, o) {
+        return {
+          id: String(id || ''), action: String(o.action || ''), shiftKey: String(o.shiftKey || ''),
+          owners: Array.isArray(o.owners) ? o.owners.slice() : [],
+          note: (o.note != null ? String(o.note) : ''),
+          refActionId: String(o.refActionId || ''),
+          viewerName: String(o.viewerName || ''),
+          createdAt: o.createdAt || '', _visibility: o._visibility || 'public'
+        };
+      }
+      // public side — everyone's PUBLISHED joint records from the server mirror (drop drafts)
+      var pb = (typeof pathBOverlays !== 'undefined' && Array.isArray(pathBOverlays)) ? pathBOverlays : [];
+      pb.forEach(function(o) {
+        if (!o || !isJoint(o.action)) return;
+        if (String(o._visibility || 'public') === 'draft') return;
+        var id = String(o.actionId || o.id || ''); if (!id) return;
+        byId[id] = norm(id, o);
+      });
+      // own side — the viewer's own joint records (incl. their own drafts) win on id collision
+      var own = (typeof OverlayManager !== 'undefined' && monthId && viewer) ? (OverlayManager.getActions(monthId, viewer) || []) : [];
+      own.forEach(function(a) {
+        if (!a || !isJoint(a.action)) return;
+        var id = String(a.id || ''); if (!id) return;
+        byId[id] = norm(id, a);
+      });
+      return Object.keys(byId).map(function(k) { return byId[k]; });
+    }
+    // shiftKey → { actionId, owners, currentOwners, currentNote, noteLog, viewerName, _visibility }.
+    //   ONE joint per shift (earliest createdAt wins). currentOwners = owners − everyone who left.
+    function _combinedJointMap(monthId, viewer) {
+      var recs = _jointRecords(monthId, viewer);
+      var bases = [], notes = [], leaves = [];
+      recs.forEach(function(r) {
+        if (r.action === 'joint') bases.push(r);
+        else if (r.action === 'joint_note') notes.push(r);
+        else if (r.action === 'joint_leave') leaves.push(r);
+      });
+      bases.sort(function(a, b) { return String(a.createdAt || '').localeCompare(String(b.createdAt || '')); });
+      var out = {};
+      bases.forEach(function(base) {
+        var sk = base.shiftKey; if (!sk || out[sk]) return;   // first joint on this shift wins
+        var refNotes = notes.filter(function(n) { return n.refActionId === base.id; })
+          .sort(function(a, b) { return String(a.createdAt || '').localeCompare(String(b.createdAt || '')); });
+        var leavers = {};
+        leaves.forEach(function(l) { if (l.refActionId === base.id && l.viewerName) leavers[l.viewerName] = 1; });
+        var currentOwners = (base.owners || []).filter(function(nm) { return !leavers[nm]; });
+        var noteLog = [{ note: base.note, by: base.viewerName, at: base.createdAt }]
+          .concat(refNotes.map(function(n) { return { note: n.note, by: n.viewerName, at: n.createdAt }; }));
+        out[sk] = {
+          actionId: base.id, owners: (base.owners || []).slice(), currentOwners: currentOwners,
+          currentNote: noteLog[noteLog.length - 1].note, noteLog: noteLog,
+          viewerName: base.viewerName, _visibility: base._visibility
+        };
+      });
+      return out;
     }
     // v3.44: current holder of a master slot after gives/swaps. Reads the same used-map the
     //   table strikes with (newOwner field), so the picker/confirm agree with what everyone sees.
@@ -5153,6 +5226,7 @@ window.allPharmacistNames = [];
       return '<div class="act-prompt">ต้องการทำอะไรกับเวรนี้?</div>' +
              '<button class="act-btn act-btn-primary" onclick="actionGoTo(\'swap\')">สลับเวรกับ...</button>' +
              '<button class="act-btn act-btn-danger" onclick="actionGoTo(\'give\')">ยกเวรให้คนอื่น</button>' +
+             '<button class="act-btn" style="background:#f0fdfa; color:#0f766e; border-color:#99f6e4;" onclick="_jointStartFromMenu()">🤝 ต่อเวรแบบเจ้าของร่วม</button>' +
              clinicBtn +
              '<button class="act-btn act-btn-cancel" onclick="closeActionModal()">ยกเลิก</button>';
     }
@@ -5496,6 +5570,12 @@ window.allPharmacistNames = [];
         const mine = findShiftByKey(actionState.shiftKey);
         if (!mine) return;
         const myKey = actionState.shiftKey, mineName = mine.name;
+        // v3.46: mutual exclusion — a jointly-owned shift can't also be swapped whole.
+        if (typeof _combinedJointMap === 'function' && _combinedJointMap(mid, getCurrentUser())[myKey]) {
+          closeActionModal();
+          if (typeof _p2bShowToast === 'function') _p2bShowToast('เวรนี้มีเจ้าของร่วมอยู่ — สลับทั้งเวรไม่ได้ (ต้องออกจากเวรร่วมก่อน)', 'warn');
+          return;
+        }
         _lwwTransferConfirm({ kind: 'swap', targetKey: targetKey, targetShift: targetShift, defaultFrom: _curHolder,
           onConfirm: function(fromName) {
             var stored = OverlayManager.addAction(mid, { action: 'swap', shiftKey: myKey, partnerShiftKey: targetKey, partnerName: fromName, originalOwner: mineName });
@@ -5522,6 +5602,12 @@ window.allPharmacistNames = [];
       if (actionState.step === 'give' && actionState.shiftKey) {
         const mid = getCurrentMonthId();
         const _giveKey = actionState.shiftKey;
+        // v3.46: mutual exclusion — a jointly-owned shift can't also be given away whole.
+        if (typeof _combinedJointMap === 'function' && _combinedJointMap(mid, getCurrentUser())[_giveKey]) {
+          closeActionModal();
+          if (typeof _p2bShowToast === 'function') _p2bShowToast('เวรนี้มีเจ้าของร่วมอยู่ — ยกทั้งเวรไม่ได้ (ต้องออกจากเวรร่วมก่อน)', 'warn');
+          return;
+        }
         const stored = OverlayManager.addAction(mid, {
           action: 'give',
           shiftKey: _giveKey,
@@ -5686,6 +5772,132 @@ window.allPharmacistNames = [];
         '<td><span class="swf-badge ' + _swfBadgeClass(s) + '">' + badgeInner + '</span></td>' +
         '</tr>';
     }
+    // ═══ v3.46 joint co-ownership — multi-person picker + note (clone of _lwwNamePicker, but
+    //   toggle-select into a Set + a note textarea + a "ยืนยัน (N คน)" commit, instead of tap-to-close).
+    function _jointCoOwnerPickerClose() { var e = document.getElementById('jointPickerOverlay'); if (e) e.remove(); }
+    function _jointCoOwnerPicker(creator, preNames, preNote, onCommit) {
+      var names = (window.allPharmacistNames || []).slice().filter(function(n) { return n && String(n) !== String(creator); });
+      var esc = (typeof _pbEsc === 'function') ? _pbEsc
+        : function (s) { return String(s == null ? '' : s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;'); };
+      var dn = (typeof displayName === 'function') ? displayName : function (n) { return n; };
+      var matches = (typeof _nkNameMatches === 'function') ? _nkNameMatches
+        : function (n, q) { return !q || String(n).toLowerCase().indexOf(String(q).toLowerCase()) >= 0; };
+      var picked = {};
+      (preNames || []).forEach(function(n) { if (n) picked[n] = 1; });
+      var ov = document.createElement('div');
+      ov.id = 'jointPickerOverlay';
+      ov.style.cssText = 'position:fixed; inset:0; background:rgba(0,0,0,0.5); z-index:10002; display:flex; align-items:center; justify-content:center; padding:16px;';
+      ov.innerHTML = '<div style="background:var(--surface); width:100%; max-width:400px; height:80vh; border-radius:14px; padding:14px; font-family:inherit; display:flex; flex-direction:column;">' +
+        '<div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:4px;"><div style="font-weight:700; font-size:15px;">🤝 เลือกผู้ร่วมเวร (เจ้าของร่วม)</div>' +
+        '<button type="button" onclick="_jointCoOwnerPickerClose()" style="border:none;background:none;font-size:18px;cursor:pointer;color:var(--sub);">✕</button></div>' +
+        '<div style="font-size:11.5px; color:var(--sub); margin-bottom:8px; line-height:1.5;">เวรนี้ยังเป็นของ <b>' + esc(dn(creator)) + '</b> — เลือกคนที่มาร่วมรับผิดชอบ (ได้หลายคน) แล้วเขียนโน้ตกำกับ</div>' +
+        '<input id="jointSearch" placeholder="พิมพ์ค้นหาชื่อ / ชื่อเล่น…" autocomplete="off" style="width:100%; padding:9px; border:1px solid var(--border); border-radius:8px; font-family:inherit; font-size:14px; box-sizing:border-box; margin-bottom:6px;" />' +
+        '<div id="jointNameList" style="overflow-y:auto; flex:1; -webkit-overflow-scrolling:touch; border:1px solid var(--border); border-radius:8px;"></div>' +
+        '<textarea id="jointNote" placeholder="📝 โน้ต — เช่น มารับช่วง 14:00, แบ่งกันดูแลคนไข้ ICU" rows="2" style="width:100%; margin-top:8px; padding:9px; border:1px solid var(--border); border-radius:8px; font-family:inherit; font-size:14px; box-sizing:border-box; resize:vertical;"></textarea>' +
+        '<button type="button" id="jointConfirm" class="swf-btn swf-primary" style="margin-top:8px;">ยืนยัน (0 คน)</button>' +
+        '</div>';
+      document.body.appendChild(ov);
+      try { document.getElementById('jointNote').value = String(preNote || ''); } catch (e) {}
+      ov.addEventListener('click', function(e) { if (e.target === ov) _jointCoOwnerPickerClose(); });
+      var search = document.getElementById('jointSearch');
+      var list = document.getElementById('jointNameList');
+      var confirmBtn = document.getElementById('jointConfirm');
+      function refreshCount() {
+        var n = Object.keys(picked).length;
+        confirmBtn.textContent = 'ยืนยัน (' + n + ' คน)';
+        confirmBtn.style.opacity = n ? '1' : '0.55';
+      }
+      function render() {
+        var qt = (search.value || '').trim();
+        var filtered = names.filter(function(n) { return matches(n, qt); });
+        list.innerHTML = filtered.slice(0, 120).map(function(n) {
+          var d = dn(n);
+          var sel = !!picked[n];
+          var sub = (d && d !== n) ? '<span style="color:var(--sub); font-size:12px; margin-left:6px;">(' + esc(n) + ')</span>' : '';
+          return '<div class="joint-name-row" data-name="' + esc(n) + '" style="display:flex; align-items:center; gap:8px; padding:11px 10px; border-bottom:1px solid var(--border); cursor:pointer; font-size:15px;' + (sel ? ' background:var(--accent-bg);' : '') + '">' +
+            '<span style="width:20px; text-align:center; color:var(--accent); font-weight:800;">' + (sel ? '✓' : '') + '</span>' +
+            '<span style="font-weight:600;">' + esc(d) + '</span>' + sub + '</div>';
+        }).join('') || '<div style="padding:14px; color:var(--sub); font-size:13px;">ไม่พบชื่อในระบบ</div>';
+        Array.prototype.forEach.call(list.querySelectorAll('.joint-name-row'), function(row) {
+          row.addEventListener('click', function() {
+            var nm = row.getAttribute('data-name');
+            if (picked[nm]) delete picked[nm]; else picked[nm] = 1;
+            render(); refreshCount();
+          });
+        });
+      }
+      confirmBtn.addEventListener('click', function() {
+        var chosen = Object.keys(picked);
+        if (!chosen.length) { if (typeof _p2bShowToast === 'function') _p2bShowToast('เลือกผู้ร่วมเวรอย่างน้อย 1 คน', 'warn'); return; }
+        var note = '';
+        try { note = document.getElementById('jointNote').value || ''; } catch (e) {}
+        _jointCoOwnerPickerClose();
+        if (typeof onCommit === 'function') onCommit(chosen, note);
+      });
+      search.addEventListener('input', render);
+      render(); refreshCount();
+      setTimeout(function() { try { search.focus(); } catch (e) {} }, 60);
+    }
+    // Entry point from the shift action-menu: guard mutual-exclusion, then open the picker.
+    function _jointStartFromMenu() {
+      var key = actionState.shiftKey;
+      var shift = key ? findShiftByKey(key) : null;
+      if (!shift) { closeActionModal(); return; }
+      var mid = getCurrentMonthId();
+      var _used = _combinedUsedMap(mid, getCurrentUser())[key];
+      if (_used) { if (typeof _p2bShowToast === 'function') _p2bShowToast('เวรนี้ถูกยก/แลกไปแล้ว — ต่อเวรร่วมไม่ได้', 'warn'); return; }
+      if (_combinedJointMap(mid, getCurrentUser())[key]) { if (typeof _p2bShowToast === 'function') _p2bShowToast('เวรนี้มีเจ้าของร่วมอยู่แล้ว', 'warn'); return; }
+      var creator = shift.name;
+      closeActionModal();
+      _jointCoOwnerPicker(creator, [], '', function(coOwners, note) { confirmPickJoint(key, creator, coOwners, note); });
+    }
+    // Commit: create the base 'joint' action (draft) → open the confirm/publish dialog (like give/swap).
+    function confirmPickJoint(shiftKey, creator, coOwners, note) {
+      var mid = getCurrentMonthId();
+      var owners = [creator].concat((coOwners || []).filter(function(n) { return String(n) !== String(creator); }));
+      if (owners.length < 2) { if (typeof _p2bShowToast === 'function') _p2bShowToast('เลือกผู้ร่วมเวรอย่างน้อย 1 คน', 'warn'); return; }
+      var stored = OverlayManager.addAction(mid, { action: 'joint', shiftKey: shiftKey, owners: owners, note: String(note || '') });
+      if (typeof triggerUpdate === 'function') triggerUpdate();
+      if (stored && typeof swfOpenConfirm === 'function') swfOpenConfirm(mid, stored);
+    }
+    // v3.46: read-only note/owners/log viewer (tap the 📝 marker on a joint row). The note history
+    //   IS the joint's timeline — each entry names who wrote it + when (tamper-evident). v1.1 adds
+    //   "แก้โน้ต" + "ออกจากเวรร่วม" buttons to this same overlay.
+    function _jointFindByActionId(actionId) {
+      var jm = _combinedJointMap(getCurrentMonthId(), getCurrentUser());
+      var keys = Object.keys(jm);
+      for (var i = 0; i < keys.length; i++) { if (String(jm[keys[i]].actionId) === String(actionId)) return jm[keys[i]]; }
+      return null;
+    }
+    function _jointCloseNote() { var e = document.getElementById('jointNoteOverlay'); if (e) e.remove(); }
+    function _jointShowNote(actionId) {
+      var st = _jointFindByActionId(actionId);
+      if (!st) { if (typeof _p2bShowToast === 'function') _p2bShowToast('ไม่พบข้อมูลเวรร่วม', 'warn'); return; }
+      var esc = (typeof _pbEsc === 'function') ? _pbEsc : function (s) { return String(s == null ? '' : s); };
+      var owners = (st.currentOwners || []).map(function(n) {
+        return '<span style="display:inline-block; background:var(--accent-bg); color:var(--accent); border-radius:999px; padding:3px 10px; margin:2px 3px 2px 0; font-size:13px; font-weight:700;">' + esc(displayName(n)) + '</span>';
+      }).join('');
+      var log = (st.noteLog || []).slice().reverse().map(function(en) {
+        var t = en.at ? new Date(en.at).toLocaleString('th-TH', { dateStyle: 'short', timeStyle: 'short' }) : '';
+        var body = en.note ? esc(en.note) : '<span style="color:var(--sub);">(ไม่มีข้อความ)</span>';
+        return '<div style="padding:7px 0; border-bottom:1px solid var(--border); font-size:13px; line-height:1.5;">📝 ' + body +
+               '<div style="color:var(--sub); font-size:11.5px; margin-top:2px;">โดย <b>' + esc(displayName(en.by || '?')) + '</b>' + (t ? ' · ' + t : '') + '</div></div>';
+      }).join('');
+      var ov = document.createElement('div');
+      ov.id = 'jointNoteOverlay';
+      ov.style.cssText = 'position:fixed; inset:0; background:rgba(0,0,0,0.5); z-index:10004; display:flex; align-items:center; justify-content:center; padding:16px;';
+      ov.innerHTML = '<div style="background:var(--surface); width:100%; max-width:400px; max-height:82vh; overflow-y:auto; border-radius:14px; padding:16px; font-family:inherit;">' +
+        '<div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px;"><div style="font-weight:700; font-size:15px;">🤝 เวรนี้เป็นเจ้าของร่วม</div>' +
+        '<button type="button" onclick="_jointCloseNote()" style="border:none;background:none;font-size:18px;cursor:pointer;color:var(--sub);">✕</button></div>' +
+        '<div style="font-size:12px; color:var(--sub); margin-bottom:4px;">ผู้รับผิดชอบร่วมกัน (' + (st.currentOwners || []).length + ' คน):</div>' +
+        '<div style="margin-bottom:12px;">' + (owners || '<span style="color:var(--sub);">—</span>') + '</div>' +
+        '<div style="font-size:12px; color:var(--sub); margin-bottom:4px;">📋 ประวัติโน้ต (ล่าสุดอยู่บนสุด):</div>' +
+        '<div>' + (log || '<span style="color:var(--sub); font-size:13px;">ยังไม่มีโน้ต</span>') + '</div>' +
+        '<button type="button" onclick="_jointCloseNote()" class="swf-btn" style="margin-top:14px; width:100%;">ปิด</button>' +
+        '</div>';
+      document.body.appendChild(ov);
+      ov.addEventListener('click', function(e) { if (e.target === ov) _jointCloseNote(); });
+    }
     // Centered action summary — same wording the timeline uses.
     function _swfSummaryHtml(act, viewer, myShift, tgtShift) {
       var me = '<span style="font-weight:700;">' + _pbEsc(displayName(viewer)) + '</span>';
@@ -5695,6 +5907,12 @@ window.allPharmacistNames = [];
       }
       if (act.action === 'give') {
         return me + ' ยก <b>' + _pbEsc(myShift ? myShift.pos : '?') + '</b> ให้ ' + partner;
+      }
+      if (act.action === 'joint') {
+        var _co = (Array.isArray(act.owners) ? act.owners : []).filter(function(n) { return String(n) !== String(viewer); });
+        var _coStr = _co.length ? _co.map(function(n) { return '<b>' + _pbEsc(displayName(n)) + '</b>'; }).join(', ') : '<b>?</b>';
+        var _nt = act.note ? ('<br><span style="color:var(--sub);">📝 ' + _pbEsc(act.note) + '</span>') : '';
+        return me + ' ต่อเวรร่วม <b>' + _pbEsc(myShift ? myShift.pos : '?') + '</b> กับ ' + _coStr + _nt;
       }
       return me + ' รับ <b>' + _pbEsc(tgtShift ? tgtShift.pos : '?') + '</b> จาก ' + partner;
     }
@@ -5715,6 +5933,10 @@ window.allPharmacistNames = [];
         myShift = _swfResolveShift(action.shiftKey, viewer);
         rowsHtml = _swfRowHtml(myShift, true);
         miniLabel = 'เวรที่ยกให้';
+      } else if (kind === 'joint') {
+        myShift = _swfResolveShift(action.shiftKey, viewer);
+        rowsHtml = _swfRowHtml(myShift, true);
+        miniLabel = 'เวรที่ต่อเวรร่วม';
       } else {  // add
         tgtShift = _swfResolveShift(action.shiftKey, action.partnerName || '');
         rowsHtml = _swfRowHtml(tgtShift, false);
@@ -5722,7 +5944,8 @@ window.allPharmacistNames = [];
       }
       var title = kind === 'swap' ? '🔄 ยืนยันการแลกเวร'
                 : (kind === 'give' ? '🎁 ยืนยันการยกเวร'
-                : '🤝 ยืนยันการรับเวร');
+                : (kind === 'joint' ? '🤝 ยืนยันการต่อเวรร่วม'
+                : '🤝 ยืนยันการรับเวร'));
       var tableHtml = rowsHtml
         ? '<div class="swf-mini-label">' + miniLabel + '</div>' +
           '<div class="swf-tbl-wrap"><table class="swf-tbl">' +
@@ -5751,9 +5974,7 @@ window.allPharmacistNames = [];
       ov.addEventListener('click', function(e) { if (e.target === ov) _swfClose(); });
       document.getElementById('swfX').addEventListener('click', _swfClose);
       document.getElementById('swfKeep').addEventListener('click', function() {
-        // Keeping a draft is friction-free: valid legs are saved; incomplete legs stay as
-        //   they were on the draft (resume later) — an ownerless/lopsided split never publishes
-        //   anyway because swfDone re-validates.
+        // "เก็บร่างไว้ก่อน" — the draft is already saved (addAction). Just close; publish later.
         _swfClose();
         if (typeof _p2bShowToast === 'function') _p2bShowToast('เก็บเป็นร่างแล้ว — ยังไม่เผยแพร่', 'ok');
       });
@@ -6604,10 +6825,12 @@ window.allPharmacistNames = [];
     function _pbOverlaySignature(pb) {
       if (!Array.isArray(pb)) return '';
       return pb.length + ':' + pb.map(function(o) {
-        var legsFp = (o && Array.isArray(o.legs))
-          ? o.legs.map(function(l) { return (l && l.owner || '') + ':' + (l && l.end || ''); }).join('+')
+        // v3.46: fold joint co-ownership fields so a note-edit / self-removal / new joint forces a
+        //   repaint even when the overlay COUNT is unchanged (the live-poll compares this signature).
+        var jointFp = (o && (Array.isArray(o.owners) || o.note != null || o.refActionId))
+          ? ('|' + (Array.isArray(o.owners) ? o.owners.join('/') : '') + '|' + (o.note != null ? String(o.note) : '') + '|' + (o.refActionId || ''))
           : '';
-        return (o && o.actionId || '') + '~' + (o && o._visibility || 'public') + '~' + (o && o.partnerName || '') + '~' + legsFp;
+        return (o && o.actionId || '') + '~' + (o && o._visibility || 'public') + '~' + (o && o.partnerName || '') + jointFp;
       }).sort().join(',');
     }
     // v3.44: adopt fresh overlays + re-render in place (shared by the poll and manual refresh).
@@ -7350,6 +7573,9 @@ window.allPharmacistNames = [];
       const _usedMap = window._lwwEngine ? _lwwBackedUsedMap(_mid, _curUser) : OverlayManager.getUsedMap(_mid, _curUser);
       // v3.41: PB usedMap for anonymous / non-owner chevron+dot
       const _pbUsedMap = window._lwwEngine ? {} : ((typeof PBOverlays !== 'undefined') ? PBOverlays.getUsedMap(_pbGetLoggedInName()) : {});
+      // v3.46: joint co-ownership map (shiftKey → {currentOwners, currentNote, ...}). Computed once
+      //   per render like the used-map; painted on the intact master row (see below).
+      const _jointMap = (typeof _combinedJointMap === 'function') ? _combinedJointMap(_mid, _curUser) : {};
       const _rowsHtml = [];
       // v3.43: show the inline 🌐 publish button once per draft action. Real rows precede ghosts
       //   in `items`, so the struck source row wins the button; a pure 'add' lands it on the ghost.
@@ -7359,6 +7585,9 @@ window.allPharmacistNames = [];
         const _isGhost = !!i._ghost;
         const _shiftKey = _isGhost ? i._ghostKey : makeShiftKey(i);
         const _used = _usedMap[_shiftKey] || _pbUsedMap[_shiftKey];  // v13/v3.41
+        // v3.46: joint co-ownership applies to the intact master row only (never a ghost/struck row).
+        const _joint = (!_isGhost && !_used) ? _jointMap[_shiftKey] : null;
+        const _jointOwners = (_joint && Array.isArray(_joint.currentOwners) && _joint.currentOwners.length >= 2) ? _joint.currentOwners : null;
         const _isOwn = !_isGhost && i.name === _curUser;
         const _tappable = editModeActive && (_isOwn || _isGhost || !!_used);
         let badge = "badge-other"; let s = i.shift.toLowerCase();
@@ -7423,7 +7652,12 @@ window.allPharmacistNames = [];
         const _nameBase = i.isNew ? 'text-orange-600 font-bold leading-none' : 'text-blue-900 font-bold leading-none';
         const _cnwCls = 'col-name-wrap';
         const _ncwLeft = '<span class="ncw-left"></span>';
-        const nameDisplay = `<span class="${_cnwCls}">${_ncwLeft}<span class="ncw-center"><span class="${_nameBase} ${_strike}">${i.isNew?'⚠️ ':''}${displayName(i.name)}</span>${_pencil}${_pubInline}</span><span class="ncw-right">${_suffix}</span></span>`;
+        // v3.46: a jointly-owned shift shows every current owner "A + B" + a 📝 note marker (tap = view).
+        const _nameInner = _jointOwners ? _jointOwners.map(n => displayName(n)).join(' + ') : displayName(i.name);
+        const _jointMark = _joint
+          ? ` <span class="joint-note-mark" onclick="event.stopPropagation(); _jointShowNote('${_joint.actionId}')" title="ต่อเวรร่วม — แตะดูโน้ต/ผู้รับผิดชอบ" role="button" style="cursor:pointer;">📝</span>`
+          : '';
+        const nameDisplay = `<span class="${_cnwCls}">${_ncwLeft}<span class="ncw-center"><span class="${_nameBase} ${_strike}">${i.isNew?'⚠️ ':''}${_nameInner}</span>${_jointMark}${_pencil}${_pubInline}</span><span class="ncw-right">${_suffix}</span></span>`;
         let _ghostCls = '';
         if (_isGhost) {
           if (i._conflict === 'overlap') _ghostCls = 'shift-ghost-overlap';

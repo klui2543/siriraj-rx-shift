@@ -75,7 +75,13 @@ function phxGetAllActiveOverlaysForMonth(monthId) {
         // v3.44: admin override audit — pass through so every viewer sees the ⚖️ badge (who/when/why)
         _overrideBy: payload._overrideBy || null,
         _overrideAt: payload._overrideAt || null,
-        _overrideReason: payload._overrideReason || null
+        _overrideReason: payload._overrideReason || null,
+        // v3.46: joint co-ownership (ต่อเวรแบบเจ้าของร่วม). Base 'joint' carries owners[] + note;
+        //   linked 'joint_note'/'joint_leave' records carry refActionId (→ base). Pass through so
+        //   every viewer resolves who shares the shift, the current note, and the edit/leave log.
+        owners: Array.isArray(payload.owners) ? payload.owners : null,
+        note: (payload.note != null ? String(payload.note) : null),
+        refActionId: String(payload.refActionId || '')
       });
     });
     
