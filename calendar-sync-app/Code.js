@@ -431,19 +431,13 @@ function unsyncMonth(monthValue) {
 }
 
 /**
- * ยกเลิกการเชื่อมต่อทั้งหมด — ทำ 3 อย่าง:
- *   1. ลบ event เวรที่แอปสร้างไว้ "ทุกเดือน" ออกจากปฏิทินผู้ใช้ (ไม่ทิ้งขยะค้าง)
- *   2. ล้างข้อมูล mapping ทั้งหมดใน UserProperties
- *   3. เพิกถอน OAuth grant ของสคริปต์นี้ (invalidateAuth) → ครั้งหน้าจะถามยินยอมใหม่
- *
- * หมายเหตุ: นี่คือการถอนสิทธิ์ "ฝั่งแอป" — ผู้ใช้ยังถอนเพิ่มได้เองที่
- * https://myaccount.google.com/permissions (ดู README §วิธีถอนสิทธิ์)
+ * ลบ event ที่แอปสร้างไว้ "ทุกเดือน" ออกจากปฏิทิน "ปัจจุบัน" + ล้าง map ทั้งหมด
+ * (ใช้ร่วมกันโดย disconnectAndRevoke และ setTargetCalendar — ไม่แตะ auth/trigger/appName)
  */
-function disconnectAndRevoke() {
+function _unsyncAllEvents() {
   var calRes = _resolveCalendar();
   var removed = 0;
   var monthKeys = _allMonthMapKeys();
-
   if (calRes.ok) {
     monthKeys.forEach(function (mk) {
       var raw = _up().getProperty(mk);
@@ -458,25 +452,42 @@ function disconnectAndRevoke() {
       });
     });
   }
+  monthKeys.forEach(function (mk) { _up().deleteProperty(mk); });
+  return { removed: removed, calendarReachable: calRes.ok };
+}
 
-  // หยุด auto-sync trigger ก่อน (ไม่งั้นมันจะรันต่อแล้วสร้าง event กลับมา)
+/**
+ * ยกเลิกการเชื่อมต่อทั้งหมด — ทำ 4 อย่าง:
+ *   1. หยุด auto-sync trigger (ไม่งั้นมันจะรันต่อแล้วสร้าง event กลับมา)
+ *   2. ลบ event เวรที่แอปสร้างไว้ "ทุกเดือน" ออกจากปฏิทินผู้ใช้ (ไม่ทิ้งขยะค้าง)
+ *   3. ล้างข้อมูล property ทั้งหมดใน UserProperties
+ *   4. เพิกถอน OAuth grant ของสคริปต์นี้ (invalidateAuth) → ครั้งหน้าจะถามยินยอมใหม่
+ *
+ * หมายเหตุ: นี่คือการถอนสิทธิ์ "ฝั่งแอป" — ผู้ใช้ยังถอนเพิ่มได้เองที่
+ * https://myaccount.google.com/permissions (ดู README §วิธีถอนสิทธิ์)
+ */
+function disconnectAndRevoke() {
+  // 1) หยุด trigger ก่อน
   var trigRemoved = 0;
   try { trigRemoved = removeAutoSync().removed; } catch (e) {}
 
-  // ล้าง property ทั้งหมด (รวม targetCalendarId, appName, autoSyncOn)
+  // 2) ลบ event + ล้าง map
+  var cleaned = _unsyncAllEvents();
+
+  // 3) ล้าง property ที่เหลือ (targetCalendarId, appName, autoSyncOn)
   _up().deleteAllProperties();
 
-  // เพิกถอนสิทธิ์ — ครั้งหน้าผู้ใช้จะเจอหน้า consent ใหม่
+  // 4) เพิกถอนสิทธิ์
   var authRevoked = true;
   try { ScriptApp.invalidateAuth(); } catch (e) { authRevoked = false; }
 
   return {
     ok: true,
-    removed: removed,
+    removed: cleaned.removed,
     triggersRemoved: trigRemoved,
     authRevoked: authRevoked,
-    calendarReachable: calRes.ok,
-    note: calRes.ok ? null : 'เข้าถึงปฏิทินไม่ได้ตอนถอนสิทธิ์ — event บางส่วนอาจค้าง ให้ลบเองในปฏิทิน'
+    calendarReachable: cleaned.calendarReachable,
+    note: cleaned.calendarReachable ? null : 'เข้าถึงปฏิทินไม่ได้ตอนถอนสิทธิ์ — event บางส่วนอาจค้าง ให้ลบเองในปฏิทิน'
   };
 }
 
@@ -527,7 +538,9 @@ function getTargetCalendar() {
 }
 
 function setTargetCalendar(calendarId) {
+  // ลบ event เดิมจากปฏิทิน "เดิม" + ล้าง map ก่อน กันซ้ำ (พอเปลี่ยนปฏิทินแล้วซิงค์ใหม่จะลงที่ใหม่สะอาด)
+  var cleaned = _unsyncAllEvents();
   if (calendarId) _up().setProperty(PROP_TARGET_CAL, String(calendarId));
   else _up().deleteProperty(PROP_TARGET_CAL);  // ล้าง = กลับไปใช้ปฏิทินหลัก
-  return { ok: true, calendarId: calendarId || null };
+  return { ok: true, calendarId: calendarId || null, movedOff: cleaned.removed };
 }

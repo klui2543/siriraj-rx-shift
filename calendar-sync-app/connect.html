@@ -33,6 +33,9 @@
     .status.err { background: #fef2f2; color: #991b1b; display: block; }
     .status.info { background: #eff6ff; color: #1e40af; display: block; }
     .muted { color: #9ca3af; font-size: .78rem; margin-top: 14px; text-align: center; }
+    label.pick { font-size: .85rem; color: #6b7280; display: block; margin-top: 16px; margin-bottom: 4px; }
+    select { width: 100%; padding: 11px; border-radius: 10px; border: 1px solid #dfe3ec;
+      font-family: inherit; font-size: .9rem; background: #fff; color: #1a1f2e; }
     .spinner { display: inline-block; width: 14px; height: 14px; border: 2px solid #fff;
       border-top-color: transparent; border-radius: 50%; animation: spin .7s linear infinite; vertical-align: -2px; margin-right: 6px; }
     @keyframes spin { to { transform: rotate(360deg); } }
@@ -49,6 +52,10 @@
       <div class="row"><span class="k">เวรที่ซิงค์แล้ว</span><span class="v" id="v-count">…</span></div>
       <div class="row"><span class="k">อัปเดตอัตโนมัติ</span><span class="v" id="v-auto">…</span></div>
     </div>
+
+    <label class="pick" for="sel-cal">บันทึกเวรลงปฏิทิน</label>
+    <select id="sel-cal"><option>กำลังโหลด…</option></select>
+    <button class="ghost" id="btn-newcal" style="margin-top:8px">➕ สร้างปฏิทินแยกเฉพาะเวร</button>
 
     <button class="primary" id="btn-sync" disabled>ซิงค์เวรเดี๋ยวนี้</button>
     <button class="ghost" id="btn-auto">⚡ อัปเดตอัตโนมัติ (แม้ปิดแอป)</button>
@@ -99,6 +106,72 @@
         setStatus('err', 'เกิดข้อผิดพลาด: ' + (e && e.message ? e.message : e));
       })
       .getStatus();
+  }
+
+  // 1b) โหลดรายชื่อปฏิทินให้เลือก (รวมปฏิทินย่อย)
+  function loadCalendars() {
+    google.script.run
+      .withSuccessHandler(function (r) {
+        if (!r || !r.ok) return;
+        var sel = $('sel-cal');
+        sel.innerHTML = '';
+        r.calendars.forEach(function (c) {
+          var o = document.createElement('option');
+          o.value = c.id;
+          o.textContent = c.name + (c.isPrimary ? ' (ปฏิทินหลัก)' : '');
+          // เลือกตัวที่ตั้งไว้ ถ้ายังไม่ตั้งให้ default = ปฏิทินหลัก
+          if (r.currentTarget ? (c.id === r.currentTarget) : c.isPrimary) o.selected = true;
+          sel.appendChild(o);
+        });
+      })
+      .withFailureHandler(function () { /* เงียบไว้ — ไม่ critical */ })
+      .listMyCalendars();
+  }
+
+  // เปลี่ยนปฏิทินปลายทาง (ลบ event เดิมจากปฏิทินเก่าให้ กันซ้ำ)
+  function onSelectCal() {
+    var id = $('sel-cal').value;
+    $('sel-cal').disabled = true;
+    google.script.run
+      .withSuccessHandler(function (r) {
+        $('sel-cal').disabled = false;
+        var moved = (r && r.movedOff) ? (' (ย้าย event เดิมออก ' + r.movedOff + ' รายการ)') : '';
+        setStatus('info', 'เลือกปฏิทินแล้ว — กด "ซิงค์เวรเดี๋ยวนี้" อีกครั้งเพื่อลงปฏิทินนี้' + moved);
+        loadStatus();
+      })
+      .withFailureHandler(function (e) {
+        $('sel-cal').disabled = false;
+        setStatus('err', 'เปลี่ยนปฏิทินไม่สำเร็จ: ' + (e && e.message ? e.message : e));
+      })
+      .setTargetCalendar(id);
+  }
+
+  // สร้างปฏิทินย่อยใหม่ "Siriraj Rx Shifts" แล้วตั้งเป็นปลายทางเลย
+  function createNewCal() {
+    $('btn-newcal').disabled = true;
+    setStatus('info', '<span class="spinner" style="border-color:#1e40af;border-top-color:transparent"></span>กำลังสร้างปฏิทิน…');
+    google.script.run
+      .withSuccessHandler(function (r) {
+        if (r && r.ok) {
+          google.script.run
+            .withSuccessHandler(function () {
+              $('btn-newcal').disabled = false;
+              setStatus('ok', 'สร้างปฏิทิน "' + r.name + '" แล้ว + ตั้งเป็นปลายทาง — กดซิงค์เพื่อลงปฏิทินนี้');
+              loadCalendars();
+              loadStatus();
+            })
+            .withFailureHandler(function () { $('btn-newcal').disabled = false; loadCalendars(); })
+            .setTargetCalendar(r.id);
+        } else {
+          $('btn-newcal').disabled = false;
+          setStatus('err', 'สร้างปฏิทินไม่สำเร็จ');
+        }
+      })
+      .withFailureHandler(function (e) {
+        $('btn-newcal').disabled = false;
+        setStatus('err', 'สร้างไม่สำเร็จ: ' + (e && e.message ? e.message : e));
+      })
+      .createAppCalendar();
   }
 
   // 2) รับข้อมูลเวรจากแอปหลัก
@@ -224,8 +297,11 @@
   $('btn-sync').addEventListener('click', function () { doSync(lastPayload); });
   $('btn-auto').addEventListener('click', toggleAuto);
   $('btn-revoke').addEventListener('click', doRevoke);
+  $('sel-cal').addEventListener('change', onSelectCal);
+  $('btn-newcal').addEventListener('click', createNewCal);
 
   loadStatus();
+  loadCalendars();
   postToOpener(MSG_READY, { ok: true });
 </script>
 </body>
