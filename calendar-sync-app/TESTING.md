@@ -54,6 +54,14 @@
 4. ลองแก้เวร (ยก/แลก) ในแอปหลัก → ซิงค์อีกครั้ง → event ในปฏิทินควรอัปเดตตาม
 5. **จุดเสี่ยงที่ต้องเช็ค:** `postMessage` ข้าม sandbox iframe อาจไม่ผ่านใน browser บางตัว — ถ้า popup เด้งแต่ event ไม่ถูกสร้าง ให้เปิด DevTools (F12) → Console ดู error แล้วบอกผม
 
+**ทดสอบ auto-sync (background trigger):**
+1. ตั้งค่า `FIREBASE_BASE` ใน `Code.js` เป็น URL ของ RTDB ตัวเดียวกับแอปหลัก
+2. ให้แอปหลักเขียน feed `calFeed/<encAppName>/<monthValue>` (ดู README §สัญญา feed) — หรือทดสอบก่อนด้วยการเขียน node นี้ในมือผ่าน Firebase console
+3. ในหน้า connect: กด **⚡ อัปเดตอัตโนมัติ** (ต้องมี `appName` แล้ว — มาจาก handshake แอปหลัก)
+4. ทดสอบเร็ว: ใน Apps Script editor รันฟังก์ชัน `autoSyncTickManual()` ด้วยมือ → ดูว่าอ่าน feed แล้วสร้าง/แก้ event ตาม
+5. ตรวจว่า trigger ถูกติดตั้ง: editor → ⏰ Triggers → ควรเห็น `_autoSyncTick` ทุก 5 นาที
+6. กด "ยกเลิกการเชื่อมต่อ" → trigger ควรหายไปจากรายการ (ไม่งั้นมันจะสร้าง event กลับมา)
+
 ---
 
 ### 🔵 เฟส 3 — เปิดให้คนอื่นใช้จริง (ตอนนี้ค่อยยุ่งกับ verify)

@@ -45,8 +45,12 @@ Apps Script ทุกโปรเจกต์ผูกกับ "default GCP pro
 ## 4. เพิ่ม Scopes
 
 - [ ] กด **Add or Remove Scopes**
-- [ ] ค้นหาและติ๊ก `.../auth/calendar.events` **เท่านั้น** (ห้ามติ๊ก scope Calendar อื่นที่กว้างกว่านี้โดยไม่จำเป็น — ดูเหตุผลใน `oauth-verification-summary.md` §2)
-- [ ] ในช่อง scope justification ที่ปรากฏ ให้ copy ข้อความจาก `oauth-verification-summary.md` §2 (ย่อหน้า "Copy-paste สำหรับช่อง scope justification")
+- [ ] ติ๊ก scope ตามที่ประกาศใน [`../../calendar-sync-app/appsscript.json`](../../calendar-sync-app/appsscript.json):
+  - [ ] `.../auth/calendar`
+  - [ ] `.../auth/userinfo.email`
+  - [ ] `.../auth/script.external_request` *(สำหรับ auto-sync — ตัดออกได้ถ้าไม่ทำ background sync)*
+  - [ ] `.../auth/script.scriptapp` *(สำหรับ auto-sync — ตัดออกได้ถ้าไม่ทำ background sync)*
+- [ ] ในช่อง scope justification ให้ copy ข้อความจาก `oauth-verification-summary.md` §2 (ตารางเหตุผล + ย่อหน้า "Copy-paste สำหรับช่อง scope justification")
 
 ## 5. Test Users (ระหว่างรอ verification)
 

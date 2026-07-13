@@ -47,9 +47,11 @@
       <div class="row"><span class="k">บัญชี Google</span><span class="v" id="v-email">…</span></div>
       <div class="row"><span class="k">ปฏิทินปลายทาง</span><span class="v" id="v-cal">…</span></div>
       <div class="row"><span class="k">เวรที่ซิงค์แล้ว</span><span class="v" id="v-count">…</span></div>
+      <div class="row"><span class="k">อัปเดตอัตโนมัติ</span><span class="v" id="v-auto">…</span></div>
     </div>
 
     <button class="primary" id="btn-sync" disabled>ซิงค์เวรเดี๋ยวนี้</button>
+    <button class="ghost" id="btn-auto">⚡ อัปเดตอัตโนมัติ (แม้ปิดแอป)</button>
     <button class="ghost" id="btn-test">🧪 ทดสอบ: สร้าง event ตัวอย่าง (พรุ่งนี้)</button>
     <button class="danger" id="btn-revoke">ยกเลิกการเชื่อมต่อ (ถอนสิทธิ์)</button>
 
@@ -65,6 +67,8 @@
   var MSG_RESULT = 'RXSHIFT_CAL_RESULT';  // หน้านี้ → แอปหลัก: ผลลัพธ์
 
   var lastPayload = null;
+  var autoOn = false;
+  var appName = null;
   var $ = function (id) { return document.getElementById(id); };
 
   function setStatus(kind, html) {
@@ -86,6 +90,9 @@
         $('v-email').textContent = r.email || '-';
         $('v-cal').textContent = r.calendarName || 'ปฏิทินหลัก';
         $('v-count').textContent = (r.syncedCount || 0) + ' รายการ';
+        autoOn = !!r.autoSyncOn;
+        if (r.appName) appName = r.appName;
+        renderAuto();
         $('btn-sync').disabled = false;
       })
       .withFailureHandler(function (e) {
@@ -99,9 +106,45 @@
     var d = e.data || {};
     if (d.type === MSG_SYNC && d.payload) {
       lastPayload = d.payload;
+      if (d.payload.appName) {  // แอปหลักส่งชื่อผู้ใช้มาด้วย → เก็บไว้ใช้กับ auto-sync
+        appName = d.payload.appName;
+        google.script.run.setAppName(appName);
+      }
       doSync(lastPayload);
     }
   });
+
+  // แสดงสถานะ auto-sync
+  function renderAuto() {
+    $('v-auto').textContent = autoOn ? 'เปิด (ทุก ~5 นาที)' : 'ปิด';
+    $('btn-auto').textContent = autoOn ? '⏸ ปิดอัปเดตอัตโนมัติ' : '⚡ อัปเดตอัตโนมัติ (แม้ปิดแอป)';
+  }
+
+  // เปิด/ปิด auto-sync (background trigger)
+  function toggleAuto() {
+    $('btn-auto').disabled = true;
+    if (!autoOn) {
+      google.script.run
+        .withSuccessHandler(function (r) {
+          $('btn-auto').disabled = false;
+          if (r && r.ok) { autoOn = true; renderAuto();
+            setStatus('ok', 'เปิดอัปเดตอัตโนมัติแล้ว · ระบบจะเช็คเวรให้ทุก ~' + r.intervalMin + ' นาที แม้คุณปิดแอป'); }
+        })
+        .withFailureHandler(function (e) { $('btn-auto').disabled = false;
+          setStatus('err', 'เปิดไม่สำเร็จ: ' + (e && e.message ? e.message : e)); })
+        .installAutoSync(appName, 5);
+    } else {
+      google.script.run
+        .withSuccessHandler(function (r) {
+          $('btn-auto').disabled = false;
+          if (r && r.ok) { autoOn = false; renderAuto();
+            setStatus('info', 'ปิดอัปเดตอัตโนมัติแล้ว (เวรที่ซิงค์ไว้ยังอยู่ในปฏิทิน)'); }
+        })
+        .withFailureHandler(function (e) { $('btn-auto').disabled = false;
+          setStatus('err', 'ปิดไม่สำเร็จ: ' + (e && e.message ? e.message : e)); })
+        .removeAutoSync();
+    }
+  }
 
   // 3) ซิงค์
   function doSync(payload) {
@@ -179,6 +222,7 @@
   });
 
   $('btn-sync').addEventListener('click', function () { doSync(lastPayload); });
+  $('btn-auto').addEventListener('click', toggleAuto);
   $('btn-revoke').addEventListener('click', doRevoke);
 
   loadStatus();

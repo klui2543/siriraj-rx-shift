@@ -32,9 +32,14 @@ reflected without manual copying.
 
 | Scope | ระดับ | เหตุผลที่ต้องใช้ |
 |---|---|---|
-| `https://www.googleapis.com/auth/calendar.events` | Sensitive | สร้าง/แก้ไข/ลบ event เวรของผู้ใช้ในปฏิทินของตัวเอง — **ไม่ขอสิทธิ์อ่านปฏิทินอื่นของผู้ใช้ ไม่ขอสิทธิ์แก้ event ที่แอปไม่ได้สร้าง** |
+| `.../auth/calendar` | Sensitive | สร้าง/แก้ไข/ลบ event เวรของผู้ใช้ในปฏิทินของตัวเอง + ให้ผู้ใช้เลือก/สร้างปฏิทินปลายทางได้ (ใช้ `CalendarApp`) — **ไม่อ่าน event เดิมของผู้ใช้ ไม่เข้าปฏิทินคนอื่น** |
+| `.../auth/userinfo.email` | ไม่ sensitive | รู้อีเมลบัญชี Google ที่ใช้ เพื่อ sync ให้ถูกคน + กันสลับบัญชีผิด |
+| `.../auth/script.external_request` | Sensitive | อ่าน "เวรล่าสุดของผู้ใช้" จาก Firebase feed ตอน background trigger ทำงาน (auto-sync แม้ปิดแอป) — อ่านอย่างเดียว |
+| `.../auth/script.scriptapp` | ไม่ sensitive | สร้าง/ลบ time trigger ของผู้ใช้เอง เพื่อทำ auto-sync (opt-in เปิด/ปิดได้) |
 
-**⚠️ ต้องเช็คก่อนยื่นจริง:** ให้ตรวจสอบใน [Google OAuth scope list ล่าสุด](https://developers.google.com/identity/protocols/oauth2/scopes#calendar) ว่ามี scope ที่แคบกว่านี้ใช้ได้หรือไม่ (เช่น scope ที่จำกัดให้แก้ไขได้เฉพาะ event ที่แอปสร้างเอง) — ถ้ามี ให้ใช้ scope แคบสุดเท่าที่ตอบโจทย์ เพราะ scope ยิ่งแคบ Google ยิ่งรีวิวไวและมีโอกาส "ไม่ต้อง" ผ่านกระบวนการ verification เต็มรูปแบบ ห้ามขอ `.../auth/calendar` (เต็มสิทธิ์ทั้งปฏิทิน) เพราะกว้างเกินความจำเป็นและเพิ่มความเสี่ยงถูกตีกลับ
+> **ถ้าต้องการหน้า consent สั้นที่สุด:** ตัด 2 scope ล่าง (`script.external_request` + `script.scriptapp`) ออก = สละ auto-sync แบบ background เหลือแค่ "ซิงค์ตอนเปิดแอป (instant-when-online)" ซึ่งไม่ต้องใช้ 2 scope นี้เลย
+
+**⚠️ หมายเหตุ `calendar` vs `calendar.events`:** โครงที่ทำใช้ `CalendarApp` จึงต้องใช้ scope `calendar` (เต็ม) เพราะเมธอดจัดการปฏิทิน (เลือก/สร้างปฏิทิน) ต้องการ scope นี้ — **ทั้งสองตัวเป็นระดับ sensitive เท่ากัน ไม่ต้อง CASA ทั้งคู่** จุดที่ตัด CASA คือการแยก Calendar ออกจาก Gmail/Drive ไม่ใช่การเลือก scope calendar แบบไหน. ถ้าผู้รีวิวขอให้แคบเป็น `calendar.events` ค่อยเปลี่ยนไปใช้ Advanced Calendar Service แล้วตัดฟีเจอร์เลือกปฏิทินออก (ดู [`../../calendar-sync-app/README.md`](../../calendar-sync-app/README.md) §เหตุผลเรื่อง scope)
 
 Copy-paste สำหรับช่อง scope justification (ต่อ scope):
 

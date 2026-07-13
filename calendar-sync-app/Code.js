@@ -37,6 +37,15 @@ var DEFAULT_COLOR = 8;
 var PROP_TARGET_CAL = 'targetCalendarId';   // UserProperty: ปฏิทินปลายทางที่ผู้ใช้เลือก
 var PROP_MAP_PREFIX = 'map_';                // UserProperty: map_<monthValue> → JSON sync map
 
+// --- Auto-sync (background trigger เก็บตกตอนผู้ใช้ปิดแอป) ---
+// แอปหลักเขียน "เวรล่าสุดของผู้ใช้" ลง Firebase node: <FEED_PATH>/<encAppName> = { <monthValue>: {shifts:[...], updatedAt} }
+// trigger ของผู้ใช้ (รันในนามผู้ใช้เอง) มาอ่าน node นี้ทุก ๆ ไม่กี่นาที แล้ว sync
+var FIREBASE_BASE = '<<PUT_FIREBASE_DB_URL>>';  // เช่น https://xxxx.asia-southeast1.firebasedatabase.app (ไม่มี / ท้าย)
+var FEED_PATH = 'calFeed';                       // ต้องตรงกับที่แอปหลักเขียน
+var AUTO_SYNC_INTERVAL_MIN = 5;                  // GAS รองรับ 1/5/10/15/30 — 5 = สมดุลระหว่างไว vs โควตา trigger
+var PROP_APP_NAME = 'appName';                   // ชื่อผู้ใช้ในแอปหลัก (รับจาก handshake) → ใช้เป็น key ของ feed
+var PROP_AUTO_ON = 'autoSyncOn';                 // '1' = เปิด auto-sync
+
 // ============================================================
 // WEB ENTRY
 // ============================================================
@@ -49,6 +58,12 @@ function doGet() {
 /** ตัวตนของผู้ใช้ที่กำลังรัน (มาจาก scope userinfo.email) */
 function whoAmI() {
   return { ok: true, email: Session.getEffectiveUser().getEmail() };
+}
+
+/** รับ "ชื่อในแอปหลัก" ของผู้ใช้ (จาก handshake) มาเก็บไว้ ใช้เป็น key ของ Firebase feed */
+function setAppName(appName) {
+  if (appName) _up().setProperty(PROP_APP_NAME, String(appName).trim());
+  return { ok: true, appName: _up().getProperty(PROP_APP_NAME) || null };
 }
 
 // ============================================================
@@ -323,8 +338,74 @@ function getStatus() {
     email: email,
     calendarName: calRes.ok ? calRes.name : null,
     syncedCount: count,
-    monthCount: months.length
+    monthCount: months.length,
+    autoSyncOn: _up().getProperty(PROP_AUTO_ON) === '1',
+    appName: _up().getProperty(PROP_APP_NAME) || null
   };
+}
+
+// ============================================================
+// AUTO-SYNC — background trigger เก็บตกตอนผู้ใช้ปิดแอป (ไฮบริดส่วนที่ 2)
+// ============================================================
+/** แปลงชื่อเป็น Firebase-safe key — ต้องตรงกับ encoder ของแอปหลักที่เขียน feed */
+function _encName(name) {
+  return String(name || '').trim().replace(/[.$#\[\]\/\s]+/g, '_');
+}
+
+/** อ่านเวรล่าสุดของผู้ใช้จาก Firebase feed (ที่แอปหลักเขียนไว้) */
+function _fetchMyFeed() {
+  var appName = _up().getProperty(PROP_APP_NAME);
+  if (!appName) return null;
+  if (!FIREBASE_BASE || FIREBASE_BASE.indexOf('<<') === 0) return null;  // ยังไม่ตั้งค่า URL
+  var url = FIREBASE_BASE.replace(/\/+$/, '') + '/' + FEED_PATH + '/' + _encName(appName) + '.json';
+  var resp = UrlFetchApp.fetch(url, { muteHttpExceptions: true });
+  if (resp.getResponseCode() !== 200) return null;
+  var txt = resp.getContentText();
+  if (!txt || txt === 'null') return null;
+  return JSON.parse(txt);  // { <monthValue>: { shifts:[...], updatedAt } }
+}
+
+/** ตัว trigger — ทำงานเองในนามผู้ใช้ทุก ๆ ไม่กี่นาที (แม้ผู้ใช้ปิดแอป) */
+function _autoSyncTick() {
+  try {
+    var feed = _fetchMyFeed();
+    if (!feed) return;
+    Object.keys(feed).forEach(function (monthValue) {
+      var m = feed[monthValue];
+      if (m && Array.isArray(m.shifts)) {
+        syncEffectiveShifts({ monthValue: monthValue, shifts: m.shifts });
+      }
+    });
+  } catch (e) {
+    console.error('[autoSync] ' + (e && e.message ? e.message : e));
+  }
+}
+
+/** เปิด auto-sync: จำชื่อแอปหลัก + ติดตั้ง time trigger (1 ตัว/ผู้ใช้) */
+function installAutoSync(appName, intervalMin) {
+  if (appName) _up().setProperty(PROP_APP_NAME, String(appName).trim());
+  removeAutoSync();  // กันซ้ำ — เหลือ trigger เดียว
+  var mins = intervalMin || AUTO_SYNC_INTERVAL_MIN;
+  ScriptApp.newTrigger('_autoSyncTick').timeBased().everyMinutes(mins).create();
+  _up().setProperty(PROP_AUTO_ON, '1');
+  return { ok: true, intervalMin: mins, appName: _up().getProperty(PROP_APP_NAME) || null };
+}
+
+/** ปิด auto-sync: ลบ time trigger ทั้งหมดของ handler นี้ */
+function removeAutoSync() {
+  var trigs = ScriptApp.getProjectTriggers();
+  var n = 0;
+  trigs.forEach(function (t) {
+    if (t.getHandlerFunction() === '_autoSyncTick') { ScriptApp.deleteTrigger(t); n++; }
+  });
+  _up().deleteProperty(PROP_AUTO_ON);
+  return { ok: true, removed: n };
+}
+
+/** ทดสอบ trigger ด้วยมือ (รันในเว็บ editor) — ต้องตั้ง FIREBASE_BASE + มี feed แล้ว */
+function autoSyncTickManual() {
+  _autoSyncTick();
+  return getStatus();
 }
 
 // ============================================================
@@ -378,7 +459,11 @@ function disconnectAndRevoke() {
     });
   }
 
-  // ล้าง property ทั้งหมด (รวม targetCalendarId)
+  // หยุด auto-sync trigger ก่อน (ไม่งั้นมันจะรันต่อแล้วสร้าง event กลับมา)
+  var trigRemoved = 0;
+  try { trigRemoved = removeAutoSync().removed; } catch (e) {}
+
+  // ล้าง property ทั้งหมด (รวม targetCalendarId, appName, autoSyncOn)
   _up().deleteAllProperties();
 
   // เพิกถอนสิทธิ์ — ครั้งหน้าผู้ใช้จะเจอหน้า consent ใหม่
@@ -388,6 +473,7 @@ function disconnectAndRevoke() {
   return {
     ok: true,
     removed: removed,
+    triggersRemoved: trigRemoved,
     authRevoked: authRevoked,
     calendarReachable: calRes.ok,
     note: calRes.ok ? null : 'เข้าถึงปฏิทินไม่ได้ตอนถอนสิทธิ์ — event บางส่วนอาจค้าง ให้ลบเองในปฏิทิน'
