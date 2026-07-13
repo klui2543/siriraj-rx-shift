@@ -2024,7 +2024,7 @@
           <div style="text-align:center; margin-top:10px;">
             <button type="button" onclick="openChangelog()"
               style="background:none; border:none; color:var(--sub); font-size:11px; font-family:inherit; cursor:pointer; text-decoration:underline; text-underline-offset:2px;">
-              เวอร์ชัน v3.45
+              เวอร์ชัน v3.46
             </button>
           </div>
         </div>
@@ -2906,7 +2906,7 @@ window.allPharmacistNames = [];
               _retroBy: o._retroBy || null,
               _retroAt: o._retroAt || null,
               _retroFinal: o._retroFinal || false,
-              // v3.48: per-shift note pass-through so a note re-derived here (anonymous / non-bound
+              // v3.46: per-shift note pass-through so a note re-derived here (anonymous / non-bound
               //   view) keeps its text + visibility.
               note: (o.note != null ? String(o.note) : null)
             }));
@@ -3095,7 +3095,7 @@ window.allPharmacistNames = [];
       const pb = (typeof PBOverlays !== 'undefined') ? PBOverlays.getUsedMap(_pbGetLoggedInName()) : {};
       return Object.assign({}, pb, om);   // OverlayManager wins on key collision (own > public)
     }
-    // ═══ v3.48 per-shift note (โน้ตเวร) — replaces joint co-ownership ═══════════════════════════
+    // ═══ v3.46 per-shift note (โน้ตเวร) — replaces joint co-ownership ═══════════════════════════
     //   Each person attaches ONE free-text note to a shift they hold (their master row OR a shift
     //   they received). A note is either PUBLIC (🌐 synced → everyone sees it on that shift) or
     //   PRIVATE (🔒 stays on this device, never leaves via sync). No ownership change, no party, no
@@ -5748,7 +5748,7 @@ window.allPharmacistNames = [];
         '<td><span class="swf-badge ' + _swfBadgeClass(s) + '">' + badgeInner + '</span></td>' +
         '</tr>';
     }
-    // ═══ v3.48 per-shift note UI (โน้ตเวร) ═══════════════════════════════════════════════════════
+    // ═══ v3.46 per-shift note UI (โน้ตเวร) ═══════════════════════════════════════════════════════
     //   Reuses the append-only OverlayManager record layer + the public/private = _visibility split.
     //   No password, no audit, no log — a note is the owner's own low-stakes reminder/announcement.
     function _noteCloseEdit() { var e = document.getElementById('noteEditOverlay'); if (e) e.remove(); }
@@ -6780,7 +6780,7 @@ window.allPharmacistNames = [];
     function _pbOverlaySignature(pb) {
       if (!Array.isArray(pb)) return '';
       return pb.length + ':' + pb.map(function(o) {
-        // v3.48: fold the note text so a public note edit forces a repaint for other viewers even
+        // v3.46: fold the note text so a public note edit forces a repaint for other viewers even
         //   when the overlay COUNT is unchanged (the live-poll compares this signature).
         var noteFp = (o && o.note != null) ? ('|' + String(o.note)) : '';
         return (o && o.actionId || '') + '~' + (o && o._visibility || 'public') + '~' + (o && o.partnerName || '') + noteFp;
@@ -7526,7 +7526,7 @@ window.allPharmacistNames = [];
       const _usedMap = window._lwwEngine ? _lwwBackedUsedMap(_mid, _curUser) : OverlayManager.getUsedMap(_mid, _curUser);
       // v3.41: PB usedMap for anonymous / non-owner chevron+dot
       const _pbUsedMap = window._lwwEngine ? {} : ((typeof PBOverlays !== 'undefined') ? PBOverlays.getUsedMap(_pbGetLoggedInName()) : {});
-      // v3.48: per-shift note map (shiftKey → {note, _visibility, by}). Computed once per render like
+      // v3.46: per-shift note map (shiftKey → {note, _visibility, by}). Computed once per render like
       //   the used-map; painted as a 📝 marker on the row (public notes on any row, private on own).
       const _noteMap = (typeof _shiftNoteMap === 'function') ? _shiftNoteMap(_mid, _curUser) : {};
       const _rowsHtml = [];
@@ -7538,7 +7538,7 @@ window.allPharmacistNames = [];
         const _isGhost = !!i._ghost;
         const _shiftKey = _isGhost ? i._ghostKey : makeShiftKey(i);
         const _used = _usedMap[_shiftKey] || _pbUsedMap[_shiftKey];  // v13/v3.41
-        // v3.48: a note shows on a row the viewer HOLDS (own master OR received ghost) — not a struck row.
+        // v3.46: a note shows on a row the viewer HOLDS (own master OR received ghost) — not a struck row.
         const _noteInfo = (!_used) ? _noteMap[_shiftKey] : null;
         const _isOwn = !_isGhost && i.name === _curUser;
         const _tappable = editModeActive && (_isOwn || _isGhost || !!_used);
@@ -7605,7 +7605,7 @@ window.allPharmacistNames = [];
         const _cnwCls = 'col-name-wrap';
         const _ncwLeft = '<span class="ncw-left"></span>';
         const _nameInner = displayName(i.name);
-        // v3.48: 📝 note marker — tap to read (owner can edit/delete). data-note-key routes via the
+        // v3.46: 📝 note marker — tap to read (owner can edit/delete). data-note-key routes via the
         //   delegated capture-phase handler so it works on any row regardless of edit mode.
         const _noteMark = (_noteInfo && _noteInfo.note)
           ? ` <span class="shift-note-mark" data-note-key="${_pbEsc(_shiftKey)}" title="${String(_noteInfo._visibility) === 'private' ? 'โน้ตส่วนตัว (เห็นเฉพาะคุณ)' : 'โน้ต'} — แตะดู" role="button" style="cursor:pointer;">📝${String(_noteInfo._visibility) === 'private' ? '<span style="font-size:0.8em; opacity:0.75;">🔒</span>' : ''}</span>`
@@ -10956,6 +10956,8 @@ table.exp-tbl .tm{margin-left:3px;opacity:0.75;}
     //   `v` = version tag, `date` = YYYY-MM-DD (Thai display), `title` = Klui's name,
     //   `detail` = one plain-language line of what changed.
     var APP_CHANGELOG = [
+      { v: 'v3.46', date: '2026-07-13', title: 'โน้ตเวร — จดโน้ตบนเวรตัวเอง',
+        detail: 'เขียนโน้ตติดไว้บนเวรของตัวเองได้ เลือกให้เพื่อนเห็น หรือเก็บเป็นส่วนตัวก็ได้ — แตะ 📝 บนเวรเพื่อดู' },
       { v: 'v3.45', date: '2026-07-11', title: 'ดูประวัติการอัปเดต',
         detail: 'ย้ายเลขเวอร์ชันมาไว้ใต้ปุ่มบันทึกลงปฏิทิน — กดแล้วเห็นว่าแต่ละรุ่นอัปเดตอะไรบ้าง ย้อนหลังได้' },
       { v: 'v3.44', date: '2026-07-10', title: 'ชื่อเล่น + ค้นหา/ตัวกรองแบบพิมพ์แล้วเจอ',
