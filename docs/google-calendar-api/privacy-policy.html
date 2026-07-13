@@ -1,0 +1,151 @@
+<!doctype html>
+<html lang="th">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>นโยบายความเป็นส่วนตัว — Siriraj Rx Shift (Google Calendar Sync)</title>
+<style>
+  :root {
+    --bg: #ffffff;
+    --fg: #1a1a1a;
+    --muted: #5a5a5a;
+    --border: #e2e2e2;
+    --accent: #1e40af;
+    --todo-bg: #fff3cd;
+    --todo-fg: #7a5b00;
+    --card-bg: #f7f7f8;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #14161a;
+      --fg: #e8e8e8;
+      --muted: #a0a0a0;
+      --border: #2c2f36;
+      --accent: #7fa2ff;
+      --todo-bg: #453a1a;
+      --todo-fg: #ffd67a;
+      --card-bg: #1c1f26;
+    }
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--fg);
+    font-family: "Noto Sans Thai", "Segoe UI", system-ui, -apple-system, sans-serif;
+    line-height: 1.7;
+  }
+  main {
+    max-width: 760px;
+    margin: 0 auto;
+    padding: 2.5rem 1.25rem 5rem;
+  }
+  h1 {
+    font-size: 1.6rem;
+    margin-bottom: 0.25rem;
+  }
+  .updated {
+    color: var(--muted);
+    font-size: 0.9rem;
+    margin-bottom: 1.5rem;
+  }
+  .todo {
+    background: var(--todo-bg);
+    color: var(--todo-fg);
+    border-radius: 8px;
+    padding: 0.75rem 1rem;
+    font-size: 0.9rem;
+    margin-bottom: 2rem;
+  }
+  h2 {
+    font-size: 1.15rem;
+    margin-top: 2.2rem;
+    padding-bottom: 0.4rem;
+    border-bottom: 1px solid var(--border);
+  }
+  a { color: var(--accent); }
+  ol, ul { padding-left: 1.4rem; }
+  li { margin-bottom: 0.4rem; }
+  .summary-en {
+    margin-top: 3rem;
+    padding: 1.25rem 1.5rem;
+    background: var(--card-bg);
+    border-radius: 10px;
+    font-size: 0.95rem;
+  }
+  .summary-en h2 { border-bottom: none; margin-top: 0; }
+  .scope-name {
+    background: var(--card-bg);
+    padding: 0.15rem 0.4rem;
+    border-radius: 4px;
+    font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+    font-size: 0.9em;
+  }
+  footer {
+    margin-top: 3rem;
+    color: var(--muted);
+    font-size: 0.85rem;
+  }
+</style>
+</head>
+<body>
+<main>
+  <h1>นโยบายความเป็นส่วนตัว — Siriraj Rx Shift (Google Calendar Sync)</h1>
+  <p class="updated">อัปเดตล่าสุด: 13 กรกฎาคม 2569</p>
+
+  <p class="todo">⚠️ TODO ก่อน publish: แทนที่อีเมลผู้ดูแลระบบและ URL หน้าแอปหลักในหัวข้อ "ติดต่อ" ด้านล่างด้วยค่าจริงก่อนนำ URL นี้ไปกรอกใน Google Cloud Console</p>
+
+  <p>เอกสารนี้ครอบคลุมเฉพาะฟีเจอร์ <strong>Google Calendar Sync</strong> ของระบบ Siriraj Rx Shift ("ระบบ", "เรา") ซึ่งเป็นระบบจัดตารางเวรภายในของฝ่ายเภสัชกรรม โรงพยาบาลศิริราช ไม่ใช่นโยบายความเป็นส่วนตัวของทั้งระบบ</p>
+
+  <h2>1. ภาพรวม</h2>
+  <p>ฟีเจอร์ Google Calendar Sync เป็นทางเลือกเสริม (opt-in) ที่ช่วยให้ผู้ใช้เห็นเวรของตัวเองในปฏิทิน Google ส่วนตัวโดยอัตโนมัติ โดยไม่ต้องคัดลอกด้วยมือ</p>
+
+  <h2>2. ข้อมูลที่เราเข้าถึงและเก็บ</h2>
+  <p>เมื่อผู้ใช้กดยืนยันเชื่อมต่อ Google Calendar เราขอสิทธิ์ (scope) <span class="scope-name">calendar.events</span> ซึ่งใช้เพื่อ:</p>
+  <ul>
+    <li><strong>สร้าง</strong> event ในปฏิทินของผู้ใช้ ตรงกับเวรที่ผู้ใช้ถืออยู่ (วันที่ เวลาเริ่ม-จบ ประเภทเวร หน่วยงาน/ห้องที่ประจำ)</li>
+    <li><strong>แก้ไข</strong> event เหล่านั้นเมื่อเวรมีการเปลี่ยนแปลง (ยก/แลกเวร)</li>
+    <li><strong>ลบ</strong> event เหล่านั้นเมื่อเวรถูกยกเลิก หรือเมื่อผู้ใช้ยกเลิกการเชื่อมต่อ</li>
+  </ul>
+  <p>เรา<strong>ไม่อ่าน</strong> event อื่นที่มีอยู่ก่อนแล้วในปฏิทินของผู้ใช้ <strong>ไม่เข้าถึง</strong>ปฏิทินอื่นนอกจากปฏิทินหลักที่ผู้ใช้อนุญาต และ<strong>ไม่ดึงข้อมูลใดจากปฏิทิน</strong>กลับเข้าระบบ — การไหลของข้อมูลเป็นทิศทางเดียว (ระบบ → ปฏิทินผู้ใช้) เท่านั้น</p>
+  <p>ข้อมูลที่ปรากฏใน event เป็นข้อมูลตารางงานของบุคลากร (เวรของเภสัชกร) เท่านั้น เราไม่เก็บ ไม่ประมวลผล และไม่เกี่ยวข้องกับข้อมูลผู้ป่วยหรือข้อมูลสุขภาพใดๆ ในฟีเจอร์นี้หรือในระบบส่วนอื่น</p>
+
+  <h2>3. วัตถุประสงค์การใช้ข้อมูล</h2>
+  <p>ใช้เพื่อวัตถุประสงค์เดียวเท่านั้นคือเตือนความจำเวรทำงานของผู้ใช้ผ่านปฏิทินส่วนตัวที่ผู้ใช้ใช้งานอยู่แล้วในชีวิตประจำวัน เราไม่ใช้ข้อมูลนี้เพื่อการโฆษณา ไม่ขาย ไม่ให้เช่า ไม่แชร์กับบุคคลหรือบริษัทภายนอกใดๆ</p>
+
+  <h2>4. การเก็บรักษาและระยะเวลา</h2>
+  <ul>
+    <li>Mapping ระหว่างเวรกับ event (shift ↔ event ID) จะถูกเก็บไว้ตราบเท่าที่ผู้ใช้ยังเปิดใช้ฟีเจอร์นี้อยู่ เพื่อให้ระบบรู้ว่าต้องอัปเดต/ลบ event ไหนเมื่อเวรเปลี่ยน</li>
+    <li>เมื่อผู้ใช้ยกเลิกการเชื่อมต่อ ระบบจะลบ event ที่สร้างไว้ทั้งหมดออกจากปฏิทินผู้ใช้ และลบ mapping ที่เกี่ยวข้องออกจากระบบ</li>
+  </ul>
+
+  <h2>5. การแชร์ข้อมูลกับบุคคลที่สาม</h2>
+  <p>เราไม่แชร์ข้อมูลจาก Google Calendar API กับบุคคลที่สามรายใด การเข้าถึง Google Calendar API เป็นไปตาม <a href="https://developers.google.com/terms/api-services-user-data-policy" target="_blank" rel="noopener">Google API Services User Data Policy</a> รวมถึงข้อกำหนด Limited Use</p>
+
+  <h2>6. สิทธิ์ของผู้ใช้ / วิธียกเลิกการเชื่อมต่อ</h2>
+  <p>ผู้ใช้สามารถยกเลิกการเชื่อมต่อได้ตลอดเวลาโดย:</p>
+  <ol>
+    <li>กดปุ่ม "ยกเลิกการเชื่อมต่อ Google Calendar" ภายในระบบ (ระบบจะลบ event ที่สร้างไว้ทั้งหมดให้อัตโนมัติ) หรือ</li>
+    <li>ถอนสิทธิ์โดยตรงที่ <a href="https://myaccount.google.com/permissions" target="_blank" rel="noopener">Google Account permissions</a> — เลือกแอป "Siriraj Rx Shift" แล้วเลือกยกเลิก</li>
+  </ol>
+  <p>ผู้ใช้สามารถขอให้ลบข้อมูล mapping ที่เกี่ยวข้องออกจากระบบได้ทันทีโดยติดต่อผู้ดูแลระบบตามช่องทางในหัวข้อ "ติดต่อ"</p>
+
+  <h2>7. ความปลอดภัย</h2>
+  <p>ข้อมูลถูกจัดเก็บในโครงสร้างพื้นฐานของ Google (Google Sheets/Firebase, region asia-southeast1) มีการบันทึก audit log การเชื่อมต่อ/ยกเลิกการเชื่อมต่อทุกครั้ง การเข้าถึงระบบจำกัดเฉพาะบุคลากรฝ่ายเภสัชกรรมที่มีบัญชีในระบบเท่านั้น</p>
+
+  <h2>8. การเปลี่ยนแปลงนโยบายนี้</h2>
+  <p>หากมีการเปลี่ยนแปลงสาระสำคัญของนโยบายนี้ เราจะปรับปรุงวันที่ "อัปเดตล่าสุด" ด้านบน และแจ้งผู้ใช้ผ่านช่องทางประกาศภายในระบบ</p>
+
+  <h2>9. ติดต่อ</h2>
+  <p>หากมีคำถามเกี่ยวกับนโยบายความเป็นส่วนตัวนี้ หรือต้องการขอลบข้อมูล ติดต่อ: <strong>[TODO: อีเมลผู้ดูแลระบบ]</strong></p>
+  <p>แอปหลัก: <strong>[TODO: URL หน้าแอปหลัก]</strong></p>
+
+  <div class="summary-en">
+    <h2>English summary (for reviewer convenience — Thai text above is authoritative)</h2>
+    <p>This privacy policy covers only the optional Google Calendar Sync feature of Siriraj Rx Shift, an internal duty-roster system for the Pharmacy Department, Siriraj Hospital. With user consent, the app uses the <span class="scope-name">calendar.events</span> scope to create/update/delete calendar events representing the user's own work shifts (date, time, shift type, assigned unit/room) on their personal calendar. The app does not read pre-existing events, does not access other calendars, does not pull any data back from Calendar into the system, and never handles patient or health information. Users can revoke access at any time in-app or via <a href="https://myaccount.google.com/permissions" target="_blank" rel="noopener">Google Account permissions</a>; doing so deletes all events the app created. Data is never sold, rented, or shared with third parties, and use complies with the <a href="https://developers.google.com/terms/api-services-user-data-policy" target="_blank" rel="noopener">Google API Services User Data Policy</a>, including the Limited Use requirements.</p>
+  </div>
+
+  <footer>Siriraj Rx Shift — Pharmacy Department, Siriraj Hospital</footer>
+</main>
+</body>
+</html>
