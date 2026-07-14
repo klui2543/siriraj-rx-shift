@@ -360,7 +360,8 @@ function _fetchMyFeed() {
   var appName = _up().getProperty(PROP_APP_NAME);
   if (!appName) return null;
   if (!FIREBASE_BASE || FIREBASE_BASE.indexOf('<<') === 0) return null;  // ยังไม่ตั้งค่า URL
-  var url = FIREBASE_BASE.replace(/\/+$/, '') + '/' + FEED_PATH + '/' + _encName(appName) + '.json';
+  // encodeURIComponent สำคัญ — ชื่อไทย/อักขระพิเศษต้อง encode ไม่งั้น Firebase หา key ไม่เจอ
+  var url = FIREBASE_BASE.replace(/\/+$/, '') + '/' + FEED_PATH + '/' + encodeURIComponent(_encName(appName)) + '.json';
   var resp = UrlFetchApp.fetch(url, { muteHttpExceptions: true });
   if (resp.getResponseCode() !== 200) return null;
   var txt = resp.getContentText();
