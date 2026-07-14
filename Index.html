@@ -5373,6 +5373,10 @@ window.allPharmacistNames = [];
       actionState.usedInfo = null;
       renderActionModal();
       document.getElementById('actionModal').style.display = 'flex';
+      // v3.47: focus the code box SYNCHRONOUSLY (still inside the tap gesture) so the mobile keyboard
+      //   opens — a deferred setTimeout focus doesn't raise the keyboard on phones.
+      var _inp = document.getElementById('pickerSearchInput');
+      if (_inp) { try { _inp.focus(); } catch (e) {} }
     }
 
     function closeActionModal() {
@@ -7700,6 +7704,9 @@ window.allPharmacistNames = [];
     };
 
     function triggerUpdate() {
+      // v3.47: a background refresh rebuilds the table/calendar (innerHTML) which can clamp the page
+      //   scroll to the top → "jitter / เด้งออกจากจุดเดิม". Capture the scroll now, restore after render.
+      var _syUpd = 0; try { _syUpd = window.scrollY || window.pageYOffset || 0; } catch(e) {}
       // v29: check if cross-user view should be loaded
       try { if (typeof _p2bMaybeLoadROOverlays === 'function') _p2bMaybeLoadROOverlays(); } catch(e) {}
       // v3.13: refresh FAB visibility (changes when current viewer changes)
@@ -7791,10 +7798,13 @@ window.allPharmacistNames = [];
         var _bw = document.getElementById('bannerWrap'); if(_bw) _bw.style.display='none'; closeSettingsPopup();
         document.getElementById('calendarGridWrapper').classList.add('hidden');
         document.getElementById('calendarNotice').classList.remove('hidden');
-        document.getElementById('calendarNotice').innerHTML = filters.multiNames.length > 1 
+        document.getElementById('calendarNotice').innerHTML = filters.multiNames.length > 1
           ? '⚠️ เลือกชื่อคนเดียวเพื่อดูปฏิทินส่วนตัว'
           : '⚠️ กรุณาระบุชื่อให้ชัดเจน';
       }
+      // v3.47: restore the pre-render scroll position (see capture at top) so a background refresh
+      //   doesn't yank the user away from where they were.
+      if (_syUpd) { try { window.scrollTo(0, _syUpd); } catch(e) {} }
     }
 
     // ==========================================
