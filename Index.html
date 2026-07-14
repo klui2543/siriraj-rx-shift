@@ -17809,7 +17809,8 @@ table.exp-tbl .tm{margin-left:3px;opacity:0.75;}
       var encName = String(me).trim().replace(/[.$#\[\]\/\s]+/g,'_');  // ต้องตรงกับ _encName() ในเคาน์เตอร์
       if (typeof fbDb === 'undefined' || !fbDb){ toast('เชื่อม Firebase ไม่ได้ — รีเฟรชแล้วลองใหม่','warn'); return; }
       try {
-        fbDb.ref('calFeed/' + encName + '/' + mid).set({ shifts: shifts, updatedAt: Date.now() });
+        fbDb.ref('calFeed/' + encName + '/' + mid).set({ shifts: shifts, updatedAt: Date.now() })
+          .catch(function(err){ toast('เขียนเวรลง Firebase ไม่ได้ (ต้องเปิดสิทธิ์ calFeed): '+(err&&err.message?err.message:err),'warn'); });
       } catch(e){ toast('เขียนเวรลง Firebase ไม่สำเร็จ: '+(e&&e.message?e.message:e),'warn'); return; }
 
       // 2) เปิดเคาน์เตอร์ปฏิทินพร้อมแนบชื่อ (?name=) → เคาน์เตอร์ไปหยิบเวรจาก Firebase เอง
