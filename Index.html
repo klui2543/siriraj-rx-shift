@@ -7909,6 +7909,7 @@ window.allPharmacistNames = [];
       var _viewer   = ('viewer'    in opts) ? opts.viewer    : getCurrentUser();
       var _midOv    = ('mid'       in opts) ? opts.mid       : getCurrentMonthId();
       var _swapTap  = !!opts.swapTap;
+      var _onlyKeys = opts.onlyKeys || null;   // v3.47b: if set, render badges ONLY for these shiftKeys (action picker)
       if (_noticeEl) _noticeEl.classList.add('hidden');
       if (_wrapEl)   _wrapEl.classList.remove('hidden');
       const label = document.getElementById('mainMonthSelector').options[document.getElementById('mainMonthSelector').selectedIndex].text;
@@ -8040,6 +8041,7 @@ window.allPharmacistNames = [];
           else if (ls.includes("รอบ 3") || ls.includes("รอบ3")) bc = "badge-s3";
           const _isGhostBadge = !!s._ghost;
           const _calKey = _isGhostBadge ? s._ghostKey : makeShiftKey(s);
+          if (_onlyKeys && !_onlyKeys[_calKey]) return '';   // action picker: hide non-selectable shifts
           const _calUsed = _calUsedMap[_calKey] || _calPBUsedMap[_calKey];  // v13/v3.41
           const _calNote = (!_calUsed && _calNoteMap[_calKey] && _calNoteMap[_calKey].note) ? _calNoteMap[_calKey] : null;
           let _calExtraCls = '';
@@ -17555,28 +17557,64 @@ table.exp-tbl .tm{margin-left:3px;opacity:0.75;}
         if (typeof phxUpdateFabUI === 'function') phxUpdateFabUI();
       } catch(e){}
     }
-    // shared bottom-sheet shift picker for the action buttons
-    var _phxActPickCb = null;
+    // shared bottom-sheet shift picker for the action buttons — ตาราง/ปฏิทิน toggle (like the tab)
+    var _phxActPickCb = null, _phxActPickMe = null, _phxActPickOnlyKeys = null, _phxActPickModeVal = 'table';
     window.phxActPickClose = function(){ var e = document.getElementById('phxActPickOverlay'); if (e) e.remove(); _phxActPickCb = null; };
+    window.phxActPickMode = function(m){
+      _phxActPickModeVal = (m === 'calendar') ? 'calendar' : 'table';
+      var tp = document.getElementById('phxActPickTablePanel');
+      var cp = document.getElementById('phxActPickCalPanel');
+      var bt = document.getElementById('phxActPickBtnTable');
+      var bc = document.getElementById('phxActPickBtnCal');
+      if (tp) tp.classList.toggle('hidden', _phxActPickModeVal !== 'table');
+      if (cp) cp.classList.toggle('hidden', _phxActPickModeVal !== 'calendar');
+      if (bt) bt.classList.toggle('active', _phxActPickModeVal === 'table');
+      if (bc) bc.classList.toggle('active', _phxActPickModeVal === 'calendar');
+      if (_phxActPickModeVal === 'calendar') _phxRenderActPickCalendar();
+    };
+    function _phxRenderActPickCalendar(){
+      var grid = document.getElementById('phxActPickCalGrid');
+      if (!grid || !_phxActPickMe || typeof renderCalendar !== 'function') return;
+      try {
+        renderCalendar(_phxActPickMe, {
+          gridEl: grid, headerEl: document.getElementById('phxActPickCalHeaderRow'),
+          noticeEl: null, wrapperEl: null, viewer: _phxActPickMe, swapTap: true,
+          onlyKeys: _phxActPickOnlyKeys   // only the picker's selectable shifts get tappable badges
+        });
+      } catch(e){ grid.innerHTML = '<div class="phx-tv-empty" style="padding:24px 12px;">แสดงปฏิทินไม่ได้</div>'; }
+    }
     function _phxActionPicker(opts){
       opts = opts || {};
       var items = opts.items || [], noteMap = opts.noteMap || {};
-      var inner = items.length
+      _phxActPickMe = opts.me || (typeof curName === 'function' ? curName() : null);
+      _phxActPickModeVal = 'table';
+      _phxActPickOnlyKeys = {};
+      items.forEach(function(s){ _phxActPickOnlyKeys[_swapRowKey(s)] = true; });
+      var tableInner = items.length
         ? _swapTable(items.map(function(s){
             var k = _swapRowKey(s);
             return _swapRow(s, { noteMap:noteMap }).replace('<tr>', '<tr class="phx-act-pick" data-act-pick-key="'+encodeURIComponent(k)+'" style="cursor:pointer;">');
           }).join(''))
         : '<div class="phx-tv-empty" style="padding:24px 12px;">'+esc(opts.empty || 'ไม่มีเวรให้เลือก')+'</div>';
+      var toggle = items.length
+        ? '<div class="tab-bar" id="phxActPickModeSwitch" style="margin:4px 0 10px;">' +
+            '<button type="button" id="phxActPickBtnTable" class="tab-btn active" onclick="phxActPickMode(\'table\')">ตาราง</button>' +
+            '<button type="button" id="phxActPickBtnCal" class="tab-btn" onclick="phxActPickMode(\'calendar\')">ปฏิทิน</button>' +
+          '</div>' : '';
+      var calPanel = items.length
+        ? '<div id="phxActPickCalPanel" class="hidden"><div style="overflow-x:auto;" class="custom-scrollbar"><div style="min-width:350px;"><div id="phxActPickCalHeaderRow" class="cal-header-row"></div><div id="phxActPickCalGrid"></div></div></div></div>' : '';
       var ov = document.createElement('div');
       ov.id = 'phxActPickOverlay';
       ov.style.cssText = 'position:fixed; inset:0; background:rgba(0,0,0,0.5); z-index:10006; display:flex; align-items:flex-end; justify-content:center;';
-      ov.innerHTML = '<div style="background:var(--surface); width:100%; max-width:520px; border-radius:16px 16px 0 0; padding:16px 14px 24px; max-height:78vh; overflow-y:auto;">' +
+      ov.innerHTML = '<div style="background:var(--surface); width:100%; max-width:520px; border-radius:16px 16px 0 0; padding:16px 14px 24px; max-height:82vh; overflow-y:auto;">' +
         '<div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:4px;">' +
           '<div style="font-weight:800; font-size:16px;">'+esc(opts.title || 'เลือกเวร')+'</div>' +
           '<button type="button" onclick="phxActPickClose()" style="border:none; background:none; font-size:18px; cursor:pointer; color:var(--sub);">✕</button>' +
         '</div>' +
-        (opts.subtitle ? '<div style="font-size:11.5px; color:var(--sub); margin:0 2px 12px;">'+esc(opts.subtitle)+'</div>' : '<div style="height:8px;"></div>') +
-        inner +
+        (opts.subtitle ? '<div style="font-size:11.5px; color:var(--sub); margin:0 2px 10px;">'+esc(opts.subtitle)+'</div>' : '<div style="height:6px;"></div>') +
+        toggle +
+        '<div id="phxActPickTablePanel">' + tableInner + '</div>' +
+        calPanel +
       '</div>';
       document.body.appendChild(ov);
       ov.addEventListener('click', function(e){ if (e.target === ov) phxActPickClose(); });
@@ -17683,13 +17721,18 @@ table.exp-tbl .tm{margin-left:3px;opacity:0.75;}
         } catch(e){ grid.innerHTML = '<div class="phx-tv-empty" style="padding:24px 12px;">แสดงปฏิทินไม่ได้</div>'; }
       }
     }
-    // tap a shift badge in the แลกเวร calendar → same path as a swap-table row tap
+    // tap a shift badge in a แลกเวร calendar → same path as a swap-table row tap,
+    //   UNLESS the action picker is open (then this calendar IS the picker's → select the shift).
     document.addEventListener('click', function(e){
       var b = (e.target && e.target.closest) ? e.target.closest('[data-swap-cal-key]') : null;
       if (!b) return;
       if (e.target.closest('[data-note-key]')) return;   // 📝 note marker wins
       e.stopPropagation();
-      phxSwapRowTap(decodeURIComponent(b.getAttribute('data-swap-cal-key') || ''));
+      var key = decodeURIComponent(b.getAttribute('data-swap-cal-key') || '');
+      if (document.getElementById('phxActPickOverlay') && _phxActPickCb){
+        var cb = _phxActPickCb; phxActPickClose(); cb(key); return;
+      }
+      phxSwapRowTap(key);
     });
 
     // ========= quick-note FAB (replaces the old edit pencil) =========
