@@ -147,20 +147,36 @@ function _buildReminderMinutes(shiftStart) {
   return out;
 }
 
+// v3.47: clinic detection (shift มี ⚠️ หรือ range = 'ตรวจสอบ')
+function _isClinicShift(shift) {
+  return !!(shift && ((shift.shift && String(shift.shift).indexOf('⚠️') >= 0) ||
+                      String(shift.range || '') === 'ตรวจสอบ'));
+}
+function _shiftTypeLabel(shift) {
+  if (_isClinicShift(shift)) return 'คลินิกพิเศษ';
+  return String(shift.shift || '').trim();
+}
+
+// v3.47: title format = ICS ("<ตำแหน่ง> <ประเภท>", คลินิกพิเศษ สำหรับเวรคลินิก)
 function _buildEventTitle(shift) {
   var parts = [];
-  if (shift.shift) parts.push(String(shift.shift).trim());
   if (shift.pos) parts.push(String(shift.pos).trim());
+  var t = _shiftTypeLabel(shift);
+  if (t) parts.push(t);
   return parts.join(' ') || 'เวร';
 }
 
+// v3.47: description ลอก format จาก ICS — เภสัชกร / ตำแหน่ง / เวลา (ตัด "ประเภท:" + "ห้อง:" ออก).
+//   เวรคลินิกพิเศษ: เวลาไม่แน่นอน → "โปรดตรวจสอบจากตารางเวรอีกครั้ง"
 function _buildEventDescription(shift) {
   var lines = [];
   if (shift.name) lines.push('เภสัชกร: ' + shift.name);
-  if (shift.shift) lines.push('ประเภท: ' + shift.shift);
   if (shift.pos) lines.push('ตำแหน่ง: ' + shift.pos);
-  if (shift.range) lines.push('เวลา: ' + shift.range);
-  if (shift.room) lines.push('ห้อง: ' + shift.room);
+  if (_isClinicShift(shift)) {
+    lines.push('เวลา: โปรดตรวจสอบจากตารางเวรอีกครั้ง');
+  } else if (shift.range && shift.range !== '-' && shift.range !== 'ตรวจสอบ') {
+    lines.push('เวลา: ' + shift.range);
+  }
   lines.push('');
   lines.push('— Siriraj Rx Shift —');
   return lines.join('\n');
