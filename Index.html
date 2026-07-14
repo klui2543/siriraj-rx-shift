@@ -8183,7 +8183,9 @@ window.allPharmacistNames = [];
           else if (ls.includes("รอบ 3") || ls.includes("รอบ3")) bc = "badge-s3";
           const _isGhostBadge = !!s._ghost;
           const _calKey = _isGhostBadge ? s._ghostKey : makeShiftKey(s);
-          if (_onlyKeys && !_onlyKeys[_calKey]) return '';   // action picker: hide non-selectable shifts
+          // v3.47: action picker shows the FULL month like the main calendar; non-selectable shifts
+          //   still render (dimmed, not tappable). _onlyKeys now drives TAPPABILITY, not visibility.
+          const _selectable = !_onlyKeys || !!_onlyKeys[_calKey];
           const _calUsed = _calUsedMap[_calKey] || _calPBUsedMap[_calKey];  // v13/v3.41
           const _calNote = (!_calUsed && _calNoteMap[_calKey] && _calNoteMap[_calKey].note) ? _calNoteMap[_calKey] : null;
           let _calExtraCls = '';
@@ -8215,10 +8217,13 @@ window.allPharmacistNames = [];
           const _isHospitalBadge = s.room && s.room !== 'clinic';
           const _isClinicBadge = s.room === 'clinic' || s.range === 'ตรวจสอบ' || (s.shift && s.shift.indexOf('⚠️') >= 0);
           let _badgeAttrs = '';
-          if (_swapTap) {
+          if (_swapTap && _selectable) {
             // v3.47: แลกเวร calendar → the badge IS the tap target; route to the same action menu
             //   as a swap-table row. Suppress the Phase-J/clinic view triggers so they don't compete.
             _badgeAttrs = ` data-swap-cal-key="${encodeURIComponent(_calKey)}" style="cursor:pointer;"`;
+          } else if (_swapTap) {
+            // non-selectable shift in the picker → visible for context but dimmed + not tappable
+            _badgeAttrs = ' style="opacity:0.38;"';
           } else if (_isHospitalBadge) {
             _badgeAttrs = ` data-phx-shift-trigger="1" data-phx-pos="${encodeURIComponent(s.pos || '')}" data-phx-room="${encodeURIComponent(s.room || '')}" data-phx-date="${encodeURIComponent(s.date || '')}"`;
           } else if (_isClinicBadge) {
@@ -17760,10 +17765,16 @@ table.exp-tbl .tm{margin-left:3px;opacity:0.75;}
       _phxActPickModeVal = 'table';
       _phxActPickOnlyKeys = {};
       items.forEach(function(s){ _phxActPickOnlyKeys[_swapRowKey(s)] = true; });
+      // v3.47: table shows the FULL schedule (like the main page); only selectable rows are tappable,
+      //   the rest render dimmed for context. Falls back to `items` if no full list was passed.
+      var _tblRows = (opts.allItems && opts.allItems.length) ? opts.allItems : items;
       var tableInner = items.length
-        ? _swapTable(items.map(function(s){
+        ? _swapTable(_tblRows.map(function(s){
             var k = _swapRowKey(s);
-            return _swapRow(s, { noteMap:noteMap }).replace('<tr>', '<tr class="phx-act-pick" data-act-pick-key="'+encodeURIComponent(k)+'" style="cursor:pointer;">');
+            var row = _swapRow(s, { noteMap:noteMap });
+            return _phxActPickOnlyKeys[k]
+              ? row.replace('<tr>', '<tr class="phx-act-pick" data-act-pick-key="'+encodeURIComponent(k)+'" style="cursor:pointer;">')
+              : row.replace('<tr>', '<tr style="opacity:0.42;">');   // context row, not selectable
           }).join(''))
         : '<div class="phx-tv-empty" style="padding:24px 12px;">'+esc(opts.empty || 'ไม่มีเวรให้เลือก')+'</div>';
       var toggle = items.length
@@ -17825,13 +17836,21 @@ table.exp-tbl .tm{margin-left:3px;opacity:0.75;}
         return;
       }
       var sets = _phxMyShiftSets(me);
+      // v3.47: full schedule (like the main table/calendar) = held ∪ changed, deduped by key. The picker
+      //   shows ALL your shifts for context; only cfg.items (valid for THIS action) stay tappable.
+      var _seen = {}, _allSched = [];
+      sets.held.concat(sets.changed).forEach(function(s){
+        var k = _swapRowKey(s);
+        if (k && !_seen[k]) { _seen[k] = true; _allSched.push(s); }
+      });
+      _allSched.sort(_swapByDate);
       var cfg = ({
         swap:   { title:'🔄 เลือกเวรที่จะสลับ',  subtitle:'แตะเวรของคุณ 1 อัน แล้วเลือกคนที่จะสลับด้วย', items:sets.held,    go:'swap', empty:'ไม่มีเวรที่ถืออยู่ให้สลับ' },
         give:   { title:'🎁 เลือกเวรที่จะยกให้',  subtitle:'แตะเวรของคุณ 1 อัน แล้วเลือกผู้รับ',          items:sets.held,    go:'give', empty:'ไม่มีเวรที่ถืออยู่ให้ยก' },
         cancel: { title:'↩️ เลือกเวรที่จะยกเลิก', subtitle:'เวรที่ยก/แลก/รับมาเดือนนี้ — แตะเพื่อยกเลิก',   items:sets.changed, go:'undo', empty:'ยังไม่มีเวรที่แลก/ยก/รับมาเดือนนี้' }
       })[kind];
       if (!cfg) return;
-      _phxActionPicker({ title:cfg.title, subtitle:cfg.subtitle, items:cfg.items, empty:cfg.empty, noteMap:sets.noteMap,
+      _phxActionPicker({ title:cfg.title, subtitle:cfg.subtitle, items:cfg.items, allItems:_allSched, empty:cfg.empty, noteMap:sets.noteMap,
         onPick: function(key){
           if (typeof openActionModalForKey === 'function') openActionModalForKey(key);
           // advance to the target step SYNCHRONOUSLY (same JS tick) so the intermediate menu never
