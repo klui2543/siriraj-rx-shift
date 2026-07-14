@@ -114,6 +114,10 @@
     .pill-btn.active { background: var(--accent-bg); color: var(--accent); }
     .pill-btn.danger { background: #fee2e2; color: #dc2626; }
     body.dark-theme .pill-btn.danger { background: #7f1d1d; color: #fca5a5; }
+    .pill-btn.mine { background: var(--accent-bg); color: var(--accent); }
+    /* v3.47: "ล้างทั้งหมด" moved below the filter menu (full-width row) */
+    .clear-all-row { display: flex; justify-content: flex-end; margin: 8px 0 2px; }
+    .clear-all-row.hidden { display: none; }
 
     .multi-list {
       position: absolute; left: 0; right: 0; top: 44px;
@@ -1206,6 +1210,25 @@
     .phx-draft-banner .tx b { font-weight: 800; }
     .phx-draft-banner .go { font-weight: 700; flex-shrink: 0; white-space: nowrap; }
     body.dark-theme .phx-draft-banner { background: #3f2d10; border-color: #78571c; color: #fcd34d; }
+    /* v3.47: ประวัติการแลกเวร — transaction timeline (newest→oldest, scrollable) */
+    .phx-tl-scroll { max-height: 46vh; overflow-y: auto; padding: 4px 2px 2px; }
+    .phx-tl { position: relative; margin-left: 6px; }
+    .phx-tl-item { position: relative; padding: 0 0 15px 18px; border-left: 2px solid var(--border); }
+    .phx-tl-item:last-child { border-left-color: transparent; padding-bottom: 2px; }
+    .phx-tl-item::before {
+      content: ''; position: absolute; left: -6px; top: 3px; width: 10px; height: 10px;
+      border-radius: 50%; background: var(--muted); border: 2px solid var(--surface); box-sizing: border-box;
+    }
+    .phx-tl-item.swap::before { background: #2563eb; }
+    .phx-tl-item.give::before { background: #a16207; }
+    .phx-tl-item.add::before  { background: #15803d; }
+    .phx-tl-summary { font-size: 13px; color: var(--text); line-height: 1.5; }
+    .phx-tl-meta { font-size: 11px; color: var(--sub); margin-top: 2px; display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+    .phx-tl-status { font-size: 9.5px; font-weight: 700; padding: 1px 7px; border-radius: 999px; white-space: nowrap; }
+    .phx-tl-status.draft { background: #fef3c7; color: #92400e; }
+    .phx-tl-status.pub { background: #dcfce7; color: #15803d; }
+    body.dark-theme .phx-tl-status.draft { background: #3f2d10; color: #fcd34d; }
+    body.dark-theme .phx-tl-status.pub { background: #14352b; color: #86efac; }
 
     /* profile rows on the ฉัน tab */
     .phx-me-hero { display: flex; align-items: center; gap: 13px; padding: 4px 2px 16px; }
@@ -1240,7 +1263,7 @@
     .phx-me-row.disabled:hover { border-color: var(--border); background: var(--surface); }
     .phx-me-row .phx-me-lock {
       font-size: 10.5px; font-weight: 700; color: var(--muted); flex-shrink: 0;
-      border: 1px solid var(--border); padding: 2px 9px; border-radius: 999px;
+      border: 1px solid var(--border); padding: 2px 9px; border-radius: 999px; white-space: nowrap;
     }
     .phx-me-cta {
       display: block; width: 100%; padding: 14px;
@@ -1956,7 +1979,7 @@
         <div class="search-row" id="pharmacistMultiWrap">
           <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="var(--muted)" stroke-width="2.5" stroke-linecap="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
           <input type="text" id="searchInput" oninput="onSearchInput()" placeholder="พิมพ์ค้นหาชื่อเภสัชกร..." autocomplete="off" />
-          <button id="clearAllBtn" class="pill-btn danger hidden" onclick="resetFilters()">ล้างทั้งหมด</button>
+          <button id="myShiftsBtn" class="pill-btn mine" onclick="phxSelectMyName()" title="ดูเฉพาะเวรของฉัน">เวรของฉัน</button>
           <button id="advFilterBtn" class="pill-btn" onclick="toggleAdvFilters()">
             <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><path d="M3 4h18M7 9h10M10 14h4M12 19h0"/></svg>
             ตัวกรอง
@@ -1996,6 +2019,11 @@
               <input type="hidden" id="posDropdown">
             </div>
           </div>
+        </div>
+
+        <!-- v3.47: "ล้างทั้งหมด" moved here — below the filter menu (was in the search row) -->
+        <div id="clearAllRow" class="clear-all-row hidden">
+          <button id="clearAllBtn" class="pill-btn danger" onclick="resetFilters()">ล้างทั้งหมด</button>
         </div>
 
         <!-- Legacy hidden elements for JS compat -->
@@ -8997,6 +9025,9 @@ async function _exportCalendarPDF_v2(personList) {
         if (hasAny) clearBtn.classList.remove('hidden');
         else clearBtn.classList.add('hidden');
       }
+      // v3.47: the button now lives in #clearAllRow below the filter menu — toggle the row too
+      var clearRow = document.getElementById('clearAllRow');
+      if (clearRow) clearRow.classList.toggle('hidden', !hasAny);
       if (advBtn) {
         var hasAdv = (dateD && dateD.value) || (roomF && roomF.value) || (posD && posD.value);
         var panel = document.getElementById('advFiltersPanel');
@@ -17462,6 +17493,24 @@ table.exp-tbl .tm{margin-left:3px;opacity:0.75;}
     function isLoggedIn(){ return !!(typeof P2B !== 'undefined' && P2B && P2B.boundName); }
     function isAdmin(){ var el = document.getElementById('adminShortcut'); return !!(el && el.style.display && el.style.display !== 'none'); }
     function disp(n){ try { return (typeof displayName === 'function') ? displayName(n) : n; } catch(e){ return n; } }
+    // v3.47: "เวรของฉัน" quick-filter — pop the user's own name straight into the schedule filter.
+    //   Mirrors the multi-select pick handler (push name → activePharmacist → renderChips → triggerUpdate).
+    window.phxSelectMyName = function(){
+      var me = curName();
+      var s = document.getElementById('searchInput');
+      if (!me){
+        if (typeof _p2bShowToast === 'function') _p2bShowToast('ยังไม่รู้ว่าคุณคือใคร — เข้าสู่ระบบ หรือพิมพ์ชื่อของคุณก่อน','warn');
+        else alert('เข้าสู่ระบบ หรือพิมพ์ชื่อของคุณก่อน');
+        if (s){ try { s.focus(); } catch(e){} }
+        return;
+      }
+      window.selectedPharmacists = window.selectedPharmacists || [];
+      if (window.selectedPharmacists.indexOf(me) < 0) window.selectedPharmacists.push(me);
+      window.activePharmacist = me;
+      if (s) s.value = '';
+      try { if (window.renderChipsAndClearBtn) window.renderChipsAndClearBtn(); } catch(e){}
+      try { if (typeof triggerUpdate === 'function') triggerUpdate(); } catch(e){}
+    };
 
     // ---- icons (18px) ----
     var IC = {
@@ -17529,6 +17578,38 @@ table.exp-tbl .tm{margin-left:3px;opacity:0.75;}
         '<thead><tr><th>วันที่</th><th>ชื่อ</th><th>ตำแหน่ง</th><th>รอบเวลา</th></tr></thead>' +
         '<tbody>'+rowsHtml+'</tbody></table></div>';
     }
+    // v3.47: format an action's createdAt (ISO) → "d/m HH:mm" for the timeline meta line
+    function _tlWhen(iso){
+      try { var d = new Date(iso); if (isNaN(d.getTime())) return '';
+        var p = function(n){ return (n<10?'0':'')+n; };
+        return p(d.getDate())+'/'+p(d.getMonth()+1)+' '+p(d.getHours())+':'+p(d.getMinutes());
+      } catch(e){ return ''; }
+    }
+    // v3.47: "ประวัติการแลกเวร" — my own transaction records (swap/give/receive) as a timeline,
+    //   newest → oldest. Notes are excluded ("เฉพาะ Transaction"). Returns '' when there are none.
+    function _swapTimelineHtml(mid, me){
+      var acts = [];
+      try { if (typeof OverlayManager !== 'undefined') acts = OverlayManager.getActions(mid, me) || []; } catch(e){}
+      acts = acts.filter(function(a){ return a && (a.action==='swap' || a.action==='give' || a.action==='add'); });
+      if (!acts.length) return '';
+      acts.sort(function(a,b){ return String(b.createdAt||'').localeCompare(String(a.createdAt||'')); });  // newest first
+      var rows = acts.map(function(a){
+        var sh = (typeof _swfActionShifts==='function') ? _swfActionShifts(a) : {my:null,tgt:null};
+        var summary = (typeof _swfSummaryHtml==='function') ? _swfSummaryHtml(a, a.viewerName||me, sh.my, sh.tgt) : '';
+        var main = sh.my || sh.tgt;
+        var dateStr = (main && main.date) ? esc(main.date) : '';
+        var when = _tlWhen(a.createdAt);
+        var isDraft = String(a._visibility)==='draft';
+        var status = isDraft ? '<span class="phx-tl-status draft">ร่าง</span>' : '<span class="phx-tl-status pub">เผยแพร่แล้ว</span>';
+        var kind = (a.action==='swap') ? 'swap' : (a.action==='give' ? 'give' : 'add');
+        return '<div class="phx-tl-item '+kind+'">' +
+            '<div class="phx-tl-summary">'+summary+'</div>' +
+            '<div class="phx-tl-meta">'+(dateStr?('เวร '+dateStr):'')+(when?(' · '+when):'')+status+'</div>' +
+          '</div>';
+      }).join('');
+      return '<div class="phx-swap-sec-label">ประวัติการแลกเวร</div>' +
+             '<div class="phx-tl-scroll"><div class="phx-tl">'+rows+'</div></div>';
+    }
     window.phxRenderSwapView = function(){
       var body = document.getElementById('phxSwapBody');
       if (!body) return;
@@ -17542,26 +17623,10 @@ table.exp-tbl .tm{margin-left:3px;opacity:0.75;}
       }
       var sa = document.getElementById('phxSwapActions'); if (sa) sa.style.display = '';
       var mid = (typeof getCurrentMonthId === 'function') ? getCurrentMonthId() : '';
-      var usedMap = {}, noteMap = {}, mine = [], ghosts = [];
-      try { if (typeof _combinedUsedMap === 'function') usedMap = _combinedUsedMap(mid, me) || {}; } catch(e){}
-      try { if (typeof _shiftNoteMap === 'function') noteMap = _shiftNoteMap(mid, me) || {}; } catch(e){}
-      try { if (typeof rawData !== 'undefined' && rawData) rawData.forEach(function(r){ if (r && r.name === me) mine.push(r); }); } catch(e){}
-      try { if (typeof buildGhostRows === 'function') ghosts = buildGhostRows(rawData, mid, me) || []; } catch(e){}
 
-      // v3.47c: tab body = recap ONLY ("แลกเวรเดือนนี้ไปแล้ว"). Picking a shift to act on now happens
-      //   inside the action buttons' picker (which has its own ตาราง/ปฏิทิน toggle).
-      var changed = mine.filter(function(r){ return !!usedMap[makeShiftKey(r)]; }).map(function(r){ return {s:r, gave:true}; })
-        .concat(ghosts.map(function(g){ return {s:g, gave:false}; }))
-        .sort(function(a,b){ return _swapByDate(a.s, b.s); });
-      var html;
-      if (changed.length){
-        html = '<div class="phx-swap-sec-label">แลกเวรเดือนนี้ไปแล้ว</div>';
-        html += _swapTable(changed.map(function(c){
-          return _swapRow(c.s, { struck:c.gave, noteMap:noteMap, tag: c.gave ? 'ยกออก' : 'รับมา', tagCls: c.gave ? 'gave' : 'recv' });
-        }).join(''));
-      } else {
-        html = '<div class="phx-tv-empty" style="padding:26px 12px;">ยังไม่มีการแลก / ยก / รับเวรเดือนนี้</div>';
-      }
+      // v3.47d: tab body = ประวัติการแลกเวร (transaction timeline, newest → oldest, scrollable).
+      var html = _swapTimelineHtml(mid, me);
+      if (!html) html = '<div class="phx-tv-empty" style="padding:26px 12px;">ยังไม่มีการแลก / ยก / รับเวรเดือนนี้</div>';
       // v3.47: pending-draft manager — if this login has unpublished ร่าง, surface a way to จัดการ
       //   (ทำต่อ / เผยแพร่ทั้งหมด) right here on the แลกเวร tab.
       var draftN = (typeof swfPendingDraftCount === 'function') ? swfPendingDraftCount(mid) : 0;
@@ -17828,10 +17893,12 @@ table.exp-tbl .tm{margin-left:3px;opacity:0.75;}
     // ========= ฉัน (profile) =========
     function meRow(js, label, svg, danger, lock){
       if (lock){
-        // v3.47: admin-only row → greyed, non-clickable, with a "เฉพาะแอดมิน" pill instead of chevron
-        return '<button class="phx-me-row disabled" type="button" disabled title="เฉพาะแอดมิน">' +
+        // v3.47: locked row → greyed, non-clickable, pill instead of chevron.
+        //   lock may be a string = the pill text (e.g. "กำลังเตรียมระบบ"), else defaults.
+        var lockTxt = (typeof lock === 'string') ? lock : 'เฉพาะแอดมิน';
+        return '<button class="phx-me-row disabled" type="button" disabled title="'+esc(lockTxt)+'">' +
           '<span class="ic">'+svg+'</span><span class="tx">'+esc(label)+'</span>' +
-          '<span class="phx-me-lock">เฉพาะแอดมิน</span></button>';
+          '<span class="phx-me-lock">'+esc(lockTxt)+'</span></button>';
       }
       return '<button class="phx-me-row'+(danger?' danger':'')+'" onclick="'+js+'" type="button">' +
         '<span class="ic">'+svg+'</span><span class="tx">'+esc(label)+'</span>'+IC.chev+'</button>';
@@ -17908,7 +17975,7 @@ table.exp-tbl .tm{margin-left:3px;opacity:0.75;}
       }
       html += '<div class="phx-me-section-label">ปฏิทิน & เตือนความจำ</div>';
       html += meRow('phxOpenIcsReminderModal()', 'เตือนเวรลงปฏิทิน (ICS)', IC.cal);
-      html += meRow('phxSyncGoogleCalendar()', 'ซิงค์เข้า Google Calendar', IC.cal, false, !isAdmin());  // v3.47: admin-only for now
+      html += meRow('phxSyncGoogleCalendar()', 'ซิงค์เข้า Google Calendar', IC.cal, false, 'กำลังเตรียมระบบ');  // v3.47: coming soon (locked for everyone)
       html += '<div class="phx-me-section-label">ทั่วไป</div>';
       html += meRow('openChangelog()', 'ประวัติการอัปเดต', IC.history);
       // ตรวจสอบคุณภาพข้อมูล (Audit) ย้ายไปเป็นลิงก์เล็กเหนือ Version ที่ท้ายตารางเวรแล้ว
