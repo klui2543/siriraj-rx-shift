@@ -1418,6 +1418,11 @@
     .phx-input:focus { outline: none; border-color: #2563eb; }
     body.dark-theme .phx-input { background: #1e293b; color: #f1f5f9; border-color: #475569; }
     body.dark-theme .phx-input:focus { border-color: #60a5fa; }
+    /* v3.47: form field labels + required marker */
+    .phx-flabel { display: block; font-size: 11px; font-weight: 500; color: #475569; margin: 2px 2px 4px; }
+    .phx-flabel .req { color: #dc2626; font-weight: 700; }
+    .phx-flabel .opt { color: #94a3b8; font-weight: 400; }
+    body.dark-theme .phx-flabel { color: #cbd5e1; }
 
     .phx-btn-primary {
       display: block; width: 100%;
@@ -12276,6 +12281,19 @@ table.exp-tbl .tm{margin-left:3px;opacity:0.75;}
       } catch(e) {}
       try { if (typeof _nkSubscribePrivate === 'function') _nkSubscribePrivate(); } catch(e) {}
       try { if (typeof _nkPullGAS === 'function') _nkPullGAS(); } catch(e) {}
+      // v3.47: apply a nickname chosen at registration (stashed until this first login)
+      try {
+        var _pn = localStorage.getItem('_phxPendingNick');
+        if (_pn) {
+          var _pnObj = JSON.parse(_pn);
+          if (_pnObj && _pnObj.name === name) {
+            localStorage.removeItem('_phxPendingNick');
+            if (_pnObj.nick && typeof nkSetPublic === 'function') {
+              setTimeout(function(){ try { nkSetPublic(_pnObj.nick); } catch(e){} }, 800);
+            }
+          }
+        }
+      } catch(e) {}
       // v3.5: bridge to P2B (old name-binding system) — login = bind as that person
       try {
         if (typeof P2B !== 'undefined' && P2B) {
@@ -12594,6 +12612,8 @@ table.exp-tbl .tm{margin-left:3px;opacity:0.75;}
       const emailLocal = (document.getElementById('phxRegEmailLocal').value || '').trim().toLowerCase();
       const pw = document.getElementById('phxRegPw').value || '';
       const pw2 = document.getElementById('phxRegPw2').value || '';
+      const _nkEl = document.getElementById('phxRegNickname');
+      const nickname = (_nkEl && _nkEl.value || '').trim();   // v3.47: optional nickname
 
       // v3.19: resolve name — either from dropdown or custom input
       let name;
@@ -12628,6 +12648,8 @@ table.exp-tbl .tm{margin-left:3px;opacity:0.75;}
       const successHandler = function(r) {
         _phxDisableButtons('phxLoginModal', false);
         if (r && r.success) {
+          // v3.47: stash the optional nickname → applied on first login (needs a logged-in identity to write)
+          if (nickname) { try { localStorage.setItem('_phxPendingNick', JSON.stringify({ name: name, nick: nickname })); } catch(e) {} }
           phxShowFormMsg(r.message || 'ส่งอีเมลยืนยันแล้ว', true);
         } else {
           phxShowFormMsg((r && r.error) || 'เกิดข้อผิดพลาด', false);
@@ -15132,6 +15154,7 @@ table.exp-tbl .tm{margin-left:3px;opacity:0.75;}
           กลับไปเข้าสู่ระบบ
         </button>
         <h3 style="font-size:15px; font-weight:600; margin:0 0 16px; color:var(--text); text-align:center;">ลงทะเบียน</h3>
+        <label class="phx-flabel">ชื่อของท่าน <span class="req">*</span></label>
         <select id="phxRegNameSelect" class="phx-select" onchange="phxOnRegNameChange()">
           <option value="">เลือกชื่อของท่าน</option>
         </select>
@@ -15144,11 +15167,16 @@ table.exp-tbl .tm{margin-left:3px;opacity:0.75;}
         <div id="phxRegCustomHint" style="display:none; font-size:10px; color:var(--sub); margin:4px 0 8px; line-height:1.5;">
           💡 ชื่อที่กรอกจะถูกนำเข้าระบบภายหลังลงทะเบียนในทันที
         </div>
+        <label class="phx-flabel">ชื่อเล่น <span class="opt">(ไม่บังคับ)</span></label>
+        <input type="text" id="phxRegNickname" class="phx-input" placeholder="ชื่อเล่นที่อยากให้คนอื่นเห็น เช่น ขลุ่ย" autocomplete="off" maxlength="40">
+        <label class="phx-flabel">อีเมลมหิดล <span class="req">*</span></label>
         <div class="phx-email-wrap">
           <input type="text" id="phxRegEmailLocal" placeholder="กรุณากรอกอีเมลล์มหิดลของท่าน" autocomplete="off" spellcheck="false">
           <div class="phx-email-suffix">@mahidol.ac.th</div>
         </div>
+        <label class="phx-flabel">รหัสผ่าน <span class="req">*</span></label>
         <input type="password" id="phxRegPw" class="phx-input" placeholder="ตั้งรหัสผ่าน (อย่างน้อย 4 ตัว)" autocomplete="new-password">
+        <label class="phx-flabel">ยืนยันรหัสผ่าน <span class="req">*</span></label>
         <input type="password" id="phxRegPw2" class="phx-input" placeholder="ยืนยันรหัสผ่าน" autocomplete="new-password">
         <button onclick="phxSubmitRegister()" class="phx-btn-primary">ส่งอีเมลยืนยัน</button>
         <div class="phx-notice-warn">
