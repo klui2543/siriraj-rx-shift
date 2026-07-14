@@ -1980,7 +1980,7 @@
         <!-- Search row with multi-select trigger -->
         <div class="search-row" id="pharmacistMultiWrap">
           <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="var(--muted)" stroke-width="2.5" stroke-linecap="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
-          <input type="text" id="searchInput" oninput="onSearchInput()" placeholder="พิมพ์ค้นหาชื่อเภสัชกร..." autocomplete="off" />
+          <input type="text" id="searchInput" oninput="onSearchInput()" placeholder="ค้นหาชื่อ..." autocomplete="off" />
           <button id="myShiftsBtn" class="pill-btn mine" onclick="phxSelectMyName()" title="ดูเฉพาะเวรของฉัน">เวรของฉัน</button>
           <button id="advFilterBtn" class="pill-btn" onclick="toggleAdvFilters()">
             <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><path d="M3 4h18M7 9h10M10 14h4M12 19h0"/></svg>
@@ -2124,13 +2124,7 @@
             </button>
           </div>
           <div id="tableWrapper" class="hidden">
-            <!-- v3.47: "ต้นฉบับ (ตามอัพโหลด)" toggle removed per Klui — always the after-swap view -->
-            <div id="lwwViewToggle" style="display:flex; gap:6px; align-items:center; margin-bottom:8px; font-size:12px; flex-wrap:wrap;">
-              <button id="phxRefreshBtn" onclick="phxManualRefresh()" title="รีเฟรชข้อมูลล่าสุด" aria-label="รีเฟรช" style="margin-left:auto; display:inline-flex; align-items:center; gap:4px; padding:4px 10px; border-radius:6px; border:1px solid var(--border); background:var(--surface); color:var(--text); font-family:inherit; font-size:12px; cursor:pointer;">
-                <svg id="phxRefreshIcon" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></svg>
-                รีเฟรช
-              </button>
-            </div>
+            <!-- v3.47: "ต้นฉบับ" toggle removed; รีเฟรช moved into the banner (left of ⚙, icon-only) -->
             <div id="tableContainer">
               <table>
                 <thead>
@@ -4264,6 +4258,9 @@ window.allPharmacistNames = [];
         '<b>' + displayName(target) + '</b>' + _nkPencil + ' ปฏิบัติงานเดือนนี้: ' +
         '<span style="font-size:18px;font-weight:800;margin:0 4px;">' + total + '</span> เวร ' +
         ovlTag +
+        '<button onclick="phxManualRefresh()" style="position:absolute;right:40px;top:50%;transform:translateY(-50%);background:none;border:1px solid transparent;border-radius:8px;cursor:pointer;padding:4px;color:var(--accent);opacity:0.7;" title="รีเฟรชข้อมูลล่าสุด" aria-label="รีเฟรช">' +
+          '<svg id="phxRefreshIcon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></svg>' +
+        '</button>' +
         '<button onclick="toggleSettingsPopup(event)" style="position:absolute;right:8px;top:50%;transform:translateY(-50%);background:none;border:1px solid transparent;border-radius:8px;cursor:pointer;padding:4px;color:var(--accent);opacity:0.7;" title="ตั้งค่า">' +
           '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 01-2.83 2.83l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-4 0v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 01-2.83-2.83l.06-.06A1.65 1.65 0 004.6 15a1.65 1.65 0 00-1.51-1H3a2 2 0 010-4h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 012.83-2.83l.06.06A1.65 1.65 0 009 4.68a1.65 1.65 0 001-1.51V3a2 2 0 014 0v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 012.83 2.83l-.06.06A1.65 1.65 0 0019.4 9a1.65 1.65 0 001.51 1H21a2 2 0 010 4h-.09a1.65 1.65 0 00-1.51 1z"/></svg>' +
         '</button>';
@@ -5575,8 +5572,11 @@ window.allPharmacistNames = [];
         const names = window.allPharmacistNames || [];
         let list = names.filter(n => n !== myName);
         if (actionState.pickerQuery) {
-          const q = actionState.pickerQuery.toLowerCase();
-          list = list.filter(n => n.toLowerCase().includes(q));
+          // v3.47: match nickname too (was real-name-only) — same as the rest of the app
+          const q = actionState.pickerQuery;
+          list = list.filter(n => (typeof _nkNameMatches === 'function')
+            ? _nkNameMatches(n, q)
+            : n.toLowerCase().includes(q.toLowerCase()));
         }
         list.sort();
         if (countEl) countEl.textContent = list.length + ' รายชื่อ';
@@ -14140,50 +14140,17 @@ table.exp-tbl .tm{margin-left:3px;opacity:0.75;}
       try {
         const fab = document.getElementById('phxFab');
         const cluster = document.getElementById('phxFabCluster');
-        const undoBtn = document.getElementById('phxFabUndo');
-        const redoBtn = document.getElementById('phxFabRedo');
-        const floppyBtn = document.getElementById('phxFabFloppy');
-        if (!fab || !cluster) return;
+        if (!fab) return;
 
         const target = (typeof getCurrentUser === 'function') ? getCurrentUser() : null;
         const canEdit = !!target;
-        const editOn = (typeof editModeActive !== 'undefined') && editModeActive;
         const activeTab = document.body.getAttribute('data-tab') || 'schedule';
 
-        // v3.47: the note-FAB belongs to ตารางเวร + แลกเวร only; ฉัน (profile) shows no FAB.
-        if (!canEdit || activeTab === 'me') {
-          // Nobody selected, or on the profile tab — hide everything
-          fab.style.display = 'none';
-          cluster.style.display = 'none';
-          return;
-        }
-
-        if (activeTab === 'swap') {
-          // แลกเวร uses the action-first flow, which flips editModeActive on just to open the
-          //   action modal. The undo/redo/เสร็จสิ้น cluster must NEVER surface here — only the
-          //   note pencil (issue: pressing สลับ/ยก/รับ was leaving the edit cluster on screen).
-          fab.style.display = 'flex';
-          cluster.style.display = 'none';
-          return;
-        }
-
-        if (editOn) {
-          // Edit mode active — show cluster
-          fab.style.display = 'none';
-          cluster.style.display = 'flex';
-          if (undoBtn) undoBtn.disabled = !phxCanUndo();
-          if (redoBtn) redoBtn.disabled = !phxCanRedo();
-          // Floppy only shown when NOT logged in (or logged in but viewing someone else)
-          const u = (typeof phxAuthGetUser === 'function') ? phxAuthGetUser() : null;
-          const willSync = !!(u && u.name === target);
-          if (floppyBtn) floppyBtn.style.display = willSync ? 'none' : 'flex';
-          // v3.45: 🌐 publish button removed — publish lives in the transaction
-          //   confirm dialog + pending-drafts popup now.
-        } else {
-          // Edit mode off — show just pencil
-          fab.style.display = 'flex';
-          cluster.style.display = 'none';
-        }
+        // v3.47: the undo/redo/เสร็จสิ้น edit cluster is RETIRED (Klui: "ลบให้เกลี้ยง"). Edit mode is
+        //   entered transiently by the แลกเวร action flow + still tappable inline; no toolbar needed.
+        //   Only the note-FAB remains — on ตารางเวร + แลกเวร (not ฉัน), when a user is selected.
+        if (cluster) cluster.style.display = 'none';
+        fab.style.display = (canEdit && activeTab !== 'me') ? 'flex' : 'none';
       } catch(e) { /* non-critical */ }
     }
 
@@ -15344,27 +15311,10 @@ table.exp-tbl .tm{margin-left:3px;opacity:0.75;}
   <!-- Toast notification container (v3.5) -->
   <div id="phxToastContainer" class="phx-toast-container"></div>
 
-  <!-- v3.13 FAB — Floating pencil + edit-mode cluster -->
+  <!-- v3.13 FAB — Floating note pencil. (v3.47: undo/redo/เสร็จสิ้น edit cluster removed — retired.) -->
   <button id="phxFab" class="phx-fab" onclick="phxNoteFabTap()" style="display:none;" title="ใส่โน้ตเวร">
     <svg width="23" height="23" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="8" y1="13" x2="16" y2="13"/><line x1="8" y1="17" x2="13" y2="17"/></svg>
   </button>
-  <div id="phxFabCluster" class="phx-fab-cluster">
-    <button id="phxFabUndo" class="phx-fab-action" onclick="phxUndoAction()" disabled title="ย้อนกลับ (Ctrl+Z)">
-      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 14 4 9 9 4"/><path d="M20 20v-7a4 4 0 00-4-4H4"/></svg>
-    </button>
-    <button id="phxFabRedo" class="phx-fab-action" onclick="phxRedoAction()" disabled title="ทำซ้ำ (Ctrl+Y)">
-      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 14 20 9 15 4"/><path d="M4 20v-7a4 4 0 014-4h12"/></svg>
-    </button>
-    <button id="phxFabFloppy" class="phx-fab-action phx-fab-floppy" onclick="phxSaveAndConfirm()" style="display:none;" title="บันทึก local">
-      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 21H5a2 2 0 01-2-2V5a2 2 0 012-2h11l5 5v11a2 2 0 01-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg>
-    </button>
-    <!-- v3.45: 🌐 publish button removed — publishing now happens in the transaction
-         confirm dialog ("เสร็จสิ้น·เผยแพร่") and the pending-drafts popup. -->
-    <button class="phx-fab-done" onclick="toggleEditMode()" title="ออกจากโหมดแก้ไข">
-      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
-      เสร็จสิ้น
-    </button>
-  </div>
 
   <!-- Persistent sync progress banner (v3.8) -->
   <div id="phxSyncBanner" class="phx-sync-banner">
