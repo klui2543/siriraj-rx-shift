@@ -39,6 +39,10 @@
 const _B3_TAB = 'PHX_Overlays_v2';
 const _B3_COL_COUNT = 6;
 const _B3_AUTH_ERROR = 'auth failed — กรุณา login ใหม่';
+// v3.47: a deleted action is TOMBSTONED (its `type` column set to this sentinel) instead of being
+//   physically removed. Pull filters tombstones out; push refuses to overwrite one. This stops a
+//   stale device from resurrecting a cancelled/deleted shift by re-pushing its old local copy.
+const _B3_TOMBSTONE = '__deleted__';
 
 
 // ════════════════════════════════════════════════════════════
@@ -69,12 +73,16 @@ function phxPushActions(rawName, pwHash, actionsArg, actingAs) {
     // v3.44 UPSERT — snapshot existing rows for the target user: actionId → { row, payload }.
     //   Old behaviour skipped any actionId already on the server, so a draft→public flip
     //   (or any edit) could never propagate. Now we overwrite the stored payload in place.
-    const existing = {};   // id → { row: absoluteSheetRow, payload: storedJson }
+    const existing = {};   // id → { row, payload, deleted }
     if (sh.getLastRow() >= 2) {
       const all = sh.getRange(2, 1, sh.getLastRow() - 1, _B3_COL_COUNT).getValues();
       for (let i = 0; i < all.length; i++) {
         if (String(all[i][1]).trim() === targetName) {
-          existing[String(all[i][0]).trim()] = { row: i + 2, payload: String(all[i][4]) };
+          existing[String(all[i][0]).trim()] = {
+            row: i + 2,
+            payload: String(all[i][4]),
+            deleted: String(all[i][3]).trim() === _B3_TOMBSTONE   // type col == tombstone
+          };
         }
       }
     }
@@ -82,6 +90,7 @@ function phxPushActions(rawName, pwHash, actionsArg, actingAs) {
     const rows = [];        // new actions → append at the bottom
     let updated = 0;        // existing actions whose payload changed → overwritten in place
     let unchanged = 0;      // existing actions with identical payload → left untouched (no sheet write)
+    let tombstoned = 0;     // v3.47: incoming actions that were deleted server-side → refused (no resurrect)
     let skipped = 0;        // malformed actions
     const now = new Date();
     for (let i = 0; i < actions.length; i++) {
@@ -91,6 +100,9 @@ function phxPushActions(rawName, pwHash, actionsArg, actingAs) {
       const payloadStr = JSON.stringify(a);
       const ex = existing[id];
       if (ex) {
+        // v3.47: this id was deleted on another device — do NOT bring it back to life.
+        //   (actionIds are unique-per-creation, so a tombstoned id is never a legit new action.)
+        if (ex.deleted) { tombstoned++; continue; }
         // Only rewrite when the payload actually differs — keeps steady-state refreshes
         // (which re-push every unchanged action) from hammering the sheet.
         if (ex.payload === payloadStr) { unchanged++; continue; }
@@ -124,6 +136,7 @@ function phxPushActions(rawName, pwHash, actionsArg, actingAs) {
       added: rows.length,
       updated: updated,
       unchanged: unchanged,
+      tombstoned: tombstoned,
       skipped: skipped,
       actedAs: targetName !== auth.name ? targetName : undefined
     };
@@ -156,6 +169,7 @@ function phxPullAll(rawName, pwHash, actingAs) {
  
     for (let i = 0; i < data.length; i++) {
       if (String(data[i][1]).trim() !== targetName) continue;
+      if (String(data[i][3]).trim() === _B3_TOMBSTONE) continue;   // v3.47: skip tombstoned deletions
       try {
         actions.push(JSON.parse(String(data[i][4])));
       } catch (e) {
@@ -194,18 +208,23 @@ function phxRemoveAction(rawName, pwHash, actionId, actingAs) {
  
     const sh = _phxGetSheet(_B3_TAB);
     if (sh.getLastRow() < 2) return { success: true, removed: 0 };
- 
-    const data = sh.getRange(2, 1, sh.getLastRow() - 1, 2).getValues();
+
+    // read actionId + name + type so we can tell live rows from already-tombstoned ones
+    const data = sh.getRange(2, 1, sh.getLastRow() - 1, 4).getValues();
     let removed = 0;
- 
+
+    // v3.47: TOMBSTONE (mark type col) instead of deleteRow, so a stale replica that still holds
+    //   this action can't resurrect it on its next upsert push. Pull filters tombstones out.
     for (let i = data.length - 1; i >= 0; i--) {
       if (String(data[i][0]).trim() === targetId &&
           String(data[i][1]).trim() === targetName) {
-        sh.deleteRow(i + 2);
-        removed++;
+        if (String(data[i][3]).trim() !== _B3_TOMBSTONE) {   // already tombstoned → skip re-write
+          sh.getRange(i + 2, 4).setValue(_B3_TOMBSTONE);     // col 4 = type
+          removed++;
+        }
       }
     }
- 
+
     _phxTouchLastSeen(auth.row.rowIndex);
     return {
       success: true,
@@ -402,12 +421,22 @@ function testB3RoundTrip() {
   const ids = testActions2.map(function(a) { return a.id; });
   Logger.log('    remaining test ids: [' + ids.join(', ') + ']');
   if (testActions2.length !== 2) passed = false;
- 
-  // 6. Clear month
+
+  // 5b. v3.47: re-push the deleted id (simulates a stale device) → tombstone must BLOCK resurrection
+  Logger.log('\n[5b] PUSH test_act_002 ซ้ำหลังลบ (test anti-resurrection)...');
+  r = phxPushActions(TEST_NAME, pwHash, [fakeActions[1]]);
+  Logger.log('    ' + JSON.stringify(r) + ' (expect added=0, tombstoned=1)');
+  if (r.added !== 0 || r.tombstoned !== 1) passed = false;
+  r = phxPullAll(TEST_NAME, pwHash);
+  const resurrected = (r.actions || []).some(function(a) { return String(a.id) === 'test_act_002'; });
+  Logger.log('    act2 resurrected? ' + resurrected + ' (expect false)');
+  if (resurrected) passed = false;
+
+  // 6. Clear month — physically purges live rows AND the tombstone (3 rows: act1, act2†, act3)
   Logger.log('\n[6] CLEAR month ' + monthId + '...');
   r = phxClearMonth(TEST_NAME, pwHash, monthId);
   Logger.log('    ' + JSON.stringify(r));
-  if (r.removed !== 2) { Logger.log('    ⚠️ expected removed=2'); passed = false; }
+  if (r.removed !== 3) { Logger.log('    ⚠️ expected removed=3 (2 live + 1 tombstone)'); passed = false; }
  
   // 7. Final pull
   Logger.log('\n[7] PULL (final)...');

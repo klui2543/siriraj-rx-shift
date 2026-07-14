@@ -7016,6 +7016,16 @@ window.allPharmacistNames = [];
         .getScheduleData(sel.value);
     }
 
+    // v3.47: true when a modal / bottom-sheet / edit flow is open — used to hold off the periodic
+    //   own-actions pull so it never yanks data out from under an in-progress action.
+    function _phxBusyUI() {
+      try {
+        var am = document.getElementById('actionModal');
+        if (am && am.style && am.style.display === 'flex') return true;
+        if (document.querySelector('[id$="Overlay"]')) return true;   // swf/pick/pending bottom-sheets
+        return false;
+      } catch (e) { return false; }
+    }
     function startFirebasePolling() {
       if (firebasePollTimer) clearInterval(firebasePollTimer);
       var selectEl = document.getElementById('mainMonthSelector');
@@ -7025,6 +7035,23 @@ window.allPharmacistNames = [];
 
       firebasePollTimer = setInterval(function() {
         if (!(window._fbConnected && window._nkFbOk) || (typeof _nkMyName === 'function' && _nkMyName() && !window._nkFbOkPriv)) { try { _nkPullGAS(); } catch (e) {} }  // v3.44: refresh from the Sheet when Firebase can't serve public OR (for a logged-in user) private
+        // v3.47: cross-device deletion sync. The poll below only refreshes OTHERS' published overlays
+        //   (pathBOverlays); it never re-pulls the logged-in user's OWN action records, so a cancel /
+        //   delete made on another device stays visible here until re-login. Every 2nd tick (~60s)
+        //   pull authoritatively (server = truth for own actions → deletions disappear). SAFE guards:
+        //   logged in + sync idle (no pending/in-flight/errored push, else we'd wipe an unpushed local
+        //   draft) + no modal open. This is PULL-ONLY — never re-pushes, so it can't resurrect a delete.
+        try {
+          window._phxOwnPullTick = (window._phxOwnPullTick || 0) + 1;
+          if (window._phxOwnPullTick % 2 === 0
+              && typeof phxCloudPullAll === 'function'
+              && typeof phxAuthIsLoggedIn === 'function' && phxAuthIsLoggedIn()
+              && typeof PHX_SYNC !== 'undefined'
+              && !PHX_SYNC.syncing && !PHX_SYNC._debounceTimer && !PHX_SYNC.error
+              && !_phxBusyUI()) {
+            phxCloudPullAll(null, { skipRenderIfUnchanged: true });   // quiet: re-render only if own-actions changed
+          }
+        } catch (e) { /* non-fatal */ }
         if (!isDataLoadedInSession) return;
         google.script.run
           .withSuccessHandler(function(res) {
@@ -13517,8 +13544,23 @@ table.exp-tbl .tm{margin-left:3px;opacity:0.75;}
         .phxPushActions(u.name, u.hash, actions);
     }
 
-    // v3.7: Pull all user's actions from server, replace local (server = source of truth)
-    function phxCloudPullAll(callback) {
+    // v3.47: signature of a user's own actions (fields that affect rendering) — lets the periodic
+    //   background pull skip a needless full re-render when nothing actually changed.
+    function _phxOwnActionsSig(dataObj, name) {
+      const out = [];
+      Object.keys(dataObj || {}).forEach(function(mid) {
+        ((dataObj[mid] && dataObj[mid].actions) || []).forEach(function(a) {
+          if (a && a.viewerName === name) {
+            out.push(mid + '|' + a.id + '|' + (a._visibility || '') + '|' + (a.partnerName || '') +
+                     '|' + (a.shiftKey || '') + '|' + (a.partnerShiftKey || '') + '|' + (a.note || ''));
+          }
+        });
+      });
+      return out.sort().join('\n');
+    }
+    // v3.7: Pull all user's actions from server, replace local (server = source of truth).
+    //   opts.skipRenderIfUnchanged (v3.47): don't triggerUpdate when own-actions are identical.
+    function phxCloudPullAll(callback, opts) {
       const u = phxAuthGetUser();
       if (!u) { callback && callback(false, 'not logged in'); return; }
       PHX_SYNC.syncing = true;
@@ -13537,6 +13579,8 @@ table.exp-tbl .tm{margin-left:3px;opacity:0.75;}
           try {
             OverlayManager.load();
             const data = OverlayManager._data || {};
+            const _quiet = !!(opts && opts.skipRenderIfUnchanged);
+            const _before = _quiet ? _phxOwnActionsSig(data, u.name) : null;
             // Step 1: remove all existing actions where viewerName === u.name
             Object.keys(data).forEach(function(monthId) {
               const original = data[monthId].actions || [];
@@ -13560,7 +13604,10 @@ table.exp-tbl .tm{margin-left:3px;opacity:0.75;}
             OverlayManager.save();
             if (typeof invalidateGhostCache === 'function') invalidateGhostCache();
         if (typeof _invalidateDraftLookup === 'function') _invalidateDraftLookup();  // v3.43
-            if (typeof triggerUpdate === 'function') triggerUpdate();
+            // v3.47: re-render only when own-actions actually changed (avoids 60s scroll-reset/flicker
+            //   from the background pull). Login/save callers pass no opts → always render, as before.
+            const _changed = !_quiet || (_before !== _phxOwnActionsSig(data, u.name));
+            if (_changed && typeof triggerUpdate === 'function') triggerUpdate();
             PHX_SYNC.lastSyncAt = Date.now();
             PHX_SYNC.error = null;
           } catch(e) {
@@ -13909,6 +13956,39 @@ table.exp-tbl .tm{margin-left:3px;opacity:0.75;}
       }, 1500);
     }
 
+    // v3.47: server-side single-action delete WITH retry. A dropped delete is what leaves a
+    //   cancelled shift alive on the other device, so don't give up after one network blip.
+    function _phxServerRemoveWithRetry(name, hash, actionId, triesLeft) {
+      try {
+        google.script.run
+          .withSuccessHandler(function(r) {
+            if (r && r.success) {
+              PHX_SYNC.lastSyncAt = Date.now();
+              PHX_SYNC.error = null;   // clear so the periodic own-actions pull can resume
+              phxUpdateSyncStatusUI();
+              phxShowSyncBanner('done', 'Sync เสร็จ');
+              phxHideSyncBanner(2000);
+            } else if (triesLeft > 0) {
+              setTimeout(function() { _phxServerRemoveWithRetry(name, hash, actionId, triesLeft - 1); }, 2500);
+            } else {
+              phxShowSyncBanner('error', 'ลบยังไม่ sync — จะลองใหม่ตอนรีเฟรช');
+              phxHideSyncBanner(3000);
+            }
+          })
+          .withFailureHandler(function(err) {
+            if (triesLeft > 0) {
+              setTimeout(function() { _phxServerRemoveWithRetry(name, hash, actionId, triesLeft - 1); }, 2500);
+            } else {
+              phxShowSyncBanner('error', 'Sync ลบล้มเหลว');
+              phxHideSyncBanner(3000);
+            }
+          })
+          .phxRemoveAction(name, hash, actionId);
+      } catch (e) {
+        if (triesLeft > 0) setTimeout(function() { _phxServerRemoveWithRetry(name, hash, actionId, triesLeft - 1); }, 2500);
+      }
+    }
+
     // Hook into OverlayManager (extend existing monkey-patches)
     (function _phxWrapOverlayForSync() {
       if (typeof OverlayManager === 'undefined') return;
@@ -13924,26 +14004,18 @@ table.exp-tbl .tm{margin-left:3px;opacity:0.75;}
         _phxScheduleSync();
         return result;
       };
-      // removeAction: also remove on server
+      // removeAction: also remove on server.
+      //   v3.47: the server delete is what makes a cancel/delete disappear on the OTHER device
+      //   (the periodic own-actions pull only helps once the server row is actually gone). The old
+      //   call was fire-and-forget — a transient failure silently left the record alive server-side
+      //   ("บางครั้งยกเลิกไม่ไปที่ server"). Retry a couple of times before giving up.
       const _origRemove = OverlayManager.removeAction.bind(OverlayManager);
       OverlayManager.removeAction = function(monthId, actionId) {
         const result = _origRemove(monthId, actionId);
         const u = phxAuthGetUser();
         if (u && actionId) {
-          // v3.12: show banner immediately
           phxShowSyncBanner('syncing', 'กำลัง sync...');
-          google.script.run
-            .withSuccessHandler(function() {
-              PHX_SYNC.lastSyncAt = Date.now();
-              phxUpdateSyncStatusUI();
-              phxShowSyncBanner('done', 'Sync เสร็จ');
-              phxHideSyncBanner(2000);
-            })
-            .withFailureHandler(function(err) {
-              phxShowSyncBanner('error', 'Sync ล้มเหลว');
-              phxHideSyncBanner(3000);
-            })
-            .phxRemoveAction(u.name, u.hash, actionId);
+          _phxServerRemoveWithRetry(u.name, u.hash, actionId, 2);
         }
         return result;
       };
