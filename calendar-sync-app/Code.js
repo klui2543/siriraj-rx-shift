@@ -23,7 +23,8 @@
 var CAL_TZ = 'Asia/Bangkok';
 var QUIET_START_HOUR = 22;   // 22:00
 var QUIET_END_HOUR = 6;      // 06:00 — ไม่เตือนช่วงนอน
-var ALARM_OFFSETS_MIN = [60, 18 * 60];  // เตือน 1 ชม.ก่อน + 18 ชม.ก่อน (กันลืมข้ามวัน)
+var ALARM_OFFSETS_MIN = [60, 18 * 60];  // (timed event เดิม — คงไว้เผื่อใช้)
+var ALLDAY_REMIND_MIN = 240;            // v3.47: all-day event → เตือน 20:00 คืนก่อน (240 นาทีก่อนเที่ยงคืนวันเวร)
 
 var EVENT_COLORS = {
   'เวรกลางวัน': 2, 'เวรเช้า': 2,
@@ -111,6 +112,19 @@ function _parseShiftDateTime(shift) {
   var end = new Date(year, month, day, endH, endM, 0);
   if (end <= start) end = new Date(year, month, day + 1, endH, endM, 0);  // ข้ามคืน
   return { start: start, end: end };
+}
+
+// v3.47: all-day date (midnight ของวันเวร) จาก timestamp — ไม่ต้องใช้ range.
+//   Klui: sync Google Calendar ให้เป็น all-day event ไปเลย (เวลาคลินิก/รอบไม่แน่นอน)
+function _shiftAllDayStart(shift) {
+  if (!shift || !shift.timestamp) return null;
+  var ts = String(shift.timestamp);
+  if (ts.length !== 8) return null;
+  var year = parseInt(ts.substring(0, 4), 10);
+  var month = parseInt(ts.substring(4, 6), 10) - 1;
+  var day = parseInt(ts.substring(6, 8), 10);
+  var d = new Date(year, month, day, 0, 0, 0);
+  return isNaN(d.getTime()) ? null : d;
 }
 
 function _isQuietHour(date) {
@@ -247,15 +261,15 @@ function syncEffectiveShifts(payload) {
     var key = toCreate[i];
     try {
       var shift = currentShifts[key];
-      var dt = _parseShiftDateTime(shift);
-      if (!dt) { errors.push({ key: key, error: 'parse_failed' }); continue; }
+      var d = _shiftAllDayStart(shift);   // v3.47: all-day
+      if (!d) { errors.push({ key: key, error: 'parse_failed' }); continue; }
       var title = _buildEventTitle(shift);
       var desc = _buildEventDescription(shift);
-      var ev = cal.createEvent(title, dt.start, dt.end, { description: desc, location: 'Siriraj Hospital' });
+      var ev = cal.createAllDayEvent(title, d, { description: desc, location: 'Siriraj Hospital' });
       ev.removeAllReminders();
-      _buildReminderMinutes(dt.start).forEach(function (m) { ev.addPopupReminder(m); });
+      ev.addPopupReminder(ALLDAY_REMIND_MIN);
       try { ev.setColor(_getEventColorId(shift)); } catch (e) {}
-      existing[key] = { eventId: ev.getId(), fingerprint: _fingerprint(title, dt.start, dt.end, desc) };
+      existing[key] = { eventId: ev.getId(), fingerprint: _fingerprint(title, d, d, desc) };
       created++;
     } catch (e) {
       var msg = String(e.message || '');
@@ -273,27 +287,27 @@ function syncEffectiveShifts(payload) {
   toUpdate.forEach(function (key) {
     try {
       var shift = currentShifts[key];
-      var dt = _parseShiftDateTime(shift);
-      if (!dt) { errors.push({ key: key, error: 'parse_failed' }); return; }
+      var d = _shiftAllDayStart(shift);   // v3.47: all-day
+      if (!d) { errors.push({ key: key, error: 'parse_failed' }); return; }
       var title = _buildEventTitle(shift);
       var desc = _buildEventDescription(shift);
-      var fp = _fingerprint(title, dt.start, dt.end, desc);
+      var fp = _fingerprint(title, d, d, desc);
       if (existing[key].fingerprint === fp) { skipped++; return; }
 
       var ev = null;
       try { ev = cal.getEventById(existing[key].eventId); } catch (e) {}
       if (!ev) {
-        var ne = cal.createEvent(title, dt.start, dt.end, { description: desc, location: 'Siriraj Hospital' });
+        var ne = cal.createAllDayEvent(title, d, { description: desc, location: 'Siriraj Hospital' });
         ne.removeAllReminders();
-        _buildReminderMinutes(dt.start).forEach(function (m) { ne.addPopupReminder(m); });
+        ne.addPopupReminder(ALLDAY_REMIND_MIN);
         try { ne.setColor(_getEventColorId(shift)); } catch (e) {}
         existing[key] = { eventId: ne.getId(), fingerprint: fp };
       } else {
         ev.setTitle(title);
-        ev.setTime(dt.start, dt.end);
+        ev.setAllDayDate(d);   // v3.47: converts a timed event to all-day too
         ev.setDescription(desc);
         ev.removeAllReminders();
-        _buildReminderMinutes(dt.start).forEach(function (m) { ev.addPopupReminder(m); });
+        ev.addPopupReminder(ALLDAY_REMIND_MIN);
         try { ev.setColor(_getEventColorId(shift)); } catch (e) {}
         existing[key].fingerprint = fp;
       }
