@@ -69,6 +69,11 @@
 
 ---
 
+## 📌 Feedback รอบล่าสุดจาก Klui (screenshots) — สถานะ
+1. **แบนเนอร์ "📅 <User> · เลือกได้ N เวรเดือนนี้"** → **DONE แล้ว** (`dc03110`) — Klui เห็นเวอร์ชัน deploy เก่า. **ต้อง deploy ถึงจะหาย**
+2. **หน้ายก/สลับ ตารางยังไม่เหมือน main table** → **PENDING** (อยู่ในหัวข้อ UI polish ข้างบน — main มี left-border สี + chevron/dot; picker `.swf-tbl` แบน. แนะนำเอาแค่ left-border สี+spacing ไม่เอา interactive elements)
+3. **Toggle dropdown บนสุดบังกัน** → **DONE** (`3a85b97`) — user menu ↔ kebab เปิดทีละอัน (กดอันไหนปิดอีกอัน)
+
 ## 🔧 Verify method (ไม่มี GAS backend ในมือ)
 - `node --check` ทุก `<script>` inline (extractor นับ regex, คาดหวัง **10 บล็อก 0 error**)
 - Harness: extract ฟังก์ชันจริงด้วย brace-matcher → eval + mock globals → assert (ทำมาตลอด session, เช่น clinic-conflict 5/5, tombstone 12/12). วางที่ scratchpad หรือชื่อ `_h_*` เท่านั้น (`.claspignore` กัน) แล้วลบทิ้ง
