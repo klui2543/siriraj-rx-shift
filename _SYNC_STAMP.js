@@ -18,9 +18,9 @@ function SYNC_STAMP() {
   return {
     version: 'v3.46',   // ← เลขเวอร์ชัน (bump เองตอนออกรุ่นใหม่) แสดงที่ footer เว็บ
     topic:   'โน้ตเวร — เขียนโน้ตติดบนเวรตัวเอง เลือกสาธารณะ/ส่วนตัว (แทนระบบเจ้าของร่วม)',
-    updated: '2026-07-14 15:01 +0000',
+    updated: '2026-07-14 15:06 +0000',
     branch:  'main',
-    based_on_commit: '4b62a2a',
+    based_on_commit: '32059e5',
     note:    'เวลา updated ถูกปั๊มอัตโนมัติเป็นเวลา push จริงตอนขึ้น GAS'
   };
 }
