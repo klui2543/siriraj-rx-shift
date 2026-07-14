@@ -8402,7 +8402,11 @@ window.allPharmacistNames = [];
     function toggleDropdownMenu(event) {
       if (event) event.stopPropagation();
       const menu = document.getElementById('hangingMenu');
-      if (menu) menu.classList.toggle('hidden');
+      if (!menu) return;
+      const willOpen = menu.classList.contains('hidden');
+      menu.classList.toggle('hidden');
+      // v3.47: only one top dropdown open at a time (Klui: toggle บนบังกัน — กดอันไหนโชว์อันนั้น)
+      if (willOpen && typeof phxCloseUserMenu === 'function') phxCloseUserMenu();
     }
 
     function closeDropdownMenu() {
@@ -12746,6 +12750,8 @@ table.exp-tbl .tm{margin-left:3px;opacity:0.75;}
       const wasHidden = menu.classList.contains('hidden');
       menu.classList.toggle('hidden');
       if (wasHidden) {
+        // v3.47: opening the user menu closes the kebab menu (only one top dropdown at a time)
+        if (typeof closeDropdownMenu === 'function') closeDropdownMenu();
         setTimeout(function() {
           document.addEventListener('click', phxCloseUserMenuOnOutside, { once: true });
         }, 10);
