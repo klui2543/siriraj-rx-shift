@@ -2142,7 +2142,7 @@
     <!-- ===== v3.47: TAB VIEW — แลกเวร (my shifts) ===== -->
     <div id="phxViewSwap" class="phx-tabview">
       <div class="phx-tv-title">แลกเวร</div>
-      <div class="phx-tv-sub">เลือกสิ่งที่ต้องการทำ หรือแตะเวรของคุณด้านล่าง</div>
+      <div class="phx-tv-sub">เลือกสิ่งที่ต้องการทำกับเวรของคุณ</div>
       <!-- v3.47b: action-first buttons (สลับ/ยก/รับ/ยกเลิก) — launch straight into the flow -->
       <div class="phx-swap-actions" id="phxSwapActions">
         <button type="button" class="phx-swap-act-btn swap" onclick="phxSwapAction('swap')"><span class="ic">🔄</span>สลับเวร</button>
@@ -2150,22 +2150,8 @@
         <button type="button" class="phx-swap-act-btn recv" onclick="phxSwapAction('receive')"><span class="ic">🤝</span>รับเวร</button>
         <button type="button" class="phx-swap-act-btn cancel" onclick="phxSwapAction('cancel')"><span class="ic">↩️</span>ยกเลิกเวร</button>
       </div>
-      <!-- v3.47: ปุ่มสลับ ตาราง/ปฏิทิน (เหมือนหน้าตารางเวร) -->
-      <div class="tab-bar" id="phxSwapModeSwitch" style="margin:6px 0 10px;">
-        <button id="phxSwapBtnTable" type="button" class="tab-btn active" onclick="phxSwapMode('table')">ตาราง</button>
-        <button id="phxSwapBtnCal" type="button" class="tab-btn" onclick="phxSwapMode('calendar')">ปฏิทิน</button>
-      </div>
-      <div id="phxSwapTablePanel">
-        <div id="phxSwapBody"></div>
-      </div>
-      <div id="phxSwapCalPanel" class="hidden">
-        <div style="overflow-x:auto;" class="custom-scrollbar">
-          <div style="min-width:350px;">
-            <div id="phxSwapCalHeaderRow" class="cal-header-row"></div>
-            <div id="phxSwapCalGrid"></div>
-          </div>
-        </div>
-      </div>
+      <!-- v3.47c: recap only — "แลกเวรเดือนนี้ไปแล้ว" (ตาราง/ปฏิทินย้ายไปอยู่ในหน้า picker ตอนกดปุ่มแล้ว) -->
+      <div id="phxSwapBody"></div>
     </div>
 
     <!-- ===== v3.47: TAB VIEW — ฉัน (profile) ===== -->
@@ -17497,15 +17483,13 @@ table.exp-tbl .tm{margin-left:3px;opacity:0.75;}
       if (!body) return;
       var me = curName();
       if (!me){
-        var sw0 = document.getElementById('phxSwapModeSwitch'); if (sw0) sw0.style.display = 'none';
         var sa0 = document.getElementById('phxSwapActions'); if (sa0) sa0.style.display = 'none';
-        var cp0 = document.getElementById('phxSwapCalPanel'); if (cp0) cp0.classList.add('hidden');
-        var tp0 = document.getElementById('phxSwapTablePanel'); if (tp0) tp0.classList.remove('hidden');
         body.innerHTML = '<div class="phx-tv-empty">ยังไม่ได้เลือกชื่อของคุณ<br>' +
           'ไปที่แท็บ <b>ตารางเวร</b> แล้วพิมพ์ชื่อ (หรือเข้าสู่ระบบ) เพื่อจัดการเวรของคุณ' +
           '<div style="margin-top:18px;"><button class="phx-me-cta" style="max-width:220px;margin:0 auto;" onclick="phxSetTab(\'schedule\')">ไปที่ตารางเวร</button></div></div>';
         return;
       }
+      var sa = document.getElementById('phxSwapActions'); if (sa) sa.style.display = '';
       var mid = (typeof getCurrentMonthId === 'function') ? getCurrentMonthId() : '';
       var usedMap = {}, noteMap = {}, mine = [], ghosts = [];
       try { if (typeof _combinedUsedMap === 'function') usedMap = _combinedUsedMap(mid, me) || {}; } catch(e){}
@@ -17513,34 +17497,21 @@ table.exp-tbl .tm{margin-left:3px;opacity:0.75;}
       try { if (typeof rawData !== 'undefined' && rawData) rawData.forEach(function(r){ if (r && r.name === me) mine.push(r); }); } catch(e){}
       try { if (typeof buildGhostRows === 'function') ghosts = buildGhostRows(rawData, mid, me) || []; } catch(e){}
 
-      // shifts I currently hold (mine not-given-away + received ghosts) → tappable
-      var mineActive = mine.filter(function(r){ return !usedMap[makeShiftKey(r)]; });
-      var actionable = mineActive.concat(ghosts).sort(_swapByDate);
-      // what CHANGED this month (gave/swapped-out = struck, received = ghost) → read-only summary
+      // v3.47c: tab body = recap ONLY ("แลกเวรเดือนนี้ไปแล้ว"). Picking a shift to act on now happens
+      //   inside the action buttons' picker (which has its own ตาราง/ปฏิทิน toggle).
       var changed = mine.filter(function(r){ return !!usedMap[makeShiftKey(r)]; }).map(function(r){ return {s:r, gave:true}; })
         .concat(ghosts.map(function(g){ return {s:g, gave:false}; }))
         .sort(function(a,b){ return _swapByDate(a.s, b.s); });
-
-      var html = '<div class="phx-swap-sec-label">เวรของฉันเดือนนี้ · แตะเพื่อ สลับ / ยก / โน้ต</div>';
-      if (actionable.length){
-        html += _swapTable(actionable.map(function(s){
-          return _swapRow(s, { actionable:true, noteMap:noteMap, tag: s._ghost ? 'รับมา' : '', tagCls: s._ghost ? 'recv' : '' });
-        }).join(''));
-      } else {
-        html += '<div class="phx-tv-empty" style="padding:20px 12px;">ไม่มีเวรที่ถืออยู่ในเดือนนี้' +
-          '<div style="margin-top:14px;"><button class="phx-me-cta" style="max-width:250px;margin:0 auto;" onclick="phxSwapEnterEdit()">เข้าโหมดแก้ไข / เพิ่มเวร</button></div></div>';
-      }
+      var html;
       if (changed.length){
-        html += '<div class="phx-swap-sec-label">แลกเวรเดือนนี้ไปแล้ว</div>';
+        html = '<div class="phx-swap-sec-label">แลกเวรเดือนนี้ไปแล้ว</div>';
         html += _swapTable(changed.map(function(c){
           return _swapRow(c.s, { struck:c.gave, noteMap:noteMap, tag: c.gave ? 'ยกออก' : 'รับมา', tagCls: c.gave ? 'gave' : 'recv' });
         }).join(''));
+      } else {
+        html = '<div class="phx-tv-empty" style="padding:26px 12px;">ยังไม่มีการแลก / ยก / รับเวรเดือนนี้</div>';
       }
       body.innerHTML = html;
-      // v3.47: show the toggle + re-apply the current panel (repaints the calendar if it's active)
-      var sw = document.getElementById('phxSwapModeSwitch'); if (sw) sw.style.display = '';
-      var sa = document.getElementById('phxSwapActions'); if (sa) sa.style.display = '';
-      if (typeof phxSwapMode === 'function') phxSwapMode(_phxSwapMode);
     };
 
     // ========= v3.47b: action-first แลกเวร (สลับ / ยก / รับ / ยกเลิก) =========
