@@ -60,6 +60,7 @@
     <button class="primary" id="btn-sync" disabled>ซิงค์เวรเดี๋ยวนี้</button>
     <button class="ghost" id="btn-auto">⚡ อัปเดตอัตโนมัติ (แม้ปิดแอป)</button>
     <button class="ghost" id="btn-test">🧪 ทดสอบ: สร้าง event ตัวอย่าง (พรุ่งนี้)</button>
+    <button class="ghost" id="btn-clear">🧹 ล้าง event เวรทั้งหมด (สำหรับเทส)</button>
     <button class="danger" id="btn-revoke">ยกเลิกการเชื่อมต่อ (ถอนสิทธิ์)</button>
 
     <div class="status" id="status"></div>
@@ -246,6 +247,28 @@
       .syncEffectiveShifts(payload);
   }
 
+  // 3b) ล้าง event ทั้งหมด (แต่ยังเชื่อมต่ออยู่) — สำหรับเทสซ้ำ
+  function doClear() {
+    if (!confirm('ล้าง event เวรทั้งหมดที่ซิงค์ไว้ ออกจากปฏิทิน?\n\n(ยังเชื่อมต่ออยู่ ซิงค์ใหม่ได้ทันที — เหมาะกับการเทสซ้ำ)')) return;
+    $('btn-clear').disabled = true;
+    setStatus('info', '<span class="spinner" style="border-color:#1e40af;border-top-color:transparent"></span>กำลังล้าง event…');
+    google.script.run
+      .withSuccessHandler(function (r) {
+        $('btn-clear').disabled = false;
+        if (r && r.ok) {
+          setStatus('ok', 'ล้างแล้ว · ลบ ' + r.removed + ' event (ยังเชื่อมต่ออยู่ กดซิงค์ใหม่ได้เลย)');
+          loadStatus();
+        } else {
+          setStatus('err', 'ล้างไม่สำเร็จ');
+        }
+      })
+      .withFailureHandler(function (e) {
+        $('btn-clear').disabled = false;
+        setStatus('err', 'ล้างล้มเหลว: ' + (e && e.message ? e.message : e));
+      })
+      .clearAllSyncedEvents();
+  }
+
   // 4) ถอนสิทธิ์
   function doRevoke() {
     if (!confirm('ยกเลิกการเชื่อมต่อ?\n\nระบบจะลบ event เวรที่สร้างไว้ทั้งหมดออกจากปฏิทินของคุณ และเพิกถอนสิทธิ์ — ครั้งหน้าต้องยินยอมใหม่ถ้าจะใช้อีก')) return;
@@ -296,6 +319,7 @@
 
   $('btn-sync').addEventListener('click', function () { doSync(lastPayload); });
   $('btn-auto').addEventListener('click', toggleAuto);
+  $('btn-clear').addEventListener('click', doClear);
   $('btn-revoke').addEventListener('click', doRevoke);
   $('sel-cal').addEventListener('change', onSelectCal);
   $('btn-newcal').addEventListener('click', createNewCal);

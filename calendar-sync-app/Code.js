@@ -457,6 +457,16 @@ function _unsyncAllEvents() {
 }
 
 /**
+ * ล้าง event เวรทั้งหมดที่แอปสร้างไว้ (ทุกเดือน) ออกจากปฏิทินปลายทาง + ล้าง map
+ * แต่ "ไม่ถอนสิทธิ์" (ยังเชื่อมต่ออยู่ ซิงค์ใหม่ได้ทันที) — เหมาะกับการเทสซ้ำ
+ * (ต้องเป็น public function ไม่ขึ้นต้น _ เพื่อให้ google.script.run เรียกได้)
+ */
+function clearAllSyncedEvents() {
+  var r = _unsyncAllEvents();
+  return { ok: true, removed: r.removed, calendarReachable: r.calendarReachable };
+}
+
+/**
  * ยกเลิกการเชื่อมต่อทั้งหมด — ทำ 4 อย่าง:
  *   1. หยุด auto-sync trigger (ไม่งั้นมันจะรันต่อแล้วสร้าง event กลับมา)
  *   2. ลบ event เวรที่แอปสร้างไว้ "ทุกเดือน" ออกจากปฏิทินผู้ใช้ (ไม่ทิ้งขยะค้าง)
