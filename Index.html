@@ -1001,6 +1001,15 @@
     body.dark-theme .cal-badge.cal-badge-adjacent { background: #422006 !important; }
     .cal-badge.cal-badge-overlap { outline: 2px solid #dc2626; outline-offset: -1px; background: #fef2f2 !important; }
     body.dark-theme .cal-badge.cal-badge-overlap { background: #450a0a !important; }
+    /* v3.47: clinic-vs-same-day-regular clash (round-based) — red = ชนแน่, orange = อาจชน */
+    .shift-clinic-clash-orange td:first-child { border-left: 3px solid #f59e0b; }
+    .shift-clinic-clash-orange { background: #fffbeb !important; }
+    body.dark-theme .shift-clinic-clash-orange { background: rgba(245,158,11,0.08) !important; }
+    .shift-clinic-clash-red td:first-child { border-left: 3px solid #dc2626; }
+    .shift-clinic-clash-red { background: #fef2f2 !important; }
+    body.dark-theme .shift-clinic-clash-red { background: rgba(220,38,38,0.10) !important; }
+    .cal-badge.cal-badge-clash-orange { outline: 2px solid #f59e0b; outline-offset: -1px; background: #fffbeb !important; }
+    .cal-badge.cal-badge-clash-red { outline: 2px solid #dc2626; outline-offset: -1px; background: #fef2f2 !important; }
 
     /* Picker section headers — split รับได้ vs จะชน */
     .pick-section-header {
@@ -1221,9 +1230,9 @@
       content: ''; position: absolute; left: -6px; top: 3px; width: 10px; height: 10px;
       border-radius: 50%; background: var(--muted); border: 2px solid var(--surface); box-sizing: border-box;
     }
-    .phx-tl-item.swap::before { background: #2563eb; }
-    .phx-tl-item.give::before { background: #a16207; }
-    .phx-tl-item.add::before  { background: #15803d; }
+    .phx-tl-item.swap::before { background: #3b82f6; }
+    .phx-tl-item.give::before { background: #f59e0b; }
+    .phx-tl-item.add::before  { background: #22c55e; }
     .phx-tl-summary { font-size: 13px; color: var(--text); line-height: 1.5; }
     .phx-tl-meta { font-size: 11px; color: var(--sub); margin-top: 2px; display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
     .phx-tl-status { font-size: 9.5px; font-weight: 700; padding: 1px 7px; border-radius: 999px; white-space: nowrap; }
@@ -2572,6 +2581,49 @@ window.allPharmacistNames = [];
         msg = '⚠️ ชน <b>รอบ 1</b> (อาจชน <b>รอบ 2</b> ในบางตำแหน่ง)';
       }
       return '<div class="pick-conflict-clinic-note">' + msg + '</div>';
+    }
+
+    // v3.47: clinic-vs-same-day-regular clash LEVEL (round-based, not exact-time — clinic start is
+    //   uncertain: จ–ศ ~16:30–17:00, ส/อา ~08:30). Returns 'red' (ชนแน่) | 'orange' (อาจชน) | '' (ไม่ชน).
+    //   จ–ศ: รอบ 1 = red, รอบ 2 = orange, รอบ 3 = none.  ส/อา: กลางวัน/เช้า = red, รอบ 1–2 = orange, รอบ 3 = none.
+    function _clinicClashLevel(regularShift, dateStr) {
+      var sh = String(regularShift || '').toLowerCase();
+      var m = String(dateStr || '').match(/\(([^)]+)\)/);
+      var dow = m ? m[1].replace(/\./g, '').trim() : '';
+      var isWeekend = (dow === 'ส' || dow === 'อา');
+      var isDay = sh.indexOf('กลางวัน') >= 0 || sh.indexOf('เช้า') >= 0;
+      var r1 = sh.indexOf('รอบ 1') >= 0 || sh.indexOf('รอบ1') >= 0;
+      var r2 = sh.indexOf('รอบ 2') >= 0 || sh.indexOf('รอบ2') >= 0;
+      if (isWeekend) {
+        if (isDay) return 'red';
+        if (r1 || r2) return 'orange';
+        return '';
+      }
+      if (r1) return 'red';
+      if (r2) return 'orange';
+      return '';
+    }
+    // v3.47: build a { "name|day|month": true } index of who has a special-clinic shift each day,
+    //   from a list of shift rows — used to flag same-day regular shifts.
+    function _buildClinicDayIndex(rows) {
+      var idx = {};
+      try {
+        (rows || []).forEach(function(it) {
+          if (it && isSpecialClinic(it)) {
+            var p = it.date ? String(it.date).split('/') : [];
+            if (p.length >= 2) idx[(it.name || '') + '|' + p[0] + '|' + p[1]] = true;
+          }
+        });
+      } catch (e) {}
+      return idx;
+    }
+    // v3.47: clash class suffix for a regular shift given a clinic-day index. '' if no clash.
+    function _clinicClashClassFor(shiftObj, clinicIdx, prefix) {
+      if (!shiftObj || isSpecialClinic(shiftObj)) return '';
+      var p = shiftObj.date ? String(shiftObj.date).split('/') : [];
+      if (p.length < 2 || !clinicIdx[(shiftObj.name || '') + '|' + p[0] + '|' + p[1]]) return '';
+      var lv = _clinicClashLevel(shiftObj.shift, shiftObj.date);
+      return lv ? (prefix + lv) : '';
     }
 
     /** Convert shift to absolute minute range, handling cross-day */
@@ -7752,6 +7804,8 @@ window.allPharmacistNames = [];
       // v3.46: per-shift note map (shiftKey → {note, _visibility, by}). Computed once per render like
       //   the used-map; painted as a 📝 marker on the row (public notes on any row, private on own).
       const _noteMap = (typeof _shiftNoteMap === 'function') ? _shiftNoteMap(_mid, _curUser) : {};
+      // v3.47: index of (person|day) that has a special-clinic shift → flag same-day regular shifts red/orange
+      const _clinicIdx = (typeof _buildClinicDayIndex === 'function') ? _buildClinicDayIndex(items) : {};
       const _rowsHtml = [];
       // v3.43: show the inline 🌐 publish button once per draft action. Real rows precede ghosts
       //   in `items`, so the struck source row wins the button; a pure 'add' lands it on the ghost.
@@ -7842,10 +7896,15 @@ window.allPharmacistNames = [];
         }
         // v3.43: mark ghost rows created by an unpublished action so their border reads dashed
         if (_isGhost && _isDraftLocal) _ghostCls += ' shift-draft';
+        // v3.47: clinic clash — a regular shift on a day where this person also has a clinic shift
+        //   (only when the row isn't already flagged as a ghost time-conflict).
+        const _clashCls = (_ghostCls.indexOf('overlap') < 0 && _ghostCls.indexOf('adjacent') < 0 && typeof _clinicClashClassFor === 'function')
+          ? _clinicClashClassFor(i, _clinicIdx, 'shift-clinic-clash-') : '';
         const _rowClasses = [
           'bg-white hover:bg-gray-50 border-b border-gray-100 transition-all',
           _used ? 'shift-used' : '',
           _ghostCls,
+          _clashCls,
           _tappable ? 'shift-row-tappable' : ''
         ].filter(Boolean).join(' ');
         const _dataAttr = _tappable ? ` data-shift-key="${encodeURIComponent(_shiftKey)}"` : '';
@@ -8113,6 +8172,8 @@ window.allPharmacistNames = [];
           return ar.start - br.start;
         });
 
+        // v3.47: does this person have a special-clinic shift today? → flag same-day regular badges
+        const _dayHasClinic = shiftsToday.some(function(s){ return isSpecialClinic(s); });
         let badgesHtml = shiftsToday.map(s => {
           let bc = "badge-other"; let ls = s.shift.toLowerCase();
           if (ls.includes("⚠️")) bc = "badge-purple";
@@ -8131,6 +8192,11 @@ window.allPharmacistNames = [];
             if (s._conflict === 'overlap') _calExtraCls = ' cal-badge-overlap';
             else if (s._conflict === 'adjacent') _calExtraCls = ' cal-badge-adjacent';
             else _calExtraCls = ' cal-badge-ghost';
+          }
+          else if (_dayHasClinic && !isSpecialClinic(s) && typeof _clinicClashLevel === 'function') {
+            const _clv = _clinicClashLevel(s.shift, s.date);   // v3.47: same-day clinic clash
+            if (_clv === 'red') _calExtraCls = ' cal-badge-clash-red';
+            else if (_clv === 'orange') _calExtraCls = ' cal-badge-clash-orange';
           }
           // v3.43: dashed outline on the badge when the underlying action is a private draft
           const _calDraftAid = _calUsed ? _calUsed.actionId : (_isGhostBadge ? s._ghostActionId : null);
@@ -11986,17 +12052,11 @@ table.exp-tbl .tm{margin-left:3px;opacity:0.75;}
             return;
           }
 
-          // Non-clinic: timed event
-          if (!s.range || s.range === '-' || s.range === 'ตรวจสอบ') return;
-          const r = parseRangeToMinutes(s.range);
-          if (!r) return;
-          const startH = Math.floor(r.start / 60);
-          const startM = r.start % 60;
-          const endH = Math.floor(r.end / 60);
-          const endM = r.end % 60;
-          // v3.36: Use effDay (may be shifted +1 for Round 3 when export toggle ON)
-          const startDate = new Date(effYear, effMonth - 1, effDay, startH, startM, 0);
-          const endDate = new Date(effYear, effMonth - 1, effDay, endH, endM, 0);
+          // Non-clinic: v3.47 — ALL-DAY event (Klui: ICS/GCal ให้เป็น all-day event ไปเลย).
+          //   No exact times (clinic start is uncertain and rounds vary); export the whole day.
+          const dateStr = effYear + pad(effMonth) + pad(effDay);
+          const nextDay = new Date(effYear, effMonth - 1, effDay + 1);
+          const nextDateStr = nextDay.getFullYear() + pad(nextDay.getMonth() + 1) + pad(nextDay.getDate());
 
           // UID: stable across day-picker selection / re-export
           //   Regular: sirx-<year>-<MMDD>-<safePos>@siriraj-rx-shift
@@ -12009,59 +12069,42 @@ table.exp-tbl .tm{margin-left:3px;opacity:0.75;}
           }
 
           const shiftTypeLabel = normalizeShiftType(s.shift);
-          // v3.28: SUMMARY = <pos> <shift_type> + ' จาก <partner>' for all ghosts with partner
-          //         (both swap and add types have partner — 'add' = taking on someone's shift)
           let summary = (s.pos || '') + (shiftTypeLabel ? ' ' + shiftTypeLabel : '');
           if (s._ghost && s._ghostPartnerName) {
             summary += ' จาก ' + stripPrefix(s._ghostPartnerName);
           }
 
-          // DESCRIPTION: clean format like preferred file
           let descLines = [
             'เภสัชกร: ' + cleanPerson,
-            'ตำแหน่ง: ' + (s.pos || ''),
-            'เวลา: ' + s.range
+            'ตำแหน่ง: ' + (s.pos || '')
           ];
+          if (s.range && s.range !== '-' && s.range !== 'ตรวจสอบ') descLines.push('เวลา: ' + s.range);
           if (s._ghost) {
             if (s._ghostType === 'swap' && s._ghostPartnerName) {
               descLines.push('แลกเวรกับ: ' + stripPrefix(s._ghostPartnerName) + (s._ghostSourcePos ? ' (เวรเดิม: ' + s._ghostSourcePos + ')' : ''));
             } else if (s._ghostType === 'add' && s._ghostPartnerName) {
               descLines.push('รับจาก: ' + stripPrefix(s._ghostPartnerName));
             }
-            // No partner name → no extra description line (no "เพิ่มเอง" text)
-          }
-          if (isClinic(s)) {
-            descLines.push('หมายเหตุ: โปรดตรวจสอบเวลาการทำงานอีกครั้ง');
           }
           const description = descLines.join('\n');
 
           rawLines.push('BEGIN:VEVENT');
           rawLines.push('UID:' + uid);
           rawLines.push('DTSTAMP:' + nowUTC);
-          rawLines.push('DTSTART;TZID=Asia/Bangkok:' + fmtLocal(startDate));
-          rawLines.push('DTEND;TZID=Asia/Bangkok:' + fmtLocal(endDate));
+          rawLines.push('DTSTART;VALUE=DATE:' + dateStr);
+          rawLines.push('DTEND;VALUE=DATE:' + nextDateStr);
           rawLines.push('SUMMARY:' + escICS(summary));
           rawLines.push('DESCRIPTION:' + escICS(description));
           rawLines.push('LOCATION:Siriraj Hospital');
           rawLines.push('SEQUENCE:0');
           rawLines.push('STATUS:CONFIRMED');
-          rawLines.push('TRANSP:OPAQUE');
-
-          // VALARM blocks (ACTION→DESCRIPTION→TRIGGER order, matches preferred file)
-          const shiftType = detectType(s.shift);
-          const clinic = isClinic(s);
-          // v3.29: alarm label includes partner — so notification banner shows "พรุ่งนี้เวร O11 จาก ณัชชพล เริ่ม 02:30"
-          const alarmLabel = (s._ghost && s._ghostPartnerName)
-            ? (s.pos || '') + ' จาก ' + stripPrefix(s._ghostPartnerName)
-            : (s.pos || '');
-          const alarms = _buildSmartAlarms(startH, startM, alarmLabel, shiftType, clinic, _userReminderSettings);
-          alarms.forEach(function(al) {
-            rawLines.push('BEGIN:VALARM');
-            rawLines.push('ACTION:DISPLAY');
-            rawLines.push('DESCRIPTION:' + escICS(al.desc));
-            rawLines.push('TRIGGER:' + al.trigger);
-            rawLines.push('END:VALARM');
-          });
+          rawLines.push('TRANSP:TRANSPARENT');
+          // Day-relative alarms (all-day): 1 วันก่อน + คืนก่อน (12 ชม.ก่อนเที่ยงวันเวร)
+          rawLines.push('BEGIN:VALARM');
+          rawLines.push('ACTION:DISPLAY');
+          rawLines.push('DESCRIPTION:' + escICS('พรุ่งนี้มีเวร ' + (s.pos || '') + (shiftTypeLabel ? ' ' + shiftTypeLabel : '')));
+          rawLines.push('TRIGGER:-P1D');
+          rawLines.push('END:VALARM');
           rawLines.push('END:VEVENT');
           added++;
         } catch(e) { console.warn('[ICS] skip shift:', s, e); }
