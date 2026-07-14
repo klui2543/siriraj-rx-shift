@@ -5312,7 +5312,12 @@ window.allPharmacistNames = [];
       box.innerHTML = html;
 
       if (s === 'swap' || s === 'add' || s === 'give') {
-        updatePickerListContent();
+        // v3.47c: defer the (possibly large) list build one tick so the picker shell + ช่องค้นหา
+        //   paints INSTANTLY. updatePickerListContent renders every other holder's shift (+ conflict
+        //   preview + _pbHolderOf per row) → เคยค้างก่อนโมดัลขึ้น (โดยเฉพาะ swap/รับ ที่ list ใหญ่).
+        var _plc = document.getElementById('pickerListContent');
+        if (_plc) _plc.innerHTML = '<div class="pick-empty">กำลังโหลด…</div>';
+        setTimeout(function() { try { updatePickerListContent(); } catch(e){} }, 0);
         setTimeout(function() {
           const inp = document.getElementById('pickerSearchInput');
           if (inp) {
