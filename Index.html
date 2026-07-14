@@ -250,7 +250,7 @@
       white-space: nowrap; text-overflow: clip;
       text-align: center; width: 100%; letter-spacing: -0.04em;
     }
-    #calendarGrid {
+    #calendarGrid, #phxActPickCalGrid {   /* v3.47: picker calendar = same 7-col grid as the main page */
       display: grid; grid-template-columns: repeat(7, minmax(0, 1fr));
       gap: 0; background: var(--surface);
       border: 1px solid var(--border); border-top: none; border-radius: 0 0 10px 10px; overflow: hidden;
@@ -2660,6 +2660,18 @@ window.allPharmacistNames = [];
 
     /** Returns 'overlap' | 'adjacent' | 'none' */
     function checkShiftConflict(a, b) {
+      // v3.47: clinic-vs-regular is ROUND-based (clinic start uncertain; the old time estimate was
+      //   too broad — a weekend 07:00–23:00 estimate falsely "overlapped" a รอบ 3 morning shift).
+      //   Use _clinicClashLevel on the regular side: red→overlap, orange→adjacent, ''→none.
+      const _aC = isSpecialClinic(a), _bC = isSpecialClinic(b);
+      if (_aC !== _bC && typeof _clinicClashLevel === 'function') {
+        const reg = _aC ? b : a, clin = _aC ? a : b;
+        const _rd = String(reg.date || '').split('/'), _cd = String(clin.date || '').split('/');
+        // same day = same day-number AND same month-number (ignore the (DOW) label)
+        if (parseInt(_rd[0], 10) !== parseInt(_cd[0], 10) || parseInt(_rd[1], 10) !== parseInt(_cd[1], 10)) return 'none';
+        const lv = _clinicClashLevel(reg.shift, reg.date);
+        return lv === 'red' ? 'overlap' : (lv === 'orange' ? 'adjacent' : 'none');
+      }
       const ma = shiftToMinutes(a);
       const mb = shiftToMinutes(b);
       if (!ma || !mb) return 'none';
@@ -12019,7 +12031,7 @@ table.exp-tbl .tm{margin-left:3px;opacity:0.75;}
             let descLines = [
               'เภสัชกร: ' + cleanPerson,
               'ตำแหน่ง: ' + (s.pos || ''),
-              'หมายเหตุ: เวรคลินิกพิเศษ — โปรดตรวจสอบเวลาทำงานในระบบ'
+              'เวลา: โปรดตรวจสอบจากตารางเวรอีกครั้ง'   // v3.47: clinic time is uncertain
             ];
             if (s._ghost) {
               if (s._ghostType === 'swap' && s._ghostPartnerName) {
@@ -17599,6 +17611,13 @@ table.exp-tbl .tm{margin-left:3px;opacity:0.75;}
     // ========= tab switcher =========
     window.phxSetTab = function(tab){
       if (tab !== 'swap' && tab !== 'me') tab = 'schedule';
+      // v3.47: the ตารางเวร tab is view-only — editing happens only on the แลกเวร tab. If the action
+      //   flow left edit mode on, clear it on landing here (Klui: no edit mode on the schedule page).
+      if (tab === 'schedule' && typeof editModeActive !== 'undefined' && editModeActive) {
+        editModeActive = false;
+        document.body.classList.remove('edit-mode-on');
+        try { if (typeof triggerUpdate === 'function') triggerUpdate(); } catch(e){}
+      }
       document.body.setAttribute('data-tab', tab);
       var items = document.querySelectorAll('#phxBottomNav .phx-bn-item');
       for (var i=0;i<items.length;i++){ items[i].classList.toggle('active', items[i].getAttribute('data-tab') === tab); }
