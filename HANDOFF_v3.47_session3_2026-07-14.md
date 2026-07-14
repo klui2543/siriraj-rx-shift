@@ -73,6 +73,7 @@
 1. **แบนเนอร์ "📅 <User> · เลือกได้ N เวรเดือนนี้"** → **DONE แล้ว** (`dc03110`) — Klui เห็นเวอร์ชัน deploy เก่า. **ต้อง deploy ถึงจะหาย**
 2. **หน้ายก/สลับ ตารางยังไม่เหมือน main table** → **PENDING** (อยู่ในหัวข้อ UI polish ข้างบน — main มี left-border สี + chevron/dot; picker `.swf-tbl` แบน. แนะนำเอาแค่ left-border สี+spacing ไม่เอา interactive elements)
 3. **Toggle dropdown บนสุดบังกัน** → **DONE** (`3a85b97`) — user menu ↔ kebab เปิดทีละอัน (กดอันไหนปิดอีกอัน)
+4. **Cursor (รับเวร) + กระตุก/scroll เด้ง** → **แก้ในโค้ดแล้ว** (`d58ac10`) แต่ **Klui ยังเห็นอยู่ = ยังไม่ deploy** (ดูเวอร์ชันเก่า). **⚠️ ต้อง deploy แล้ว retest ก่อนสรุปว่ายังพัง.** ตรวจเพิ่มแล้ว: `_pbOverlaySignature` (7049) + `getDataSignature` (verifiedAt=null) = **content-based ทั้งคู่ → ไม่มี re-render ทุก 30วิ** (re-render เกิดเฉพาะตอนข้อมูลเปลี่ยนจริง เช่น มีคนแลกเวร). scroll fix แก้ "เด้ง" (jump). **ถ้าหลัง deploy ยัง "กระพริบ (flash)" ตอนข้อมูลเปลี่ยนจริง = คนละเรื่อง** — ต้องเลี่ยง full `innerHTML` re-render (ทำ DOM diff / patch เฉพาะแถวที่เปลี่ยน) = งานใหญ่กว่า, ทำทีหลังถ้า Klui ยังรำคาญหลัง deploy
 
 ## 🔧 Verify method (ไม่มี GAS backend ในมือ)
 - `node --check` ทุก `<script>` inline (extractor นับ regex, คาดหวัง **10 บล็อก 0 error**)
