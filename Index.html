@@ -17799,25 +17799,20 @@ table.exp-tbl .tm{margin-left:3px;opacity:0.75;}
         return { name: s.name, date: s.date, timestamp: s.timestamp, pos: s.pos, shift: s.shift, range: range, room: s.room };
       });
 
-      // เปิดประตู Calendar เป็น popup แล้วส่งเวรเข้าไปตอนมันพร้อม (handshake READY→SYNC→RESULT)
-      var win = window.open(RX_CAL_WEBAPP_URL, 'rxshift_cal', 'width=480,height=640');
+      // ---- วิธี relay ผ่าน Firebase (เชื่อถือกว่า postMessage ที่ Apps Script sandbox กันไว้) ----
+      // 1) เขียนเวร "ฝาก" ไว้ที่ Firebase node calFeed/<ชื่อ>/<เดือน>
+      var encName = String(me).trim().replace(/[.$#\[\]\/\s]+/g,'_');  // ต้องตรงกับ _encName() ในเคาน์เตอร์
+      if (typeof fbDb === 'undefined' || !fbDb){ toast('เชื่อม Firebase ไม่ได้ — รีเฟรชแล้วลองใหม่','warn'); return; }
+      try {
+        fbDb.ref('calFeed/' + encName + '/' + mid).set({ shifts: shifts, updatedAt: Date.now() });
+      } catch(e){ toast('เขียนเวรลง Firebase ไม่สำเร็จ: '+(e&&e.message?e.message:e),'warn'); return; }
+
+      // 2) เปิดเคาน์เตอร์ปฏิทินพร้อมแนบชื่อ (?name=) → เคาน์เตอร์ไปหยิบเวรจาก Firebase เอง
+      var url = RX_CAL_WEBAPP_URL + (RX_CAL_WEBAPP_URL.indexOf('?')<0?'?':'&') +
+                'name=' + encodeURIComponent(encName) + '&month=' + encodeURIComponent(mid);
+      var win = window.open(url, 'rxshift_cal', 'width=480,height=660');
       if (!win){ toast('เบราว์เซอร์บล็อก popup — อนุญาต popup ให้เว็บนี้แล้วลองใหม่','warn'); return; }
-      toast('เปิดหน้าเชื่อมต่อปฏิทิน… ถ้าเป็นครั้งแรกให้กดอนุญาต','info');
-      var done = false;
-      function onMsg(e){
-        var d = e.data || {};
-        if (d.type === 'RXSHIFT_CAL_READY'){
-          try { win.postMessage({ type:'RXSHIFT_CAL_SYNC', payload:{ monthValue: mid, shifts: shifts, appName: me } }, '*'); } catch(_){}
-        } else if (d.type === 'RXSHIFT_CAL_RESULT'){
-          done = true;
-          window.removeEventListener('message', onMsg);
-          var r = d.data || {};
-          if (r.ok) toast('ซิงค์ปฏิทินสำเร็จ · เพิ่ม '+(r.created||0)+' · แก้ '+(r.updated||0)+' · ลบ '+(r.deleted||0),'success');
-          else toast('ซิงค์ไม่สำเร็จ: '+(r.message||r.error||'unknown'),'warn');
-        }
-      }
-      window.addEventListener('message', onMsg);
-      setTimeout(function(){ if(!done) window.removeEventListener('message', onMsg); }, 180000); // กันค้าง 3 นาที
+      toast('เปิดหน้าปฏิทิน… เวร '+shifts.length+' รายการกำลังซิงค์ (ครั้งแรกให้กดอนุญาต)','info');
     };
 
     window.phxRenderMeView = function(){

@@ -76,7 +76,8 @@
 
   var lastPayload = null;
   var autoOn = false;
-  var appName = null;
+  var BOOT_NAME = <?!= JSON.stringify(paramName) ?>;  // ชื่อผู้ใช้จากแอปหลัก (ผ่าน ?name=) — ว่างถ้าเปิดตรงๆ
+  var appName = BOOT_NAME || null;
   var $ = function (id) { return document.getElementById(id); };
 
   function setStatus(kind, html) {
@@ -220,7 +221,27 @@
     }
   }
 
-  // 3) ซิงค์
+  // 3-relay) ดึงเวรจาก Firebase feed (ที่แอปหลักฝากไว้) แล้วซิงค์ — วิธีหลัก (แทน postMessage)
+  function autoPullSync(retries) {
+    retries = retries || 0;
+    setStatus('info', '<span class="spinner" style="border-color:#1e40af;border-top-color:transparent"></span>กำลังดึงเวรจากแอปหลัก…');
+    google.script.run
+      .withSuccessHandler(function (r) {
+        if (r && r.ok && r.months > 0) {
+          setStatus('ok', 'ซิงค์สำเร็จ · เพิ่ม ' + (r.created || 0) + ' · แก้ ' + (r.updated || 0) +
+                          ' · ลบ ' + (r.deleted || 0) + ' (' + (r.months || 0) + ' เดือน)');
+          loadStatus();
+        } else if (retries < 4) {
+          setTimeout(function () { autoPullSync(retries + 1); }, 1500);  // กัน race: เวรอาจยังเขียนไม่ถึง Firebase
+        } else {
+          setStatus('info', 'ยังไม่พบเวรที่ส่งมา — กด "ซิงค์เวรเดี๋ยวนี้" อีกครั้ง หรือกดซิงค์จากแอปหลักใหม่');
+        }
+      })
+      .withFailureHandler(function (e) { setStatus('err', 'ดึงเวรล้มเหลว: ' + (e && e.message ? e.message : e)); })
+      .pullAndSyncFromFeed(appName || BOOT_NAME || '');
+  }
+
+  // 3) ซิงค์ (fallback สำหรับ postMessage เดิม — ยังเก็บไว้เผื่อ)
   function doSync(payload) {
     if (!payload) {
       setStatus('info', 'ยังไม่มีข้อมูลเวรส่งเข้ามา — กรุณากดซิงค์จากแอปหลัก');
@@ -317,7 +338,10 @@
     doSync({ monthValue: 'TEST', shifts: [_sampleShift()] });
   });
 
-  $('btn-sync').addEventListener('click', function () { doSync(lastPayload); });
+  $('btn-sync').addEventListener('click', function () {
+    if (appName || BOOT_NAME) autoPullSync(0);   // รู้ชื่อ → ดึงจาก Firebase
+    else doSync(lastPayload);                     // ไม่งั้น fallback postMessage
+  });
   $('btn-auto').addEventListener('click', toggleAuto);
   $('btn-clear').addEventListener('click', doClear);
   $('btn-revoke').addEventListener('click', doRevoke);
@@ -326,6 +350,7 @@
 
   loadStatus();
   loadCalendars();
+  if (BOOT_NAME) autoPullSync(0);   // แอปหลักเปิดมาพร้อมชื่อ → ดึงเวรจาก Firebase + ซิงค์อัตโนมัติ
   postToOpener(MSG_READY, { ok: true });
 </script>
 </body>
