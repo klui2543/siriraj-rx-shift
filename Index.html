@@ -1191,6 +1191,21 @@
     .phx-swap-act-btn.give   { background:#fefce8; border-color:#fde68a; color:#a16207; }
     .phx-swap-act-btn.recv   { background:#f0fdf4; border-color:#bbf7d0; color:#15803d; }
     .phx-swap-act-btn.cancel { background:#fef2f2; border-color:#fecaca; color:#dc2626; }
+    /* v3.47: pending-draft manager banner on the แลกเวร tab */
+    .phx-draft-banner {
+      display: flex; align-items: center; gap: 9px; width: 100%;
+      padding: 11px 13px; margin: 2px 0 12px; border-radius: 12px;
+      background: #fffbeb; border: 1px solid #fde68a; color: #92400e;
+      font-family: 'Kanit', sans-serif; font-size: 12.5px; font-weight: 600;
+      cursor: pointer; text-align: left; transition: box-shadow 0.15s, transform 0.1s;
+    }
+    .phx-draft-banner:hover { box-shadow: 0 2px 10px rgba(0,0,0,0.06); }
+    .phx-draft-banner:active { transform: scale(0.99); }
+    .phx-draft-banner .ic { font-size: 17px; line-height: 1; flex-shrink: 0; }
+    .phx-draft-banner .tx { flex: 1; }
+    .phx-draft-banner .tx b { font-weight: 800; }
+    .phx-draft-banner .go { font-weight: 700; flex-shrink: 0; white-space: nowrap; }
+    body.dark-theme .phx-draft-banner { background: #3f2d10; border-color: #78571c; color: #fcd34d; }
 
     /* profile rows on the ฉัน tab */
     .phx-me-hero { display: flex; align-items: center; gap: 13px; padding: 4px 2px 16px; }
@@ -1220,6 +1235,13 @@
     .phx-me-row .ch { color: var(--muted); flex-shrink: 0; }
     .phx-me-row.danger { color: #dc2626; }
     .phx-me-row.danger .ic { color: #dc2626; }
+    /* v3.47: admin-only row shown greyed + locked for non-admins */
+    .phx-me-row.disabled { opacity: 0.5; cursor: not-allowed; }
+    .phx-me-row.disabled:hover { border-color: var(--border); background: var(--surface); }
+    .phx-me-row .phx-me-lock {
+      font-size: 10.5px; font-weight: 700; color: var(--muted); flex-shrink: 0;
+      border: 1px solid var(--border); padding: 2px 9px; border-radius: 999px;
+    }
     .phx-me-cta {
       display: block; width: 100%; padding: 14px;
       background: var(--accent); color: #fff; border: 0; border-radius: 12px;
@@ -6092,14 +6114,15 @@ window.allPharmacistNames = [];
       if (act.action === 'give') return { my: _swfResolveShift(act.shiftKey, viewer), tgt: null };
       return { my: null, tgt: _swfResolveShift(act.shiftKey, act.partnerName || '') };
     }
-    function swfShowPendingDrafts() {
+    // Collect this login's pending drafts for `mid` (own actions + retro hops recorded for others).
+    //   Retro chains live under historical actors' viewerNames so getActions(bound) alone misses
+    //   them (and since the inline 🌐 was removed they'd otherwise have no publish surface).
+    //   Returns null when there's no logged-in identity / month. Shared by the popup + tab banner.
+    function _swfCollectDrafts(mid) {
       var bound = (typeof _pbGetLoggedInName === 'function') ? _pbGetLoggedInName() : null;
-      if (!bound) return;                       // publishing needs a logged-in identity
-      var mid = getCurrentMonthId();
-      if (!mid) return;
-      // Own actions + retro hops THIS login recorded for others (_retroBy) — retro chains
-      //   live under historical actors' viewerNames so getActions(bound) alone misses them
-      //   (and since the inline 🌐 was removed they'd otherwise have no publish surface).
+      if (!bound) return null;                  // publishing needs a logged-in identity
+      mid = mid || getCurrentMonthId();
+      if (!mid) return null;
       OverlayManager.load();
       var _all = ((OverlayManager._data && OverlayManager._data[mid]) || {}).actions || [];
       var acts = _all.filter(function(a) {
@@ -6110,6 +6133,17 @@ window.allPharmacistNames = [];
         ? _pbChainReps(mid, acts)
         : acts.map(function(a) { return { rep: a, size: 1 }; });
       var drafts = reps.filter(function(r) { return r.rep && r.rep._visibility === 'draft'; });
+      return { bound: bound, mid: mid, acts: acts, drafts: drafts };
+    }
+    // v3.47: count for the แลกเวร-tab "จัดการร่าง" banner
+    window.swfPendingDraftCount = function(mid) {
+      var col = _swfCollectDrafts(mid);
+      return col ? col.drafts.length : 0;
+    };
+    function swfShowPendingDrafts() {
+      var col = _swfCollectDrafts();
+      if (!col) return;
+      var bound = col.bound, mid = col.mid, acts = col.acts, drafts = col.drafts;
       if (!drafts.length) return;
       _swfPendingClose();
       var items = '';
@@ -14010,10 +14044,21 @@ table.exp-tbl .tm{margin-left:3px;opacity:0.75;}
         const target = (typeof getCurrentUser === 'function') ? getCurrentUser() : null;
         const canEdit = !!target;
         const editOn = (typeof editModeActive !== 'undefined') && editModeActive;
+        const activeTab = document.body.getAttribute('data-tab') || 'schedule';
 
-        if (!canEdit) {
-          // Nobody selected — hide everything
+        // v3.47: the note-FAB belongs to ตารางเวร + แลกเวร only; ฉัน (profile) shows no FAB.
+        if (!canEdit || activeTab === 'me') {
+          // Nobody selected, or on the profile tab — hide everything
           fab.style.display = 'none';
+          cluster.style.display = 'none';
+          return;
+        }
+
+        if (activeTab === 'swap') {
+          // แลกเวร uses the action-first flow, which flips editModeActive on just to open the
+          //   action modal. The undo/redo/เสร็จสิ้น cluster must NEVER surface here — only the
+          //   note pencil (issue: pressing สลับ/ยก/รับ was leaving the edit cluster on screen).
+          fab.style.display = 'flex';
           cluster.style.display = 'none';
           return;
         }
@@ -17439,6 +17484,7 @@ table.exp-tbl .tm{margin-left:3px;opacity:0.75;}
       for (var i=0;i<items.length;i++){ items[i].classList.toggle('active', items[i].getAttribute('data-tab') === tab); }
       if (tab === 'swap') phxRenderSwapView();
       else if (tab === 'me') phxRenderMeView();
+      try { if (typeof phxUpdateFabUI === 'function') phxUpdateFabUI(); } catch(e){}  // v3.47: FAB is tab-aware
       try { window.scrollTo(0,0); } catch(e){}
     };
 
@@ -17516,7 +17562,17 @@ table.exp-tbl .tm{margin-left:3px;opacity:0.75;}
       } else {
         html = '<div class="phx-tv-empty" style="padding:26px 12px;">ยังไม่มีการแลก / ยก / รับเวรเดือนนี้</div>';
       }
-      body.innerHTML = html;
+      // v3.47: pending-draft manager — if this login has unpublished ร่าง, surface a way to จัดการ
+      //   (ทำต่อ / เผยแพร่ทั้งหมด) right here on the แลกเวร tab.
+      var draftN = (typeof swfPendingDraftCount === 'function') ? swfPendingDraftCount(mid) : 0;
+      var draftBanner = draftN
+        ? '<button type="button" class="phx-draft-banner" onclick="swfShowPendingDrafts()">' +
+            '<span class="ic">📝</span>' +
+            '<span class="tx">มีร่างค้าง <b>'+draftN+'</b> รายการ — ยังไม่เผยแพร่ให้คนอื่นเห็น</span>' +
+            '<span class="go">จัดการ ›</span>' +
+          '</button>'
+        : '';
+      body.innerHTML = draftBanner + html;
     };
 
     // ========= v3.47b: action-first แลกเวร (สลับ / ยก / รับ / ยกเลิก) =========
@@ -17770,7 +17826,13 @@ table.exp-tbl .tm{margin-left:3px;opacity:0.75;}
     });
 
     // ========= ฉัน (profile) =========
-    function meRow(js, label, svg, danger){
+    function meRow(js, label, svg, danger, lock){
+      if (lock){
+        // v3.47: admin-only row → greyed, non-clickable, with a "เฉพาะแอดมิน" pill instead of chevron
+        return '<button class="phx-me-row disabled" type="button" disabled title="เฉพาะแอดมิน">' +
+          '<span class="ic">'+svg+'</span><span class="tx">'+esc(label)+'</span>' +
+          '<span class="phx-me-lock">เฉพาะแอดมิน</span></button>';
+      }
       return '<button class="phx-me-row'+(danger?' danger':'')+'" onclick="'+js+'" type="button">' +
         '<span class="ic">'+svg+'</span><span class="tx">'+esc(label)+'</span>'+IC.chev+'</button>';
     }
@@ -17846,7 +17908,7 @@ table.exp-tbl .tm{margin-left:3px;opacity:0.75;}
       }
       html += '<div class="phx-me-section-label">ปฏิทิน & เตือนความจำ</div>';
       html += meRow('phxOpenIcsReminderModal()', 'เตือนเวรลงปฏิทิน (ICS)', IC.cal);
-      html += meRow('phxSyncGoogleCalendar()', 'ซิงค์เข้า Google Calendar', IC.cal);
+      html += meRow('phxSyncGoogleCalendar()', 'ซิงค์เข้า Google Calendar', IC.cal, false, !isAdmin());  // v3.47: admin-only for now
       html += '<div class="phx-me-section-label">ทั่วไป</div>';
       html += meRow('openChangelog()', 'ประวัติการอัปเดต', IC.history);
       // ตรวจสอบคุณภาพข้อมูล (Audit) ย้ายไปเป็นลิงก์เล็กเหนือ Version ที่ท้ายตารางเวรแล้ว
