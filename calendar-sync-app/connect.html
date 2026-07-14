@@ -3,68 +3,125 @@
 <head>
   <base target="_top">
   <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Kanit:wght@400;500;600;700&display=swap" rel="stylesheet">
   <style>
-    * { box-sizing: border-box; }
-    body {
-      font-family: "Noto Sans Thai", "Segoe UI", system-ui, sans-serif;
-      margin: 0; padding: 20px; background: #f4f6fb; color: #1a1f2e;
-      line-height: 1.6;
+    :root{
+      --bg:#e9edf4; --card:#ffffff; --fg:#1e293b; --muted:#647087;
+      --border:#e6eaf2; --panel:#f4f6fb;
+      --primary:#2563eb; --primary-d:#1d4ed8; --on-primary:#ffffff;
+      --ok-bg:#e7f7ef; --ok-fg:#0b7a4b; --err-bg:#fdecec; --err-fg:#b42318;
+      --info-bg:#eaf1fe; --info-fg:#1d4ed8; --danger:#dc2626;
+      --shadow:0 10px 34px rgba(20,30,60,.10);
     }
-    .card {
-      max-width: 460px; margin: 0 auto; background: #fff; border-radius: 14px;
-      box-shadow: 0 4px 20px rgba(0,0,0,.08); padding: 24px; overflow: hidden;
+    @media (prefers-color-scheme: dark){
+      :root{
+        --bg:#0d1117; --card:#161c28; --fg:#e6edf7; --muted:#93a0b5;
+        --border:#26303f; --panel:#1c2432;
+        --primary:#4f7cf7; --primary-d:#3f6ef0; --on-primary:#ffffff;
+        --ok-bg:#123024; --ok-fg:#4ade80; --err-bg:#3a1a1a; --err-fg:#fca5a5;
+        --info-bg:#16233c; --info-fg:#93b4fb; --danger:#f87171;
+        --shadow:0 10px 34px rgba(0,0,0,.45);
+      }
     }
-    h1 { font-size: 1.2rem; margin: 0 0 4px; }
-    .sub { color: #6b7280; font-size: .85rem; margin: 0 0 18px; }
-    .row { display: flex; justify-content: space-between; padding: 8px 0; border-bottom: 1px solid #eef0f4; font-size: .9rem; }
-    .row .k { color: #6b7280; }
-    .row .v { font-weight: 600; text-align: right; }
-    button {
-      width: 100%; border: none; border-radius: 10px; padding: 12px; font-size: .95rem;
-      font-weight: 600; cursor: pointer; margin-top: 12px; font-family: inherit;
+    *{ box-sizing:border-box; }
+    body{
+      margin:0; min-height:100vh; padding:16px;
+      display:flex; align-items:flex-start; justify-content:center;
+      background:var(--bg); color:var(--fg);
+      font-family:'Kanit','Noto Sans Thai','Segoe UI',system-ui,sans-serif; line-height:1.5;
+      -webkit-font-smoothing:antialiased;
     }
-    .primary { background: #1e40af; color: #fff; }
-    .primary:disabled { background: #9aa7cf; cursor: default; }
-    .danger { background: #fff; color: #dc2626; border: 1px solid #f0c4c4; }
-    .ghost { background: #f1f3f9; color: #374151; }
-    .status { margin-top: 16px; padding: 12px; border-radius: 10px; font-size: .88rem; display: none; }
-    .status.ok { background: #ecfdf5; color: #065f46; display: block; }
-    .status.err { background: #fef2f2; color: #991b1b; display: block; }
-    .status.info { background: #eff6ff; color: #1e40af; display: block; }
-    .muted { color: #9ca3af; font-size: .78rem; margin-top: 14px; text-align: center; }
-    label.pick { font-size: .85rem; color: #6b7280; display: block; margin-top: 16px; margin-bottom: 4px; }
-    select { width: 100%; padding: 11px; border-radius: 10px; border: 1px solid #dfe3ec;
-      font-family: inherit; font-size: .9rem; background: #fff; color: #1a1f2e; }
-    .spinner { display: inline-block; width: 14px; height: 14px; border: 2px solid #fff;
-      border-top-color: transparent; border-radius: 50%; animation: spin .7s linear infinite; vertical-align: -2px; margin-right: 6px; }
-    @keyframes spin { to { transform: rotate(360deg); } }
+    .card{
+      width:100%; max-width:420px; background:var(--card); border-radius:20px;
+      box-shadow:var(--shadow); padding:22px 20px 16px; margin:6px 0;
+    }
+    .hd{ display:flex; align-items:center; gap:12px; margin-bottom:18px; }
+    .hd-ic{ width:44px; height:44px; border-radius:13px; flex:0 0 auto;
+      background:linear-gradient(135deg,var(--primary),var(--primary-d)); color:#fff;
+      display:flex; align-items:center; justify-content:center; font-size:22px; }
+    .hd h1{ font-size:1.12rem; font-weight:600; margin:0; letter-spacing:-.01em; }
+    .hd .sub{ font-size:.78rem; color:var(--muted); margin:1px 0 0; }
+    .sum{ background:var(--panel); border-radius:14px; padding:2px 14px; margin-bottom:16px; }
+    .sum .row{ display:flex; justify-content:space-between; align-items:center; gap:10px;
+      padding:11px 0; border-bottom:1px solid var(--border); font-size:.85rem; }
+    .sum .row:last-child{ border-bottom:none; }
+    .sum .k{ color:var(--muted); flex:0 0 auto; }
+    .sum .v{ font-weight:600; text-align:right; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+    .field{ margin-bottom:6px; }
+    .field label{ display:block; font-size:.8rem; color:var(--muted); margin-bottom:6px; font-weight:500; }
+    select{ width:100%; padding:12px 13px; border-radius:12px; border:1px solid var(--border);
+      background:var(--card); color:var(--fg); font-family:inherit; font-size:.9rem; appearance:none; -webkit-appearance:none;
+      background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%238a94a6' stroke-width='2' stroke-linecap='round'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E");
+      background-repeat:no-repeat; background-position:right 12px center; }
+    .linkbtn{ background:none; border:none; color:var(--primary); font-family:inherit; font-size:.82rem;
+      font-weight:500; padding:8px 2px 2px; cursor:pointer; }
+    .btn{ width:100%; border:none; border-radius:13px; padding:0 14px; height:50px; font-size:.95rem;
+      font-weight:600; font-family:inherit; cursor:pointer; margin-top:10px;
+      transition:transform .08s ease, filter .15s, background .15s;
+      display:flex; align-items:center; justify-content:center; gap:7px; }
+    .btn:active{ transform:scale(.985); }
+    .btn-primary{ background:var(--primary); color:var(--on-primary); box-shadow:0 5px 16px rgba(37,99,235,.28); }
+    .btn-primary:hover{ background:var(--primary-d); }
+    .btn-primary:disabled{ opacity:.5; box-shadow:none; cursor:default; }
+    .btn-soft{ background:var(--panel); color:var(--fg); }
+    .btn-ghost{ background:transparent; color:var(--muted); border:1px solid var(--border); height:44px; font-weight:500; font-size:.88rem; }
+    details.tools{ margin-top:14px; }
+    details.tools>summary{ cursor:pointer; font-size:.8rem; color:var(--muted); list-style:none; padding:6px 2px; user-select:none; }
+    details.tools>summary::-webkit-details-marker{ display:none; }
+    details.tools>summary::before{ content:'▸  '; }
+    details.tools[open]>summary::before{ content:'▾  '; }
+    .revoke{ display:block; width:100%; text-align:center; background:none; border:none; color:var(--danger);
+      font-family:inherit; font-size:.84rem; font-weight:500; cursor:pointer; margin-top:14px; padding:8px; }
+    .status{ margin-top:14px; padding:12px 14px; border-radius:12px; font-size:.85rem; display:none; line-height:1.5; }
+    .status.ok{ background:var(--ok-bg); color:var(--ok-fg); display:block; }
+    .status.err{ background:var(--err-bg); color:var(--err-fg); display:block; }
+    .status.info{ background:var(--info-bg); color:var(--info-fg); display:block; }
+    .foot{ color:var(--muted); font-size:.73rem; margin:14px 0 2px; text-align:center; line-height:1.6; }
+    .spinner{ display:inline-block; width:14px; height:14px; border:2px solid currentColor;
+      border-top-color:transparent; border-radius:50%; animation:spin .7s linear infinite; vertical-align:-2px; margin-right:6px; }
+    @keyframes spin{ to{ transform:rotate(360deg);} }
   </style>
 </head>
 <body>
   <div class="card">
-    <h1>เชื่อมต่อ Google Calendar</h1>
-    <p class="sub">Siriraj Rx Shift — ซิงค์เวรของคุณเข้าปฏิทินอัตโนมัติ</p>
+    <div class="hd">
+      <div class="hd-ic">📅</div>
+      <div>
+        <h1>ซิงค์ปฏิทินเวร</h1>
+        <p class="sub">Siriraj Rx Shift</p>
+      </div>
+    </div>
 
-    <div id="info">
+    <div class="sum">
       <div class="row"><span class="k">บัญชี Google</span><span class="v" id="v-email">…</span></div>
       <div class="row"><span class="k">ปฏิทินปลายทาง</span><span class="v" id="v-cal">…</span></div>
       <div class="row"><span class="k">เวรที่ซิงค์แล้ว</span><span class="v" id="v-count">…</span></div>
       <div class="row"><span class="k">อัปเดตอัตโนมัติ</span><span class="v" id="v-auto">…</span></div>
     </div>
 
-    <label class="pick" for="sel-cal">บันทึกเวรลงปฏิทิน</label>
-    <select id="sel-cal"><option>กำลังโหลด…</option></select>
-    <button class="ghost" id="btn-newcal" style="margin-top:8px">➕ สร้างปฏิทินแยกเฉพาะเวร</button>
+    <div class="field">
+      <label for="sel-cal">บันทึกเวรลงปฏิทิน</label>
+      <select id="sel-cal"><option>กำลังโหลด…</option></select>
+      <button class="linkbtn" id="btn-newcal">+ สร้างปฏิทินแยกเฉพาะเวร</button>
+    </div>
 
-    <button class="primary" id="btn-sync" disabled>ซิงค์เวรเดี๋ยวนี้</button>
-    <button class="ghost" id="btn-auto">⚡ อัปเดตอัตโนมัติ (แม้ปิดแอป)</button>
-    <button class="ghost" id="btn-test">🧪 ทดสอบ: สร้าง event ตัวอย่าง (พรุ่งนี้)</button>
-    <button class="ghost" id="btn-clear">🧹 ล้าง event เวรทั้งหมด (สำหรับเทส)</button>
-    <button class="danger" id="btn-revoke">ยกเลิกการเชื่อมต่อ (ถอนสิทธิ์)</button>
+    <button class="btn btn-primary" id="btn-sync" disabled>ซิงค์เวรเดี๋ยวนี้</button>
+    <button class="btn btn-soft" id="btn-auto">⚡ อัปเดตอัตโนมัติ (แม้ปิดแอป)</button>
 
     <div class="status" id="status"></div>
-    <p class="muted">ยินยอมครั้งเดียว · เวรใหม่จะซิงค์อัตโนมัติ · ถอนสิทธิ์ได้ตลอดเวลา</p>
+
+    <details class="tools">
+      <summary>เครื่องมือทดสอบ</summary>
+      <button class="btn btn-ghost" id="btn-test">🧪 สร้าง event ตัวอย่าง (พรุ่งนี้)</button>
+      <button class="btn btn-ghost" id="btn-clear">🧹 ล้าง event เวรทั้งหมด</button>
+    </details>
+
+    <button class="revoke" id="btn-revoke">ยกเลิกการเชื่อมต่อ</button>
+
+    <p class="foot">ยินยอมครั้งเดียว · เวรใหม่ซิงค์อัตโนมัติ · ถอนสิทธิ์ได้ตลอดเวลา</p>
   </div>
 
 <script>

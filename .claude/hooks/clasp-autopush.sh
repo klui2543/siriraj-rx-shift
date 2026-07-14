@@ -81,7 +81,11 @@ if [ -f "$CAL_DIR/.clasp.json" ]; then
       CAL_OUT="$( cd "$CAL_DIR" && "$CAL_CLASP" push -f 2>&1 )"; CAL_RC=$?
       if [ "$CAL_RC" -eq 0 ]; then
         mkdir -p .claude; printf '%s' "$CAL_CUR_HASH" > "$CAL_HASH_FILE"
-        echo "✅ clasp push (calendar-sync-app) สำเร็จ — เคาน์เตอร์ปฏิทินอัพเดตแล้ว"
+        echo "✅ clasp push (calendar-sync-app) สำเร็จ"
+        # อัปเดต /exec deployment เดิม → /exec ได้โค้ดล่าสุดทันที (URL คงเดิม) ไม่ต้องกด deploy เอง
+        CAL_DEPLOY_ID="AKfycbxcH2114uAenaK6Gcy1YL_uzJv8p2IYzPQxtOZXOV47ndguYPYWqqyu3Ntc1x8VUBM1fw"
+        DOUT="$( cd "$CAL_DIR" && "$CAL_CLASP" deploy -i "$CAL_DEPLOY_ID" -d auto 2>&1 )"; DRC=$?
+        if [ "$DRC" -eq 0 ]; then echo "✅ clasp deploy (calendar /exec) อัพเดตแล้ว"; else echo "⚠️ deploy calendar /exec ไม่สำเร็จ:"; printf '%s\n' "$DOUT" | tail -3; fi
       else
         echo "‼️ clasp push (calendar-sync-app) ไม่สำเร็จ:"; printf '%s\n' "$CAL_OUT" | tail -4
       fi
