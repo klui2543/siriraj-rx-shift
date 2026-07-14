@@ -1176,6 +1176,21 @@
     .phx-swap-tag { display: inline-block; font-size: 9px; font-weight: 700; padding: 1px 6px; border-radius: 999px; margin-left: 5px; vertical-align: middle; white-space: nowrap; }
     .phx-swap-tag.recv { background: #dcfce7; color: #15803d; }
     .phx-swap-tag.gave { background: #f1f5f9; color: #64748b; }
+    /* v3.47b: action-first buttons on the แลกเวร tab (สลับ/ยก/รับ/ยกเลิก) */
+    .phx-swap-actions { display: grid; grid-template-columns: 1fr 1fr; gap: 9px; margin: 2px 0 4px; }
+    .phx-swap-act-btn {
+      display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 5px;
+      padding: 15px 8px; border-radius: 13px; border: 1px solid var(--border); background: var(--surface);
+      font-family: 'Kanit', sans-serif; font-size: 13.5px; font-weight: 700; color: var(--text);
+      cursor: pointer; transition: transform 0.1s, box-shadow 0.15s;
+    }
+    .phx-swap-act-btn:active { transform: scale(0.97); }
+    .phx-swap-act-btn:hover { box-shadow: 0 2px 10px rgba(0,0,0,0.06); }
+    .phx-swap-act-btn .ic { font-size: 22px; line-height: 1; }
+    .phx-swap-act-btn.swap   { background:#eff6ff; border-color:#bfdbfe; color:#1d4ed8; }
+    .phx-swap-act-btn.give   { background:#fefce8; border-color:#fde68a; color:#a16207; }
+    .phx-swap-act-btn.recv   { background:#f0fdf4; border-color:#bbf7d0; color:#15803d; }
+    .phx-swap-act-btn.cancel { background:#fef2f2; border-color:#fecaca; color:#dc2626; }
 
     /* profile rows on the ฉัน tab */
     .phx-me-hero { display: flex; align-items: center; gap: 13px; padding: 4px 2px 16px; }
@@ -2127,7 +2142,14 @@
     <!-- ===== v3.47: TAB VIEW — แลกเวร (my shifts) ===== -->
     <div id="phxViewSwap" class="phx-tabview">
       <div class="phx-tv-title">แลกเวร</div>
-      <div class="phx-tv-sub">เวรของคุณในเดือนนี้ — แตะที่เวรเพื่อ <b>ยก / แลก / ใส่โน้ต</b></div>
+      <div class="phx-tv-sub">เลือกสิ่งที่ต้องการทำ หรือแตะเวรของคุณด้านล่าง</div>
+      <!-- v3.47b: action-first buttons (สลับ/ยก/รับ/ยกเลิก) — launch straight into the flow -->
+      <div class="phx-swap-actions" id="phxSwapActions">
+        <button type="button" class="phx-swap-act-btn swap" onclick="phxSwapAction('swap')"><span class="ic">🔄</span>สลับเวร</button>
+        <button type="button" class="phx-swap-act-btn give" onclick="phxSwapAction('give')"><span class="ic">🎁</span>ยกเวรให้</button>
+        <button type="button" class="phx-swap-act-btn recv" onclick="phxSwapAction('receive')"><span class="ic">🤝</span>รับเวร</button>
+        <button type="button" class="phx-swap-act-btn cancel" onclick="phxSwapAction('cancel')"><span class="ic">↩️</span>ยกเลิกเวร</button>
+      </div>
       <!-- v3.47: ปุ่มสลับ ตาราง/ปฏิทิน (เหมือนหน้าตารางเวร) -->
       <div class="tab-bar" id="phxSwapModeSwitch" style="margin:6px 0 10px;">
         <button id="phxSwapBtnTable" type="button" class="tab-btn active" onclick="phxSwapMode('table')">ตาราง</button>
@@ -17474,6 +17496,7 @@ table.exp-tbl .tm{margin-left:3px;opacity:0.75;}
       var me = curName();
       if (!me){
         var sw0 = document.getElementById('phxSwapModeSwitch'); if (sw0) sw0.style.display = 'none';
+        var sa0 = document.getElementById('phxSwapActions'); if (sa0) sa0.style.display = 'none';
         var cp0 = document.getElementById('phxSwapCalPanel'); if (cp0) cp0.classList.add('hidden');
         var tp0 = document.getElementById('phxSwapTablePanel'); if (tp0) tp0.classList.remove('hidden');
         body.innerHTML = '<div class="phx-tv-empty">ยังไม่ได้เลือกชื่อของคุณ<br>' +
@@ -17514,13 +17537,104 @@ table.exp-tbl .tm{margin-left:3px;opacity:0.75;}
       body.innerHTML = html;
       // v3.47: show the toggle + re-apply the current panel (repaints the calendar if it's active)
       var sw = document.getElementById('phxSwapModeSwitch'); if (sw) sw.style.display = '';
+      var sa = document.getElementById('phxSwapActions'); if (sa) sa.style.display = '';
       if (typeof phxSwapMode === 'function') phxSwapMode(_phxSwapMode);
+    };
+
+    // ========= v3.47b: action-first แลกเวร (สลับ / ยก / รับ / ยกเลิก) =========
+    // The action modal needs editModeActive AND getCurrentUser()===me (openActionModalForKey gate +
+    //   findShiftByKey's _g_ ghost resolution both key off getCurrentUser()). Set them DIRECTLY —
+    //   not via toggleEditMode, whose triggerUpdate→renderBanner v25 auto-disable can cancel the flow.
+    function _phxEnsureEditFor(me){
+      try {
+        if (me && (!window.selectedPharmacists || window.selectedPharmacists.length !== 1 || window.selectedPharmacists[0] !== me)) {
+          window.selectedPharmacists = [me];
+        }
+        if (typeof editModeActive !== 'undefined') editModeActive = true;
+        document.body.classList.add('edit-mode-on');
+        if (typeof phxUpdateFabUI === 'function') phxUpdateFabUI();
+      } catch(e){}
+    }
+    // shared bottom-sheet shift picker for the action buttons
+    var _phxActPickCb = null;
+    window.phxActPickClose = function(){ var e = document.getElementById('phxActPickOverlay'); if (e) e.remove(); _phxActPickCb = null; };
+    function _phxActionPicker(opts){
+      opts = opts || {};
+      var items = opts.items || [], noteMap = opts.noteMap || {};
+      var inner = items.length
+        ? _swapTable(items.map(function(s){
+            var k = _swapRowKey(s);
+            return _swapRow(s, { noteMap:noteMap }).replace('<tr>', '<tr class="phx-act-pick" data-act-pick-key="'+encodeURIComponent(k)+'" style="cursor:pointer;">');
+          }).join(''))
+        : '<div class="phx-tv-empty" style="padding:24px 12px;">'+esc(opts.empty || 'ไม่มีเวรให้เลือก')+'</div>';
+      var ov = document.createElement('div');
+      ov.id = 'phxActPickOverlay';
+      ov.style.cssText = 'position:fixed; inset:0; background:rgba(0,0,0,0.5); z-index:10006; display:flex; align-items:flex-end; justify-content:center;';
+      ov.innerHTML = '<div style="background:var(--surface); width:100%; max-width:520px; border-radius:16px 16px 0 0; padding:16px 14px 24px; max-height:78vh; overflow-y:auto;">' +
+        '<div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:4px;">' +
+          '<div style="font-weight:800; font-size:16px;">'+esc(opts.title || 'เลือกเวร')+'</div>' +
+          '<button type="button" onclick="phxActPickClose()" style="border:none; background:none; font-size:18px; cursor:pointer; color:var(--sub);">✕</button>' +
+        '</div>' +
+        (opts.subtitle ? '<div style="font-size:11.5px; color:var(--sub); margin:0 2px 12px;">'+esc(opts.subtitle)+'</div>' : '<div style="height:8px;"></div>') +
+        inner +
+      '</div>';
+      document.body.appendChild(ov);
+      ov.addEventListener('click', function(e){ if (e.target === ov) phxActPickClose(); });
+      _phxActPickCb = (typeof opts.onPick === 'function') ? opts.onPick : null;
+    }
+    document.addEventListener('click', function(e){
+      var tr = (e.target && e.target.closest) ? e.target.closest('tr.phx-act-pick[data-act-pick-key]') : null;
+      if (!tr) return;
+      if (e.target.closest('[data-note-key]')) return;   // 📝 note marker wins
+      e.stopPropagation();
+      var key = decodeURIComponent(tr.getAttribute('data-act-pick-key') || '');
+      var cb = _phxActPickCb;
+      phxActPickClose();
+      if (cb) cb(key);
+    });
+    // my held shifts (own not-given + received ghosts) + my changed shifts (given/swapped-out + received)
+    function _phxMyShiftSets(me){
+      var mid = (typeof getCurrentMonthId==='function') ? getCurrentMonthId() : '';
+      var usedMap = {}, mine = [], ghosts = [], noteMap = {};
+      try { if (typeof _combinedUsedMap==='function') usedMap = _combinedUsedMap(mid, me) || {}; } catch(e){}
+      try { if (typeof _shiftNoteMap==='function') noteMap = _shiftNoteMap(mid, me) || {}; } catch(e){}
+      try { if (typeof rawData!=='undefined' && rawData) rawData.forEach(function(r){ if(r && r.name===me) mine.push(r); }); } catch(e){}
+      try { if (typeof buildGhostRows==='function') ghosts = buildGhostRows(rawData, mid, me) || []; } catch(e){}
+      return {
+        held: mine.filter(function(r){ return !usedMap[makeShiftKey(r)]; }).concat(ghosts).sort(_swapByDate),
+        changed: mine.filter(function(r){ return !!usedMap[makeShiftKey(r)]; }).concat(ghosts).sort(_swapByDate),
+        noteMap: noteMap
+      };
+    }
+    // the 4 action buttons: launch straight into the existing flow (สลับ/ยก via picker→actionGoTo,
+    //   รับ via openActionModalForAdd, ยกเลิก via the picker→undo/ghostMenu path).
+    window.phxSwapAction = function(kind){
+      var me = curName();
+      if (!me){ if(typeof _p2bShowToast==='function') _p2bShowToast('เลือกชื่อของคุณก่อน','warn'); else alert('เลือกชื่อของคุณก่อน'); return; }
+      _phxEnsureEditFor(me);
+      if (kind === 'receive'){
+        if (typeof openActionModalForAdd === 'function') openActionModalForAdd();
+        return;
+      }
+      var sets = _phxMyShiftSets(me);
+      var cfg = ({
+        swap:   { title:'🔄 เลือกเวรที่จะสลับ',  subtitle:'แตะเวรของคุณ 1 อัน แล้วเลือกคนที่จะสลับด้วย', items:sets.held,    go:'swap', empty:'ไม่มีเวรที่ถืออยู่ให้สลับ' },
+        give:   { title:'🎁 เลือกเวรที่จะยกให้',  subtitle:'แตะเวรของคุณ 1 อัน แล้วเลือกผู้รับ',          items:sets.held,    go:'give', empty:'ไม่มีเวรที่ถืออยู่ให้ยก' },
+        cancel: { title:'↩️ เลือกเวรที่จะยกเลิก', subtitle:'เวรที่ยก/แลก/รับมาเดือนนี้ — แตะเพื่อยกเลิก',   items:sets.changed, go:null,   empty:'ยังไม่มีเวรที่แลก/ยก/รับมาเดือนนี้' }
+      })[kind];
+      if (!cfg) return;
+      _phxActionPicker({ title:cfg.title, subtitle:cfg.subtitle, items:cfg.items, empty:cfg.empty, noteMap:sets.noteMap,
+        onPick: function(key){
+          if (typeof openActionModalForKey === 'function') openActionModalForKey(key);
+          if (cfg.go && typeof actionGoTo === 'function') setTimeout(function(){ try { actionGoTo(cfg.go); } catch(e){} }, 0);
+        }
+      });
     };
 
     // tap a shift row on the แลกเวร tab → ensure edit mode → open the action menu (stay on this tab)
     window.phxSwapRowTap = function(key){
       if (!key) return;
-      try { if (typeof editModeActive !== 'undefined' && !editModeActive && typeof toggleEditMode === 'function') toggleEditMode(); } catch(e){}
+      _phxEnsureEditFor(curName());
       try { if (typeof openActionModalForKey === 'function') openActionModalForKey(key); } catch(e){}
     };
     // empty-state / admin escape hatch: turn edit mode on and view the full schedule
@@ -17631,7 +17745,7 @@ table.exp-tbl .tm{margin-left:3px;opacity:0.75;}
 
     // ======= ซิงค์เวรของฉัน → Google Calendar (ผ่านประตู calendar-sync-app แยก) =======
     // ⚠️ ตั้งค่า URL ของ Web app โปรเจกต์ calendar-sync-app (หลัง deploy) ตรงนี้ก่อนใช้งาน:
-    var RX_CAL_WEBAPP_URL = '<<PUT_CALENDAR_WEBAPP_EXEC_URL>>';
+    var RX_CAL_WEBAPP_URL = 'https://script.google.com/macros/s/AKfycbxcH2114uAenaK6Gcy1YL_uzJv8p2IYzPQxtOZXOV47ndguYPYWqqyu3Ntc1x8VUBM1fw/exec';
     window.phxSyncGoogleCalendar = function(){
       var toast = function(m,t){ if (typeof _p2bShowToast==='function') _p2bShowToast(m,t||'info'); else alert(m); };
       if (RX_CAL_WEBAPP_URL.indexOf('<<') === 0){
