@@ -17628,6 +17628,57 @@ table.exp-tbl .tm{margin-left:3px;opacity:0.75;}
       return '<button class="phx-me-row'+(danger?' danger':'')+'" onclick="'+js+'" type="button">' +
         '<span class="ic">'+svg+'</span><span class="tx">'+esc(label)+'</span>'+IC.chev+'</button>';
     }
+
+    // ======= ซิงค์เวรของฉัน → Google Calendar (ผ่านประตู calendar-sync-app แยก) =======
+    // ⚠️ ตั้งค่า URL ของ Web app โปรเจกต์ calendar-sync-app (หลัง deploy) ตรงนี้ก่อนใช้งาน:
+    var RX_CAL_WEBAPP_URL = '<<PUT_CALENDAR_WEBAPP_EXEC_URL>>';
+    window.phxSyncGoogleCalendar = function(){
+      var toast = function(m,t){ if (typeof _p2bShowToast==='function') _p2bShowToast(m,t||'info'); else alert(m); };
+      if (RX_CAL_WEBAPP_URL.indexOf('<<') === 0){
+        toast('ยังไม่ได้ตั้งค่า URL ปฏิทิน (RX_CAL_WEBAPP_URL) ในโค้ด','warn'); return;
+      }
+      var me = curName();
+      if (!me){ toast('เลือกชื่อของคุณก่อนซิงค์ปฏิทิน','warn'); return; }
+      var mid = (typeof getCurrentMonthId==='function') ? getCurrentMonthId() : '';
+
+      // เวรที่ฉันถืออยู่จริงเดือนนี้ (own − ยกไปแล้ว + ที่รับมา) — pattern เดียวกับ phxNoteFabTap
+      var usedMap = {}, mine = [], ghosts = [];
+      try { if (typeof _combinedUsedMap==='function') usedMap = _combinedUsedMap(mid, me) || {}; } catch(e){}
+      try { if (typeof rawData!=='undefined' && rawData) rawData.forEach(function(r){ if (r && r.name===me) mine.push(r); }); } catch(e){}
+      try { if (typeof buildGhostRows==='function') ghosts = buildGhostRows(rawData, mid, me) || []; } catch(e){}
+      var held = mine.filter(function(r){ return !usedMap[makeShiftKey(r)]; }).concat(ghosts);
+      if (!held.length){ toast('ไม่มีเวรของคุณในเดือนนี้ให้ซิงค์','info'); return; }
+
+      // แปลงเป็น payload เบา ๆ (เฉพาะ field ที่ปฏิทินใช้) + resolve ช่วงเวลาคลินิก "ตรวจสอบ"
+      var shifts = held.map(function(s){
+        var range = s.range;
+        if ((range==='ตรวจสอบ' || String(s.shift||'').indexOf('⚠️')>=0) && typeof estimateSpecialClinicRange==='function'){
+          try { var est = estimateSpecialClinicRange(s); if (typeof est==='string' && est.indexOf('-')>0) range = est; } catch(e){}
+        }
+        return { name: s.name, date: s.date, timestamp: s.timestamp, pos: s.pos, shift: s.shift, range: range, room: s.room };
+      });
+
+      // เปิดประตู Calendar เป็น popup แล้วส่งเวรเข้าไปตอนมันพร้อม (handshake READY→SYNC→RESULT)
+      var win = window.open(RX_CAL_WEBAPP_URL, 'rxshift_cal', 'width=480,height=640');
+      if (!win){ toast('เบราว์เซอร์บล็อก popup — อนุญาต popup ให้เว็บนี้แล้วลองใหม่','warn'); return; }
+      toast('เปิดหน้าเชื่อมต่อปฏิทิน… ถ้าเป็นครั้งแรกให้กดอนุญาต','info');
+      var done = false;
+      function onMsg(e){
+        var d = e.data || {};
+        if (d.type === 'RXSHIFT_CAL_READY'){
+          try { win.postMessage({ type:'RXSHIFT_CAL_SYNC', payload:{ monthValue: mid, shifts: shifts, appName: me } }, '*'); } catch(_){}
+        } else if (d.type === 'RXSHIFT_CAL_RESULT'){
+          done = true;
+          window.removeEventListener('message', onMsg);
+          var r = d.data || {};
+          if (r.ok) toast('ซิงค์ปฏิทินสำเร็จ · เพิ่ม '+(r.created||0)+' · แก้ '+(r.updated||0)+' · ลบ '+(r.deleted||0),'success');
+          else toast('ซิงค์ไม่สำเร็จ: '+(r.message||r.error||'unknown'),'warn');
+        }
+      }
+      window.addEventListener('message', onMsg);
+      setTimeout(function(){ if(!done) window.removeEventListener('message', onMsg); }, 180000); // กันค้าง 3 นาที
+    };
+
     window.phxRenderMeView = function(){
       var body = document.getElementById('phxMeBody');
       if (!body) return;
@@ -17653,6 +17704,7 @@ table.exp-tbl .tm{margin-left:3px;opacity:0.75;}
       }
       html += '<div class="phx-me-section-label">ปฏิทิน & เตือนความจำ</div>';
       html += meRow('phxOpenIcsReminderModal()', 'เตือนเวรลงปฏิทิน (ICS)', IC.cal);
+      html += meRow('phxSyncGoogleCalendar()', 'ซิงค์เข้า Google Calendar', IC.cal);
       html += '<div class="phx-me-section-label">ทั่วไป</div>';
       html += meRow('openChangelog()', 'ประวัติการอัปเดต', IC.history);
       // ตรวจสอบคุณภาพข้อมูล (Audit) ย้ายไปเป็นลิงก์เล็กเหนือ Version ที่ท้ายตารางเวรแล้ว
