@@ -65,4 +65,27 @@ else
   echo "‼️ clasp push ไม่สำเร็จ (RC=$RC) — โค้ดบน GAS ยังไม่อัพเดท ต้อง push เอง:"
   printf '%s\n' "$OUT" | tail -6
 fi
+
+# --- push โปรเจกต์ Calendar แยก (calendar-sync-app/) แยก scriptId ของตัวเอง ---
+# มี hash gate ของตัวเอง → push เฉพาะตอนไฟล์เคาน์เตอร์เปลี่ยน (ไม่ push ซ้ำทุกครั้ง)
+# ปลอดภัย: อยู่หลังการ push แอปหลัก + จบด้วย exit 0 เสมอ ไม่กระทบ flow หลัก
+CAL_DIR="$PROJECT_DIR/calendar-sync-app"
+if [ -f "$CAL_DIR/.clasp.json" ]; then
+  CAL_HASH_FILE=".claude/.last-clasp-push-calendar.hash"
+  CAL_CUR_HASH="$(find "$CAL_DIR" -type f \( -name '*.js' -o -name '*.html' -o -name 'appsscript.json' \) \
+    -exec sha1sum {} + 2>/dev/null | LC_ALL=C sort | sha1sum | awk '{print $1}')"
+  CAL_PREV_HASH="$(cat "$CAL_HASH_FILE" 2>/dev/null || echo '')"
+  if [ "$CAL_CUR_HASH" != "$CAL_PREV_HASH" ]; then
+    CAL_CLASP="$(command -v clasp 2>/dev/null || true)"
+    if [ -n "$CAL_CLASP" ]; then
+      CAL_OUT="$( cd "$CAL_DIR" && "$CAL_CLASP" push -f 2>&1 )"; CAL_RC=$?
+      if [ "$CAL_RC" -eq 0 ]; then
+        mkdir -p .claude; printf '%s' "$CAL_CUR_HASH" > "$CAL_HASH_FILE"
+        echo "✅ clasp push (calendar-sync-app) สำเร็จ — เคาน์เตอร์ปฏิทินอัพเดตแล้ว"
+      else
+        echo "‼️ clasp push (calendar-sync-app) ไม่สำเร็จ:"; printf '%s\n' "$CAL_OUT" | tail -4
+      fi
+    fi
+  fi
+fi
 exit 0
