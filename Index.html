@@ -115,9 +115,11 @@
     .pill-btn.danger { background: #fee2e2; color: #dc2626; }
     body.dark-theme .pill-btn.danger { background: #7f1d1d; color: #fca5a5; }
     .pill-btn.mine { background: var(--accent-bg); color: var(--accent); }
-    /* v3.47: "ล้างทั้งหมด" moved below the filter menu (full-width row) */
-    .clear-all-row { display: flex; justify-content: flex-end; margin: 8px 0 2px; }
-    .clear-all-row.hidden { display: none; }
+    /* v3.47: "ล้างทั้งหมด" tucked into the ตัวกรอง card as a full-width footer row */
+    .adv-card-foot {
+      display: flex; justify-content: flex-end; align-items: center;
+      padding-top: 10px; margin-top: 2px; border-top: 1px dashed var(--border);
+    }
 
     .multi-list {
       position: absolute; left: 0; right: 0; top: 44px;
@@ -2019,11 +2021,10 @@
               <input type="hidden" id="posDropdown">
             </div>
           </div>
-        </div>
-
-        <!-- v3.47: "ล้างทั้งหมด" moved here — below the filter menu (was in the search row) -->
-        <div id="clearAllRow" class="clear-all-row hidden">
-          <button id="clearAllBtn" class="pill-btn danger" onclick="resetFilters()">ล้างทั้งหมด</button>
+          <!-- v3.47: "ล้างทั้งหมด" tucked inside the ตัวกรอง card (spans full width, shown when any filter is set) -->
+          <div id="clearAllRow" class="adv-card-foot span-2 hidden">
+            <button id="clearAllBtn" class="pill-btn danger" onclick="resetFilters()">ล้างทั้งหมด</button>
+          </div>
         </div>
 
         <!-- Legacy hidden elements for JS compat -->
@@ -18047,7 +18048,7 @@ table.exp-tbl .tm{margin-left:3px;opacity:0.75;}
       }
       html += '<div class="phx-me-section-label">ปฏิทิน & เตือนความจำ</div>';
       html += meRow('phxOpenIcsReminderModal()', 'เตือนเวรลงปฏิทิน (ICS)', IC.cal);
-      html += meRow('phxSyncGoogleCalendar()', 'ซิงค์เข้า Google Calendar', IC.cal, false, 'กำลังเตรียมระบบ');  // v3.47: coming soon (locked for everyone)
+      html += meRow('phxSyncGoogleCalendar()', 'ซิงค์เข้า Google Calendar', IC.cal, false, !isAdmin());  // v3.47: admin-only until Klui trusts it (non-admin → "เฉพาะแอดมิน" locked)
       html += '<div class="phx-me-section-label">ทั่วไป</div>';
       html += meRow('openChangelog()', 'ประวัติการอัปเดต', IC.history);
       // ตรวจสอบคุณภาพข้อมูล (Audit) ย้ายไปเป็นลิงก์เล็กเหนือ Version ที่ท้ายตารางเวรแล้ว
