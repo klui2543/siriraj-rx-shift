@@ -18077,13 +18077,16 @@ table.exp-tbl .tm{margin-left:3px;opacity:0.75;}
         html += meRow('phxOpenBackupEmailModal()', 'อีเมลสำรอง', IC.mail);
         html += meRow('phxOpenEmailNotifModal()', 'การแจ้งเตือนผ่านอีเมล', IC.bell);
       }
-      html += '<div class="phx-me-section-label">ปฏิทิน & เตือนความจำ</div>';
-      html += meRow('phxOpenIcsReminderModal()', 'เตือนเวรลงปฏิทิน (ICS)', IC.cal);
-      html += meRow('phxSyncGoogleCalendar()', 'ซิงค์เข้า Google Calendar', IC.cal, false, !isAdmin());  // v3.47: admin-only until Klui trusts it (non-admin → "เฉพาะแอดมิน" locked)
-      html += '<div class="phx-me-section-label">ทั่วไป</div>';
-      html += meRow('openChangelog()', 'ประวัติการอัปเดต', IC.history);
-      // ตรวจสอบคุณภาพข้อมูล (Audit) ย้ายไปเป็นลิงก์เล็กเหนือ Version ที่ท้ายตารางเวรแล้ว
-      if (logged){ html += '<div style="height:8px;"></div>'; html += meRow('phxLogout()', 'ออกจากระบบ', IC.logout, true); }
+      // v3.47: ปฏิทิน + ทั่วไป โชว์เฉพาะตอน login แล้ว (Klui: ยังไม่เข้าระบบ ไม่ควรขึ้นรายการพวกนี้)
+      if (logged){
+        html += '<div class="phx-me-section-label">ปฏิทิน & เตือนความจำ</div>';
+        html += meRow('phxOpenIcsReminderModal()', 'เตือนเวรลงปฏิทิน (ICS)', IC.cal);
+        html += meRow('phxSyncGoogleCalendar()', 'ซิงค์เข้า Google Calendar', IC.cal, false, !isAdmin());  // v3.47: admin-only until Klui trusts it
+        html += '<div class="phx-me-section-label">ทั่วไป</div>';
+        html += meRow('openChangelog()', 'ประวัติการอัปเดต', IC.history);
+        // ตรวจสอบคุณภาพข้อมูล (Audit) ย้ายไปเป็นลิงก์เล็กเหนือ Version ที่ท้ายตารางเวรแล้ว
+        html += '<div style="height:8px;"></div>'; html += meRow('phxLogout()', 'ออกจากระบบ', IC.logout, true);
+      }
       body.innerHTML = html;
     };
 
