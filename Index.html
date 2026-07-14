@@ -17762,13 +17762,6 @@ table.exp-tbl .tm{margin-left:3px;opacity:0.75;}
     function _phxRenderActPickCalendar(){
       var grid = document.getElementById('phxActPickCalGrid');
       if (!grid || !_phxActPickMe || typeof renderCalendar !== 'function') return;
-      // summary banner (like the main calendar) — count of SELECTABLE shifts for this action
-      var banner = document.getElementById('phxActPickCalBanner');
-      if (banner){
-        var cnt = _phxActPickOnlyKeys ? Object.keys(_phxActPickOnlyKeys).length : 0;
-        var nm = (typeof displayName === 'function') ? displayName(_phxActPickMe) : _phxActPickMe;
-        banner.innerHTML = '📅 ' + esc(nm) + ' · เลือกได้ <span class="num">' + cnt + '</span> เวรเดือนนี้';
-      }
       try {
         renderCalendar(_phxActPickMe, {
           gridEl: grid, headerEl: document.getElementById('phxActPickCalHeaderRow'),
@@ -17798,7 +17791,7 @@ table.exp-tbl .tm{margin-left:3px;opacity:0.75;}
             '<button type="button" id="phxActPickBtnCal" class="tab-btn" onclick="phxActPickMode(\'calendar\')">ปฏิทิน</button>' +
           '</div>' : '';
       var calPanel = items.length
-        ? '<div id="phxActPickCalPanel" class="hidden"><div id="phxActPickCalBanner" class="personal-summary" style="padding:9px 14px;"></div><div style="overflow-x:auto;" class="custom-scrollbar"><div style="min-width:350px;"><div id="phxActPickCalHeaderRow" class="cal-header-row"></div><div id="phxActPickCalGrid"></div></div></div></div>' : '';
+        ? '<div id="phxActPickCalPanel" class="hidden"><div style="overflow-x:auto;" class="custom-scrollbar"><div style="min-width:350px;"><div id="phxActPickCalHeaderRow" class="cal-header-row"></div><div id="phxActPickCalGrid"></div></div></div></div>' : '';
       var ov = document.createElement('div');
       ov.id = 'phxActPickOverlay';
       ov.style.cssText = 'position:fixed; inset:0; background:rgba(0,0,0,0.5); z-index:10006; display:flex; align-items:flex-end; justify-content:center;';
