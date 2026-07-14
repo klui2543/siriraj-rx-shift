@@ -17636,13 +17636,19 @@ table.exp-tbl .tm{margin-left:3px;opacity:0.75;}
       var cfg = ({
         swap:   { title:'🔄 เลือกเวรที่จะสลับ',  subtitle:'แตะเวรของคุณ 1 อัน แล้วเลือกคนที่จะสลับด้วย', items:sets.held,    go:'swap', empty:'ไม่มีเวรที่ถืออยู่ให้สลับ' },
         give:   { title:'🎁 เลือกเวรที่จะยกให้',  subtitle:'แตะเวรของคุณ 1 อัน แล้วเลือกผู้รับ',          items:sets.held,    go:'give', empty:'ไม่มีเวรที่ถืออยู่ให้ยก' },
-        cancel: { title:'↩️ เลือกเวรที่จะยกเลิก', subtitle:'เวรที่ยก/แลก/รับมาเดือนนี้ — แตะเพื่อยกเลิก',   items:sets.changed, go:null,   empty:'ยังไม่มีเวรที่แลก/ยก/รับมาเดือนนี้' }
+        cancel: { title:'↩️ เลือกเวรที่จะยกเลิก', subtitle:'เวรที่ยก/แลก/รับมาเดือนนี้ — แตะเพื่อยกเลิก',   items:sets.changed, go:'undo', empty:'ยังไม่มีเวรที่แลก/ยก/รับมาเดือนนี้' }
       })[kind];
       if (!cfg) return;
       _phxActionPicker({ title:cfg.title, subtitle:cfg.subtitle, items:cfg.items, empty:cfg.empty, noteMap:sets.noteMap,
         onPick: function(key){
           if (typeof openActionModalForKey === 'function') openActionModalForKey(key);
-          if (cfg.go && typeof actionGoTo === 'function') setTimeout(function(){ try { actionGoTo(cfg.go); } catch(e){} }, 0);
+          // advance to the target step SYNCHRONOUSLY (same JS tick) so the intermediate menu never
+          //   flashes. cancel → 'undo' = renderUndoStep (direct cancel confirm), also for รับมา/ghost
+          //   (openActionModalForKey sets ghost's usedInfo.actionId → confirmUndo works from 'undo').
+          var am = document.getElementById('actionModal');
+          if (cfg.go && typeof actionGoTo === 'function' && am && am.style.display === 'flex') {
+            try { actionGoTo(cfg.go); } catch(e){}
+          }
         }
       });
     };
