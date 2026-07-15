@@ -3618,6 +3618,7 @@ window.allPharmacistNames = [];
         // Editing a DRAFT = quiet local fix. Editing a PUBLISHED record = an Admin OVERRIDE →
         //   force a reason and stamp who/when/why for the audit trail.
         function _apply(reason) {
+          var _oldPartner = a.partnerName;   // v3.49 ก้อน C #3: ค่าเดิมก่อนแก้ (ลง audit)
           var patch = { partnerName: nm };
           if (wasPublic) {
             var au = (typeof phxAuthGetUser === 'function') ? phxAuthGetUser() : null;
@@ -3639,6 +3640,8 @@ window.allPharmacistNames = [];
             }
             if (typeof invalidateGhostCache === 'function') invalidateGhostCache();
             if (window._syncPublish && typeof _phxScheduleSync === 'function') _phxScheduleSync();
+            // v3.49 ก้อน C #3: แอดมินแก้ผู้รับของ record ที่เผยแพร่แล้ว → บันทึก audit (เดิมไม่บันทึก)
+            try { phxAuditLog('admin_override', id, { partnerName: _oldPartner, owner: (a.viewerName || viewer) }, { partnerName: nm, reason: reason }, 'web'); } catch (e) {}
           }
           if (typeof triggerUpdate === 'function') triggerUpdate();
           renderPublishModal();
@@ -3697,10 +3700,13 @@ window.allPharmacistNames = [];
               if (!res || !res.success) return _pbOverrideFail(res && res.error);
               var target = (res.actions || []).find(function(x) { return String(x.id) === String(actionId); });
               if (!target) return _pbOverrideFail('ไม่พบรายการบน server');
+              var _oldPartner = target.partnerName;   // v3.49 ก้อน C #3: เก็บค่าเดิมไว้ลง audit
               target.partnerName = nm;
               target._overrideBy = admin.name;
               target._overrideAt = new Date().toISOString();
               target._overrideReason = reason;
+              // v3.49 ก้อน C #3: แอดมินแก้ผู้ให้/ผู้รับของคนอื่น → บันทึก audit trail (ก่อนหน้านี้ไม่ได้บันทึก)
+              try { phxAuditLog('admin_override', actionId, { partnerName: _oldPartner, owner: ownerViewer }, { partnerName: nm, reason: reason }, 'web'); } catch (e) {}
               google.script.run
                 .withSuccessHandler(function(r2) {
                   if (!r2 || !r2.success) return _pbOverrideFail(r2 && r2.error);
@@ -12318,9 +12324,21 @@ table.exp-tbl .tm{margin-left:3px;opacity:0.75;}
     const PHX_LS_NAME = 'siriraj_logged_in_name';
     const PHX_LS_HASH = 'siriraj_logged_in_hash';
     const PHX_LS_ROLE = 'siriraj_logged_in_role';
+    // v3.49 ก้อน C #4 — เซสชันหมดอายุ 24 ชม. (เดิม login แล้วอยู่ถาวร = เสี่ยงถ้าลืม logout บนเครื่องรวม).
+    //   Mitigation ฝั่ง client: จำเวลา login แล้วเทียบตอนเช็คสิทธิ์. (การบังคับฝั่ง server ผ่าน lastSeen
+    //   ใน PHX_Pharmacists เป็นงานต่อยอดที่แข็งแรงกว่า — ยังไม่ทำรอบนี้เพื่อลดความเสี่ยง.)
+    const PHX_LS_LOGIN_AT = 'siriraj_login_at';
+    const PHX_SESSION_MAX_MS = 24 * 60 * 60 * 1000;   // 24 ชั่วโมง
+    function _phxSessionExpired() {
+      try {
+        var t = parseInt(localStorage.getItem(PHX_LS_LOGIN_AT) || '', 10);
+        if (!t || isNaN(t)) return false;   // ไม่มี timestamp (เซสชันเก่า) → ไม่เตะออก (init จะ stamp ให้)
+        return (Date.now() - t) > PHX_SESSION_MAX_MS;
+      } catch (e) { return false; }
+    }
 
     function phxAuthIsLoggedIn() {
-      try { return !!localStorage.getItem(PHX_LS_NAME) && !!localStorage.getItem(PHX_LS_HASH); }
+      try { return !!localStorage.getItem(PHX_LS_NAME) && !!localStorage.getItem(PHX_LS_HASH) && !_phxSessionExpired(); }
       catch(e) { return false; }
     }
 
@@ -12330,6 +12348,7 @@ table.exp-tbl .tm{margin-left:3px;opacity:0.75;}
         const hash = localStorage.getItem(PHX_LS_HASH);
         const role = localStorage.getItem(PHX_LS_ROLE) || 'user';
         if (!name || !hash) return null;
+        if (_phxSessionExpired()) return null;   // v3.49 ก้อน C #4: เกิน 24 ชม. → ถือว่าไม่ได้ login
         return { name: name, hash: hash, role: role };
       } catch(e) { return null; }
     }
@@ -12344,6 +12363,7 @@ table.exp-tbl .tm{margin-left:3px;opacity:0.75;}
         localStorage.setItem(PHX_LS_NAME, name);
         localStorage.setItem(PHX_LS_HASH, hash);
         localStorage.setItem(PHX_LS_ROLE, role || 'user');
+        localStorage.setItem(PHX_LS_LOGIN_AT, String(Date.now()));   // v3.49 ก้อน C #4: เริ่มนับ 24 ชม.
       } catch(e) {}
       try { if (typeof _nkSubscribePrivate === 'function') _nkSubscribePrivate(); } catch(e) {}
       try { if (typeof _nkPullGAS === 'function') _nkPullGAS(); } catch(e) {}
@@ -12406,6 +12426,7 @@ table.exp-tbl .tm{margin-left:3px;opacity:0.75;}
         localStorage.removeItem(PHX_LS_NAME);
         localStorage.removeItem(PHX_LS_HASH);
         localStorage.removeItem(PHX_LS_ROLE);
+        localStorage.removeItem(PHX_LS_LOGIN_AT);   // v3.49 ก้อน C #4
       } catch(e) {}
       try { if (typeof _nkSubscribePrivate === 'function') _nkSubscribePrivate(); } catch(e) {}
       // Feature 2 (B4b): clear reminder cache on logout
@@ -14197,6 +14218,18 @@ table.exp-tbl .tm{margin-left:3px;opacity:0.75;}
 
     // ─── Init ───
     document.addEventListener('DOMContentLoaded', function() {
+      // v3.49 ก้อน C #4: บังคับหมดอายุเซสชัน 24 ชม. ตอนโหลด
+      try {
+        if (localStorage.getItem(PHX_LS_NAME) && localStorage.getItem(PHX_LS_HASH)) {
+          if (!localStorage.getItem(PHX_LS_LOGIN_AT)) {
+            // เซสชันเก่า (ก่อนมีฟีเจอร์นี้) → เริ่มนับ 24 ชม. จากตอนนี้ ไม่เตะออกทันที
+            localStorage.setItem(PHX_LS_LOGIN_AT, String(Date.now()));
+          } else if (_phxSessionExpired()) {
+            if (typeof phxAuthClearSession === 'function') phxAuthClearSession();
+            if (typeof phxShowToast === 'function') phxShowToast('เซสชันหมดอายุ (24 ชม.) — กรุณาเข้าสู่ระบบใหม่', 'info');
+          }
+        }
+      } catch (e) {}
       phxUpdateAuthPill();
       phxUpdateCloudSyncHint();
       phxUpdateSyncStatusUI();
