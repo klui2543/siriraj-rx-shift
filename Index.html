@@ -17782,7 +17782,9 @@ table.exp-tbl .tm{margin-left:3px;opacity:0.75;}
         var dateStr = (main && main.date) ? esc(main.date) : '';
         var when = _tlWhen(a.createdAt);
         var isDraft = String(a._visibility)==='draft';
-        var status = isDraft ? '<span class="phx-tl-status draft">ร่าง</span>' : '<span class="phx-tl-status pub">เผยแพร่แล้ว</span>';
+        // v3.49 สมุดส่วนตัว: ไม่มีเรื่องเผยแพร่ → ไม่โชว์ป้าย "ร่าง/เผยแพร่แล้ว" (ทุกอย่างอยู่ในสมุดตัวเอง)
+        var status = !window._publishEnabled ? ''
+                   : (isDraft ? '<span class="phx-tl-status draft">ร่าง</span>' : '<span class="phx-tl-status pub">เผยแพร่แล้ว</span>');
         var kind = (a.action==='swap') ? 'swap' : (a.action==='give' ? 'give' : 'add');
         return '<div class="phx-tl-item '+kind+'">' +
             '<div class="phx-tl-summary">'+summary+'</div>' +
