@@ -58,23 +58,43 @@
 
 ---
 
-## 📋 งานที่เหลือทั้งหมด (ภาพรวมโปรเจกต์)
+## 📋 งานที่เหลือทั้งหมด (ภาพรวมโปรเจกต์ — กวาดจากทุก handoff)
 
-### ค้าง DEPLOY (สะสมจาก session ก่อน — ⚠️ ยังไม่ deploy)
-1. **แอปหลัก:** สร้าง GAS deployment version ใหม่ของ `Index.html` (Deploy → Manage deployments → New version)
-2. **calendar-sync-app:** clasp push/deploy แยก (คนละ scriptId) — งาน Google Calendar all-day
-- feedback ที่ "แก้โค้ดแล้วแต่ Klui ยังเห็นของเก่า" = ต้อง deploy ก่อน retest: banner เลือกได้ N,
-  cursor รับเวร, scroll เด้ง (ทั้งหมด commit บน main แล้ว `d58ac10`/`dc03110`)
+### 🔴 LAUNCH ศุกร์ 17 ก.ค. 2569 (เหลือ ~2 วัน) — Security prelaunch
+ที่มา: `HANDOFF_security_prelaunch_2026-07-14.md` + `docs/DATA_MAP.md §3`. **ยังไม่แก้อะไรเลย.**
+Klui ต้องเคาะว่าอันไหนแก้เต็ม / อันไหน mitigation / อันไหนเลื่อน. ลำดับที่ handoff แนะนำ:
+| # | เรื่อง | แนะนำ |
+|---|---|---|
+| 1 | ยกเลิกเวรที่เผยแพร่แล้ว **ไม่เช็ครหัสผ่านจริงฝั่ง server** | ✅ แก้เต็มก่อน Friday (scope เล็ก, token 2-5 นาที ผูก session hash) |
+| 2 | "เดือน" มี ID **3 สูตรไม่ตรงกัน** (รากของ "Firebase ดับ") | 🟠 mitigation ก่อน Friday (แก้เต็มเสี่ยง regression) |
+| 3 | แอดมินแก้ผู้ให้/ผู้รับ **ไม่มี audit log** | แก้ถ้ามีเวลา (เล็ก ไม่เสี่ยง) |
+| 4 | **Session ไม่หมดอายุ** | soft-expiry ถ้ามีเวลา (col `lastSeen` ใน `PHX_Pharmacists` มีแล้ว) |
+| 5 | **LINE webhook ไม่ verify ลายเซ็น** | รอได้ถ้า bot ยังไม่ user-facing — **ถาม Klui ว่าเปิด LINE ศุกร์นี้ไหม** |
+| 6 | LWW record ไม่ถูกบันทึกจริง (คำนวณสด) | ไม่รีบ (LWW เป็น flag opt-in, prod ใช้ตัวเก่า) |
+| — | Password salt เดียวกันทุกคน · Firebase rules ไม่อยู่ใน repo | เลื่อนหลัง launch (งาน migration ใหญ่) |
 
-### งานพัฒนา
-- **[ดีไซน์ผ่าน] แลกเวรให้ง่ายขึ้น** → ลงโค้ดจริงตาม §จุดที่ต้องแก้ ข้างบน
-- **[pending] UI polish** — picker table ยังไม่เหมือน main table (left-border สีตามชนิดเวร + spacing)
+### ⚠️ ค้าง DEPLOY (สะสม — โค้ดแก้แล้วแต่ยังไม่ deploy → Klui ยังเห็นของเก่า)
+1. **แอปหลัก:** GAS deployment version ใหม่ของ `Index.html` (Deploy → Manage deployments → New version)
+2. **calendar-sync-app:** clasp push/deploy แยก (คนละ scriptId) — Google Calendar all-day
+- ของที่รอ deploy ถึงจะเห็นผล: banner "เลือกได้ N", cursor รับเวร, scroll เด้ง (`d58ac10`/`dc03110`)
+
+### งานพัฒนา / UX (เตรียม launch)
+- **[ดีไซน์ผ่าน ✅] แลกเวรให้ง่ายขึ้น (A→B→C)** → ลงโค้ดจริงตาม §จุดที่ต้องแก้ + ปรับ wording (Klui เคาะทีหลัง)
+- **[pending] UI polish** — picker table ให้เหมือน main table (left-border สีตามชนิดเวร + spacing)
 - **[pending] ภาษาทางการ** — รีวิว user-facing strings เขียนใหม่ให้ชัด (ทำ sample tone ก่อน)
+- **[pending] joint v2.1** — "ต่อเวรแบบเจ้าของร่วม" เหลือ **per-person work-time labels + ICS export**
+  (ที่มา `HANDOFF_v3.47_joint_v2.0`; v1→v2.0 ship แล้ว, deployed `@342`). หมายเหตุ: ระบบ **ไม้/relay
+  ถูกแทนที่ด้วย joint แล้ว** — relay handoffs เก่าถือว่า deprecated
 
-### หมายเหตุ sync (SessionStart เตือน)
-มี 3 branch นำหน้า main: `claude/app-design-hospital-scale-5h3t5r` (+73),
-`claude/existing-system-assistants-9drri4` (+12), `work/v3.44-lww` (+62) — **ยังไม่ตรวจ/ไม่แตะ**
-รอ Klui สั่งว่าจะรวมอันไหนเข้า main.
+### Perf / tech debt
+- **picker list ช้าตอนเวรเยอะ** → pagination / pre-cache `_pbHolderOf` (เสนอไว้ ยังไม่ทำ)
+- `New Text Document.txt` ค้างสถานะลบใน working tree (ไฟล์เปล่า) — ลบ commit ทิ้งได้
+
+### หมายเหตุ sync / git hygiene
+- branch นี้ (`claude/mobile-work-continuation-7b7q1t`) นำหน้า main → เมื่อพร้อม **merge เข้า main** กันแตกกิ่งค้าง
+- 3 branch นำหน้า main: `app-design-hospital-scale` (+73), `existing-system-assistants` (+12),
+  `work/v3.44-lww` (+62) — **ยังไม่ตรวจ/ไม่แตะ** รอ Klui สั่งว่าจะรวมอันไหน
+- ⚠️ มีงานคู่ขนานแก้ `Index.html` เดียวกัน (calendar-sync-app) — `git fetch` ก่อนแก้โค้ดจริงเสมอ
 
 ---
 
