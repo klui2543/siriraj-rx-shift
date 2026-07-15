@@ -5889,19 +5889,35 @@ window.allPharmacistNames = [];
       triggerUpdate();
     }
 
+    // v3.49 สมุดส่วนตัว: ยกเลิกเวร/เชนแบบอิสระ. ลบทุก hop ที่เชื่อมกัน (local OverlayManager)
+    //   พร้อม "ล้าง mirror" ออกจาก pathBOverlays ทันที เพื่อให้ ghost/รอยขีดฆ่าหายจากจอเดี๋ยวนั้น
+    //   (ไม่ต้องรอ refetch) — แก้อาการ "ยกเลิกแล้วยังค้าง" ของเชนเก่าที่เคยเผยแพร่. removeAction
+    //   ยังยิงลบขึ้น server + tombstone กันฟื้นตามเดิม.
+    function _pbFreeCancelChain(mid, aid) {
+      var idset = {};
+      try { (_collectConnectedChain(mid, aid) || []).forEach(function(x){ if (x) idset[String(x)] = 1; }); } catch (e) {}
+      if (!Object.keys(idset).length && aid) idset[String(aid)] = 1;
+      Object.keys(idset).forEach(function(x){ try { OverlayManager.removeAction(mid, x); } catch (e) {} });
+      try {
+        if (typeof pathBOverlays !== 'undefined' && Array.isArray(pathBOverlays)) {
+          pathBOverlays = pathBOverlays.filter(function(o){ return !(o && idset[String(o.actionId)]); });
+        }
+      } catch (e) {}
+      try { if (typeof invalidateGhostCache === 'function') invalidateGhostCache(); } catch (e) {}
+      try { if (typeof triggerUpdate === 'function') triggerUpdate(); } catch (e) {}
+      return Object.keys(idset).length;
+    }
+
     function confirmUndo() {
       const mid = getCurrentMonthId();
       const aid = actionState.usedInfo && actionState.usedInfo.actionId;
       closeActionModal();
       if (!aid) { triggerUpdate(); return; }
       // v3.49 สมุดส่วนตัว: ไม่มี "สมุดกลาง" ให้ปกป้องแล้ว → ยกเลิกได้อิสระ ไม่ต้องรหัสผ่าน/
-      //   ไม่ติดกฎ tail-only. ลบทั้ง "เชน" ที่เชื่อมกัน (พ่อ+ลูก) พร้อมกัน กัน hop ค้าง/orphan —
-      //   ครอบคลุมเชนเก่าที่ค้างมาจากตอนยังเปิดเผยแพร่ (Klui: "บางเวรที่สลับไว้ก่อนหน้ายกเลิกไม่ได้").
+      //   ไม่ติดกฎ tail-only. ลบทั้ง "เชน" ที่เชื่อมกัน + ล้าง mirror ใน pathBOverlays ให้หายทันที.
       if (!window._publishEnabled) {
-        var _ids = (typeof _collectConnectedChain === 'function') ? _collectConnectedChain(mid, aid) : [aid];
-        if (!_ids.length) _ids = [aid];
-        _ids.forEach(function(x){ try { OverlayManager.removeAction(mid, x); } catch(e){} });
-        triggerUpdate();
+        var _n = _pbFreeCancelChain(mid, aid);
+        if (typeof _p2bShowToast === 'function') _p2bShowToast(_n > 1 ? ('ยกเลิกแล้ว (' + _n + ' ขั้น)') : 'ยกเลิกแล้ว', 'ok');
         return;
       }
       // v3.45: undo is DRAFT-only. A published record must go through the cancel
@@ -6363,6 +6379,12 @@ window.allPharmacistNames = [];
     var _SWF_CANCEL_REASONS = ['ตกลงกันใหม่ / เปลี่ยนใจ', 'เลือกคน หรือ เวรผิด', 'อีกฝ่ายไม่รับแล้ว'];
     function _swfCancelClose() { var e = document.getElementById('swfCancelOverlay'); if (e) e.remove(); }
     function swfCancelPublished(mid, actionId) {
+      // v3.49 สมุดส่วนตัว: ไม่มีสมุดกลาง → ยกเลิกอิสระ (ไม่ต้องรหัส/เหตุผล/ไม่ติด tail-only)
+      if (!window._publishEnabled) {
+        var _fn = _pbFreeCancelChain(mid, actionId);
+        if (typeof _p2bShowToast === 'function') _p2bShowToast(_fn > 1 ? ('ยกเลิกแล้ว (' + _fn + ' ขั้น)') : 'ยกเลิกแล้ว', 'ok');
+        return;
+      }
       var u = (typeof phxAuthGetUser === 'function') ? phxAuthGetUser() : null;
       if (!u || !u.name || !u.hash) {
         if (typeof _p2bShowToast === 'function') _p2bShowToast('ต้อง login ก่อนยกเลิก', 'warn');
