@@ -17802,6 +17802,7 @@ table.exp-tbl .tm{margin-left:3px;opacity:0.75;}
       var me = curName();
       if (!me){
         var sa0 = document.getElementById('phxSwapActions'); if (sa0) sa0.style.display = 'none';
+        body.removeAttribute('data-swf-fp');   // v3.49: reset fingerprint so login re-renders timeline
         body.innerHTML = '<div class="phx-tv-empty">ยังไม่ได้เลือกชื่อของคุณ<br>' +
           'ไปที่แท็บ <b>ตารางเวร</b> แล้วพิมพ์ชื่อ (หรือเข้าสู่ระบบ) เพื่อจัดการเวรของคุณ' +
           '<div style="margin-top:18px;"><button class="phx-me-cta" style="max-width:220px;margin:0 auto;" onclick="phxSetTab(\'schedule\')">ไปที่ตารางเวร</button></div></div>';
@@ -17823,7 +17824,17 @@ table.exp-tbl .tm{margin-left:3px;opacity:0.75;}
             '<span class="go">จัดการ ›</span>' +
           '</button>'
         : '';
-      body.innerHTML = draftBanner + html;
+      // v3.49 FIX "ประวัติเด้งขึ้นบน": การ poll (phxRefreshActiveTab ~ทุก 30-60 วิ) เรียกซ้ำ →
+      //   เดิม rebuild body.innerHTML ทุกครั้ง → กล่องเลื่อน .phx-tl-scroll ถูกสร้างใหม่ → scroll เด้งกลับบน.
+      //   (1) ถ้าเนื้อหาเดิมเป๊ะ (fingerprint) → ไม่ rebuild เลย → scroll อยู่ที่เดิม.
+      //   (2) ถ้าเนื้อหาเปลี่ยนจริง → จำ scrollTop ของกล่องประวัติ แล้วคืนหลัง render.
+      var _out = draftBanner + html;
+      if (body.getAttribute('data-swf-fp') === _out) return;   // เนื้อหาไม่เปลี่ยน → ไม่แตะ DOM
+      var _prevSc = 0;
+      try { var _old = body.querySelector('.phx-tl-scroll'); if (_old) _prevSc = _old.scrollTop || 0; } catch(e){}
+      body.innerHTML = _out;
+      body.setAttribute('data-swf-fp', _out);
+      if (_prevSc) { try { var _new = body.querySelector('.phx-tl-scroll'); if (_new) _new.scrollTop = _prevSc; } catch(e){} }
     };
 
     // ========= v3.47b: action-first แลกเวร (สลับ / ยก / รับ / ยกเลิก) =========
