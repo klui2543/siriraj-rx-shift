@@ -3142,6 +3142,12 @@ window.allPharmacistNames = [];
           return all.filter(a => a.viewerName === viewerName);
         }
 
+        // v3.49 สมุดส่วนตัว: ปิดเผยแพร่ → ผู้ที่ "ไม่ใช่เจ้าของ" (คนอื่น login / ไม่ได้ login/incognito)
+        //   ต้องไม่เห็น overlay ของ viewer นี้เลย. เจ้าของเห็น book ตัวเองผ่าน path bound===viewer ด้านบน.
+        //   ปิดรอยรั่ว: เดิม fallback pathBOverlays ด้านล่าง ทำให้ incognito/คนอื่นที่ filter ดู ขลุ่ย
+        //   เห็น overlay สาธารณะของ ขลุ่ย → นับเวรเกิน + โชว์เวรที่ไม่ควรเห็น.
+        if (!window._publishEnabled) return [];
+
         // Asking for another user's actions — try P2B._RO first (richer, includes partner-side)
         if (typeof P2B !== 'undefined' && P2B && P2B._RO
             && P2B._RO.currentViewName === viewerName
