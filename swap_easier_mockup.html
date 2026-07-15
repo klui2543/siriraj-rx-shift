@@ -1,0 +1,519 @@
+<title>Prototype v13 — แลกเวร (A → B ⟷ C)</title>
+<style>
+  :root {
+    --bg: #f8fafc; --surface: #ffffff; --text: #1e293b; --sub: #64748b; --muted: #94a3b8;
+    --border: #e2e8f0; --accent: #2563eb; --accent-bg: #eff6ff; --accent-border: #bfdbfe;
+    --name: #1e3a8a; --give: #dc2626; --get: #16a34a; --info-bg:#fff7ed; --info-fg:#9a3412;
+  }
+  :root.dark {
+    --bg: #0b1220; --surface: #1f2937; --text: #f1f5f9; --sub: #94a3b8; --muted: #64748b;
+    --border: #374151; --accent: #3b82f6; --accent-bg: #1e3a5f; --accent-border: #1d4ed8;
+    --name: #93c5fd; --give: #f87171; --get: #4ade80; --info-bg:#3a2408; --info-fg:#fcd9b0;
+  }
+  @media (prefers-color-scheme: dark) { :root:not(.light) {
+    --bg: #0b1220; --surface: #1f2937; --text: #f1f5f9; --sub: #94a3b8; --muted: #64748b;
+    --border: #374151; --accent: #3b82f6; --accent-bg: #1e3a5f; --accent-border: #1d4ed8;
+    --name: #93c5fd; --give: #f87171; --get: #4ade80; --info-bg:#3a2408; --info-fg:#fcd9b0;
+  } }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--text);
+    font-family: 'Kanit','IBM Plex Sans Thai','Noto Sans Thai',system-ui,-apple-system,sans-serif;
+    -webkit-font-smoothing: antialiased; line-height: 1.5; }
+  .outer { max-width: 430px; margin: 0 auto; padding: 14px 12px 40px; }
+  .intro { font-size: 12px; color: var(--sub); text-align: center; margin: 2px 0 12px; line-height: 1.55; }
+  .intro b { color: var(--text); }
+
+  .phone { position: relative; background: var(--surface); border: 1px solid var(--border); border-radius: 22px; overflow: hidden;
+    box-shadow: 0 12px 40px rgba(15,23,42,.14); display: flex; flex-direction: column; height: 660px; }
+  .topbar { display: flex; align-items: center; gap: 8px; padding: 12px 14px; border-bottom: 1px solid var(--border); flex: none; }
+  .back { border: none; background: none; color: var(--accent); font-size: 20px; cursor: pointer; font-family: inherit; padding: 0 2px; visibility: hidden; }
+  .back.on { visibility: visible; }
+  .tt { font-size: 15px; font-weight: 700; }
+  .dots { margin-left: auto; display: flex; gap: 5px; }
+  .dots i { width: 6px; height: 6px; border-radius: 50%; background: var(--border); }
+  .dots i.on { background: var(--accent); }
+  .screen { padding: 16px 14px; overflow-y: auto; flex: 1; }
+
+  .tv-title { font-size: 17px; font-weight: 800; margin: 2px 0 3px; }
+  .tv-sub { font-size: 11.5px; color: var(--sub); margin-bottom: 14px; line-height: 1.55; }
+  .acts { display: grid; grid-template-columns: 1fr 1fr; gap: 9px; margin: 2px 0 4px; }
+  .act { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 6px;
+    padding: 18px 8px; border-radius: 13px; border: 1px solid var(--border); font-family: inherit; font-size: 13.5px; font-weight: 700; cursor: pointer; transition: transform .1s; }
+  .act:active { transform: scale(.97); }
+  .act .ic { font-size: 24px; line-height: 1; }
+  .act.swap { background:#eff6ff; border-color:#bfdbfe; color:#1d4ed8; }
+  .act.give { background:#fefce8; border-color:#fde68a; color:#a16207; }
+  .act.recv { background:#f0fdf4; border-color:#bbf7d0; color:#15803d; }
+  .act.cancel { background:#fef2f2; border-color:#fecaca; color:#dc2626; }
+  :root.dark .act.swap{background:#1e3a5f;border-color:#1d4ed8;color:#93c5fd}
+  :root.dark .act.give{background:#3a2e08;border-color:#a16207;color:#fde047}
+  :root.dark .act.recv{background:#052e16;border-color:#15803d;color:#86efac}
+  :root.dark .act.cancel{background:#450a0a;border-color:#b91c1c;color:#fca5a5}
+  .recap { margin-top: 18px; border-top: 1px solid var(--border); padding-top: 12px; }
+  .recap-h { font-size: 11.5px; font-weight: 700; color: var(--sub); margin-bottom: 8px; }
+  .recap-empty { text-align: center; color: var(--muted); font-size: 12px; padding: 16px 10px; }
+
+  .plist { display: flex; flex-direction: column; gap: 6px; }
+  .prow { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 10px 12px;
+    border-radius: 10px; border: 1px solid var(--border); background: var(--surface); cursor: pointer; text-align: left; width: 100%; font-family: inherit; }
+  .prow:active { background: var(--bg); }
+  .prow .nm { font-size: 13px; font-weight: 700; color: var(--name); }
+  .prow .nm .lead { font-weight: 500; color: var(--sub); }
+  .prow .orig { font-size: 9.5px; color: var(--muted); margin-top: 2px; font-style: italic; }
+  .prow .meta { display: flex; gap: 6px; margin-top: 5px; align-items: center; }
+  .prow .date { font-size: 10px; font-weight: 700; color: var(--sub); padding: 2px 7px; background: var(--bg); border-radius: 5px; border: 1px solid var(--border); }
+  .prow .pos { font-size: 11px; font-weight: 800; color: var(--name); letter-spacing: .3px; }
+  .prow .badge { padding: 3px 6px; font-size: 9px; font-weight: 700; border-radius: 4px; background: #eff6ff; color: #1d4ed8; border: 1px solid #dbeafe; white-space: nowrap; }
+  :root.dark .prow .badge { background:#1e3a8a;color:#93c5fd;border-color:#1d4ed8; }
+  .prow .chev { color: var(--muted); font-size: 15px; }
+  .sc-title { font-size: 15px; font-weight: 700; margin: 0 0 3px; }
+  .sc-sub { font-size: 12px; color: var(--sub); margin: 0 0 13px; line-height: 1.5; }
+
+  /* real picker filters (renderShiftPickerShell) */
+  .pick-filters { display: flex; gap: 6px; margin-bottom: 8px; }
+  .pick-ta { position: relative; flex: 1; min-width: 0; }
+  .pick-ta-input { width: 100%; padding: 7px 24px 7px 8px; font-size: 12px; border-radius: 7px; border: 1px solid var(--border); background: var(--bg); color: var(--text); font-family: inherit; outline: none; }
+  .pick-ta-input:focus { border-color: var(--accent); }
+  .pick-ta-clear { position: absolute; right: 5px; top: 50%; transform: translateY(-50%); display: none; cursor: pointer; color: var(--muted); font-size: 15px; line-height: 1; padding: 2px 5px; border-radius: 4px; }
+  .pick-ta-input:not(:placeholder-shown) ~ .pick-ta-clear { display: block; }
+  .pick-search-box { display: flex; align-items: center; gap: 6px; padding: 0 10px; height: 36px; background: var(--bg); border: 1px solid var(--border); border-radius: 8px; margin-bottom: 8px; }
+  .pick-search-box input { flex: 1; border: none; background: none; outline: none; font-size: 12px; font-family: inherit; color: var(--text); }
+  .pick-count { font-size: 10px; color: var(--muted); margin-bottom: 6px; font-weight: 600; }
+  .pick-list { display: flex; flex-direction: column; gap: 5px; }
+
+  /* ── _lwwTransferConfirm dialog (ค่าจริง) ── */
+  .lww-title { display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; }
+  .lww-title .t { font-weight: 700; font-size: 15px; }
+  .lww-info { display: flex; gap: 8px; background: var(--info-bg); border-radius: 8px; padding: 9px 11px; margin-bottom: 14px; font-size: 12px; color: var(--info-fg); line-height: 1.55; }
+  .lww-lab { font-size: 12px; color: var(--sub); }
+  .lww-field { width: 100%; margin: 5px 0 4px; padding: 11px 13px; border: 1px solid var(--border); border-radius: 6px;
+    font-family: inherit; font-size: 15px; cursor: pointer; display: flex; justify-content: space-between; align-items: center; background: var(--surface); color: var(--text); }
+  .lww-field .v { font-weight: 700; color: var(--name); }
+  .lww-field .car { color: var(--sub); }
+  .lww-hint { font-size: 10.5px; color: var(--accent); font-weight: 600; margin: 4px 2px 14px; }
+  .lww-btns { display: flex; gap: 8px; margin-top: 16px; }
+  .lbtn { flex: 1; padding: 12px; border-radius: 9px; font-family: inherit; font-size: 14px; font-weight: 700; cursor: pointer; border: 1px solid var(--border); background: var(--surface); color: var(--text); }
+  .lbtn.ok { background: var(--accent); border-color: var(--accent); color: #fff; }
+  .lbtn.danger { background: var(--give); border-color: var(--give); color: #fff; }
+
+  /* name picker overlay (ระบุชื่อผู้สัมปทานเวร) */
+  .np-ov { position: absolute; inset: 0; background: rgba(0,0,0,.45); z-index: 40; display: flex; align-items: center; justify-content: center; padding: 16px; }
+  .np-ov[hidden] { display: none; }
+  .np-box { background: var(--surface); width: 100%; max-width: 360px; height: 78%; border-radius: 14px; padding: 14px; display: flex; flex-direction: column; }
+  .np-h { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; }
+  .np-h .t { font-weight: 700; font-size: 15px; }
+  .np-search { width: 100%; padding: 10px; border: 1px solid var(--border); border-radius: 8px; font-family: inherit; font-size: 14px; margin-bottom: 8px; background: var(--bg); color: var(--text); }
+  .np-list { overflow-y: auto; flex: 1; }
+  .np-row { padding: 12px 8px; border-bottom: 1px solid var(--border); cursor: pointer; font-size: 14px; display: flex; align-items: center; gap: 6px; }
+  .np-row .nn { font-weight: 600; }
+  .np-row .nk { color: var(--sub); font-size: 12px; }
+  .np-row.cur { color: var(--accent); }
+
+  /* ── direction diagram ── */
+  .dcap { font-size: 10px; font-weight: 700; letter-spacing: .05em; color: var(--sub); text-transform: uppercase; margin: 2px 0 8px; }
+  .chain { padding: 9px 10px; background: var(--bg); border: 1px solid var(--border); border-radius: 10px; margin-bottom: 14px; text-align: center; }
+  .chain .lab { font-size: 9.5px; color: var(--muted); font-weight: 600; margin-bottom: 6px; }
+  .chain-line { display: flex; flex-wrap: wrap; align-items: center; justify-content: center; gap: 3px 5px; }
+  .cn { font-size: 12.5px; font-weight: 700; color: var(--text); }
+  .cn.now { color: var(--get); } .cn.now::after { content:" ●"; font-size: 7px; vertical-align: middle; }
+  .cn.you { color: var(--accent); }
+  .cseg { display: inline-flex; flex-direction: column; align-items: center; line-height: 1; }
+  .cseg .ca { font-size: 14px; color: var(--accent); }
+  .cseg .ct { font-size: 8px; color: var(--muted); margin-top: 1px; white-space: nowrap; }
+
+  .flow { display: grid; grid-template-columns: 1fr 92px 1fr; align-items: center; gap: 4px; margin: 2px 0; }
+  .pn { display: flex; flex-direction: column; align-items: center; gap: 4px; }
+  .pn .ic { width: 44px; height: 44px; color: var(--sub); }
+  .pn.me .ic { color: var(--accent); }
+  .pn .n { font-size: 12.5px; font-weight: 700; }
+  .pn.me .n { color: var(--accent); }
+  .pn .hold { font-size: 9px; color: var(--muted); }
+  .ac { display: flex; flex-direction: column; align-items: center; gap: 10px; }
+  .ride { display: flex; align-items: center; gap: 3px; }
+  .ride .rc { font-size: 11px; font-weight: 800; color: var(--name); background: var(--bg); border: 1px solid var(--border); border-radius: 6px; padding: 2px 6px; letter-spacing: .3px; }
+  .ride .rh { font-size: 17px; font-weight: 700; line-height: 1; }
+  .ride.give .rh, .ride.give .rc { color: var(--give); border-color: var(--give); }
+  .ride.get .rh, .ride.get .rc { color: var(--get); border-color: var(--get); }
+  .ac .rt { font-size: 8px; font-weight: 700; margin-top: -6px; color: var(--sub); text-align: center; }
+  .diag-wrap { border: 1px dashed var(--accent-border); border-radius: 11px; padding: 11px 11px 13px; margin: 6px 0 2px; background: color-mix(in srgb, var(--accent-bg) 45%, transparent); }
+  .diag-wrap .dw-h { font-size: 10px; font-weight: 700; color: var(--accent); margin-bottom: 8px; letter-spacing:.03em; }
+
+  /* A → B ⟷ C people line */
+  .pline { display: flex; align-items: flex-start; justify-content: center; gap: 1px; flex-wrap: nowrap; overflow-x: auto; padding: 6px 0 2px; }
+  .pp { display: flex; flex-direction: column; align-items: center; gap: 3px; min-width: 50px; flex: none; }
+  .pp .ic { width: 38px; height: 38px; color: var(--sub); }
+  .pp.me .ic { color: var(--accent); }
+  .pp .nm { font-size: 12.5px; font-weight: 700; }
+  .pp.me .nm { color: var(--accent); }
+  .pp .sub { font-size: 8.5px; color: var(--muted); white-space: nowrap; }
+  .pp.now .nm::after { content:" ●"; color: var(--get); font-size: 7px; vertical-align: middle; }
+  .par { display: flex; flex-direction: column; align-items: center; padding-top: 9px; min-width: 32px; flex: none; }
+  .par .s { font-size: 17px; line-height: 1; color: var(--accent); font-weight: 700; }
+  .par .l { font-size: 8px; color: var(--muted); margin-top: 2px; white-space: nowrap; }
+
+  .result { margin-top: 12px; font-size: 12px; color: var(--text); background: var(--accent-bg); border: 1px solid var(--accent-border); border-radius: 10px; padding: 10px 12px; line-height: 1.6; }
+  .result b { color: var(--accent); }
+  .result .warn { color: var(--give); font-weight: 700; }
+  .result .rowo { display: flex; gap: 6px; margin-top: 4px; }
+  .result .rowo b { color: var(--name); }
+
+  .cta { display: flex; gap: 8px; margin-top: 16px; }
+  .btn { flex: 1; padding: 12px; border-radius: 9px; font-family: inherit; font-size: 13.5px; font-weight: 700; cursor: pointer; border: 1px solid var(--border); background: var(--surface); color: var(--text); }
+  .btn.primary { background: var(--accent); border-color: var(--accent); color: #fff; }
+  .btn.danger { background: var(--give); border-color: var(--give); color: #fff; }
+
+  .done { text-align: center; padding: 30px 14px; }
+  .done .big { font-size: 42px; }
+  .done .m { font-size: 15px; font-weight: 700; margin: 10px 0 4px; }
+  .done .s { font-size: 12.5px; color: var(--sub); line-height: 1.6; }
+
+  .qbox { margin-top: 16px; font-size: 12px; color: var(--sub); line-height: 1.65; }
+  .qbox b { color: var(--text); }
+  code { font-family: ui-monospace, Menlo, monospace; font-size: 11.5px; background: var(--surface); padding: 1px 5px; border-radius: 5px; border: 1px solid var(--border); }
+  .toggle { position: fixed; top: 10px; right: 10px; z-index: 50; }
+  .toggle button { border: 1px solid var(--border); background: var(--surface); color: var(--text); border-radius: 8px; padding: 5px 11px; font-size: 11.5px; font-weight: 600; cursor: pointer; font-family: inherit; }
+  @media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
+</style>
+
+<div class="toggle"><button id="themeBtn" type="button">สลับธีม</button></div>
+<svg width="0" height="0" style="position:absolute" aria-hidden="true"><symbol id="usr" viewBox="0 0 24 24"><circle cx="12" cy="8" r="4.2" fill="currentColor"/><path d="M4 21c0-4.2 3.6-6.5 8-6.5s8 2.3 8 6.5z" fill="currentColor"/></symbol></svg>
+
+<div class="outer">
+  <p class="intro"><b>Prototype v13</b> — <b>A→B⟷C ใช้ทั้งสลับและรับแล้ว</b>. รับเวร: เปลี่ยน “รับจาก ▾” เป็นชื่อที่ต่างจากตาราง → ขึ้น <b>เอ๋ → ก้อย → คุณ</b> (A→B→C). สลับ: เลือก OPD-3 (โต้ง เดิมของเอ๋) → <b>เอ๋ → โต้ง ⟷ คุณ</b>.</p>
+
+  <div class="phone">
+    <div class="topbar">
+      <button class="back" id="backBtn" type="button" aria-label="ย้อนกลับ">‹</button>
+      <span class="tt" id="topTitle">แลกเวร</span>
+      <span class="dots" id="dots"></span>
+    </div>
+    <div class="screen" id="screen"></div>
+    <div class="np-ov" id="npOv" hidden></div>
+  </div>
+
+  <div class="qbox" id="qbox"></div>
+</div>
+
+<script>
+(function () {
+  var r = document.documentElement;
+  document.getElementById('themeBtn').addEventListener('click', function () {
+    var isDark = r.classList.contains('dark') || (!r.classList.contains('light') && window.matchMedia('(prefers-color-scheme: dark)').matches);
+    r.classList.remove('dark','light'); r.classList.add(isDark ? 'light' : 'dark');
+  });
+
+  var YOU = 'คุณ';
+  var MINE = [
+    { id:'m1', pos:'OPD-1', date:'15 ก.ค.', round:'รอบ 2' },
+    { id:'m2', pos:'ER-2',  date:'18 ก.ค.', round:'รอบ 1' }
+  ];
+  var OTHERS = [
+    { id:'o1',  holder:'โต้ง',   orig:'เอ๋', pos:'OPD-3', date:'16 ก.ค.', round:'รอบ 1', at:'14 ก.ค. 20:30' },
+    { id:'o2',  holder:'มะปราง', orig:null,  pos:'OPD-5', date:'17 ก.ค.', round:'รอบ 1', at:'13 ก.ค. 09:12' },
+    { id:'o3',  holder:'บอส',    orig:'ก้อย',pos:'IPD-2', date:'20 ก.ค.', round:'รอบ 3', at:'12 ก.ค. 15:40' },
+    { id:'o4',  holder:'โต้ง',   orig:null,  pos:'OPD-8', date:'22 ก.ค.', round:'รอบ 2', at:'11 ก.ค. 08:22' },
+    { id:'o5',  holder:'แนน',    orig:null,  pos:'ER-3',  date:'16 ก.ค.', round:'รอบ 2', at:'10 ก.ค. 19:05' },
+    { id:'o6',  holder:'ก้อย',   orig:null,  pos:'OPD-2', date:'18 ก.ค.', round:'รอบ 1', at:'10 ก.ค. 11:30' },
+    { id:'o7',  holder:'มะปราง', orig:'บอส', pos:'IPD-1', date:'19 ก.ค.', round:'รอบ 3', at:'09 ก.ค. 14:00' },
+    { id:'o8',  holder:'เอ๋',    orig:null,  pos:'OPD-4', date:'23 ก.ค.', round:'รอบ 1', at:'09 ก.ค. 09:45' },
+    { id:'o9',  holder:'บอส',    orig:null,  pos:'ER-1',  date:'24 ก.ค.', round:'รอบ 2', at:'08 ก.ค. 21:10' },
+    { id:'o10', holder:'แนน',    orig:'เอ๋', pos:'OPD-6', date:'25 ก.ค.', round:'รอบ 1', at:'08 ก.ค. 07:50' },
+    { id:'o11', holder:'โต้ง',   orig:null,  pos:'IPD-3', date:'26 ก.ค.', round:'รอบ 3', at:'07 ก.ค. 16:20' },
+    { id:'o12', holder:'ก้อย',   orig:null,  pos:'OPD-1', date:'28 ก.ค.', round:'รอบ 2', at:'07 ก.ค. 10:05' },
+    { id:'o13', holder:'มะปราง', orig:null,  pos:'ER-2',  date:'29 ก.ค.', round:'รอบ 1', at:'06 ก.ค. 13:33' },
+    { id:'o14', holder:'เอ๋',    orig:null,  pos:'OPD-7', date:'30 ก.ค.', round:'รอบ 2', at:'06 ก.ค. 08:00' }
+  ];
+  var OFFERED = [
+    { id:'f1', giver:'เอ๋',  orig:null, pos:'ER-1', date:'19 ก.ค.', round:'รอบ 2', at:'14 ก.ค. 18:05' },
+    { id:'f2', giver:'ก้อย', orig:'แนน',pos:'OPD-7',date:'21 ก.ค.', round:'รอบ 1', at:'13 ก.ค. 22:11' },
+    { id:'f3', giver:'บอส',  orig:null, pos:'IPD-2',date:'23 ก.ค.', round:'รอบ 3', at:'12 ก.ค. 20:40' },
+    { id:'f4', giver:'แนน',  orig:null, pos:'OPD-4',date:'27 ก.ค.', round:'รอบ 1', at:'11 ก.ค. 09:18' }
+  ];
+  var PEOPLE = ['มะปราง','บอส','ก้อย','แนน','โต้ง','เอ๋'];
+  var NAMES = [
+    {n:'เอ๋', k:'เอกพล'},{n:'โต้ง', k:'ธนโชติ'},{n:'มะปราง', k:'ปรางทิพย์'},
+    {n:'บอส', k:'ภูริช'},{n:'ก้อย', k:'กัญญา'},{n:'แนน', k:'นันทน์'}
+  ];
+  var CHANGED = [ { id:'c1', pos:'OPD-3', date:'16 ก.ค.', round:'รอบ 1', from:'โต้ง', via:'รับมา' } ];
+  var META = { swap:{title:'สลับเวร',steps:3}, give:{title:'ยกเวรให้',steps:3}, receive:{title:'รับเวร',steps:2}, cancel:{title:'ยกเลิกเวร',steps:2} };
+
+  var S = {};
+  var screen = document.getElementById('screen');
+  var topTitle = document.getElementById('topTitle');
+  var dotsEl = document.getElementById('dots');
+  var backBtn = document.getElementById('backBtn');
+  var npOv = document.getElementById('npOv');
+  var stack = [];
+
+  function esc(s){ return String(s==null?'':s).replace(/[&<>"]/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c];}); }
+  function usr(cls){ return '<svg class="ic'+(cls?' '+cls:'')+'"><use href="#usr"/></svg>'; }
+  function setDots(total, idx){ if(!total){dotsEl.innerHTML='';return;} var h=''; for(var i=0;i<total;i++) h+='<i class="'+(i===idx?'on':'')+'"></i>'; dotsEl.innerHTML=h; }
+  function go(id, push){ if(push!==false) stack.push(id); render(id); }
+  backBtn.addEventListener('click', function(){ if(!npOv.hidden){ npOv.hidden=true; return; } if(stack.length>1){ stack.pop(); render(stack[stack.length-1]); } });
+
+  function render(id){
+    backBtn.classList.toggle('on', stack.length>1);
+    var m = S.action ? META[S.action] : null;
+    if (id==='home'){
+      topTitle.textContent='แลกเวร'; setDots(0);
+      screen.innerHTML =
+        '<div class="tv-title">แลกเวร</div><div class="tv-sub">เลือกสิ่งที่ต้องการทำกับเวรของคุณ</div>'+
+        '<div class="acts">'+
+          '<button class="act swap" data-act="swap"><span class="ic">🔄</span>สลับเวร</button>'+
+          '<button class="act give" data-act="give"><span class="ic">🎁</span>ยกเวรให้</button>'+
+          '<button class="act recv" data-act="receive"><span class="ic">🤝</span>รับเวร</button>'+
+          '<button class="act cancel" data-act="cancel"><span class="ic">↩️</span>ยกเลิกเวร</button>'+
+        '</div>'+
+        '<div class="recap"><div class="recap-h">แลกเวรเดือนนี้ไปแล้ว</div><div class="recap-empty">เดือนนี้ยังไม่มีรายการ</div></div>';
+      return;
+    }
+    topTitle.textContent = m ? m.title : 'แลกเวร';
+    if (id==='pickMine'){
+      setDots(m.steps, 0);
+      screen.innerHTML = '<div class="sc-title">'+(S.action==='give'?'เลือกเวรที่จะยกให้':'เลือกเวรของคุณที่จะสลับ')+'</div>'+
+        '<div class="sc-sub">แตะเวรของคุณ 1 อัน</div><div class="plist">'+
+        MINE.map(function(s){ return rowHTML({nm:'เวรของคุณ',pos:s.pos,date:s.date,round:s.round,ds:'mine:'+s.id}); }).join('')+'</div>';
+      return;
+    }
+    if (id==='pickOther'){
+      setDots(m.steps, 1);
+      screen.innerHTML = '<div class="sc-title">เลือกเวรของคนอื่นที่จะสลับด้วย</div>'+
+        '<div class="sc-sub">กรองด้วยชื่อคน / วันที่ / รหัสตำแหน่ง — เวรที่เปลี่ยนมือจะเห็นว่า “ถืออยู่” โดยใคร</div>'+
+        filterBar()+'<div class="pick-list" id="pickList"></div>';
+      wirePick('other'); return;
+    }
+    if (id==='pickPerson'){
+      setDots(m.steps, 1);
+      screen.innerHTML = '<div class="sc-title">เลือกผู้รับ</div>'+
+        '<div class="sc-sub">ยกเวร <b>'+esc(S.mine.pos)+'</b> ('+esc(S.mine.date)+') ให้ใคร</div>'+
+        '<div class="pick-search-box">'+SEARCH_SVG+'<input id="fName" placeholder="พิมพ์ค้นหาชื่อ / ชื่อเล่น…" value="'+esc(S.fName||'')+'"></div>'+
+        '<div class="pick-count" id="pickCount"></div><div class="pick-list" id="pickList"></div>';
+      wirePick('person'); return;
+    }
+    if (id==='pickOffered'){
+      setDots(m.steps, 0);
+      screen.innerHTML = '<div class="sc-title">เลือกเวรที่มีคนเสนอให้ (รับเวรเพิ่ม)</div>'+
+        '<div class="sc-sub">กรองด้วยชื่อผู้ให้ / วันที่ / รหัสตำแหน่ง</div>'+
+        filterBar()+'<div class="pick-list" id="pickList"></div>';
+      wirePick('offered'); return;
+    }
+    if (id==='pickCancel'){
+      setDots(m.steps, 0);
+      screen.innerHTML = '<div class="sc-title">เลือกเวรที่จะยกเลิก</div>'+
+        '<div class="sc-sub">เฉพาะเวรที่คุณ แลก/ยก/รับ มาเดือนนี้ — ยกเลิกแล้วจะคืนสภาพเดิม</div><div class="plist">'+
+        (CHANGED.length? CHANGED.map(function(s){ return rowHTML({nm:s.via+'จาก '+s.from,pos:s.pos,date:s.date,round:s.round,ds:'cancel:'+s.id}); }).join('') : '<div class="recap-empty">ยังไม่มีเวรที่แลก/ยก/รับมาเดือนนี้</div>')+'</div>';
+      return;
+    }
+    if (id==='concession'){ setDots(m.steps, m.steps-1); screen.innerHTML = concessionHTML(); wireConcession(); return; }
+    if (id==='confirmPlain'){ setDots(m.steps, m.steps-1); screen.innerHTML = confirmPlainHTML(); return; }
+    if (id==='done'){
+      setDots(0); topTitle.textContent='เสร็จสิ้น';
+      var msg = ({ swap:'สลับ '+S.mine.pos+' ↔ '+S.other.pos+' กับ '+S.fromName, give:'ยก '+S.mine.pos+' ให้ '+S.person,
+        receive:'รับ '+S.offered.pos+' จาก '+S.fromName, cancel:'ยกเลิก '+S.cancel.pos+' — คืนให้ '+S.cancel.from })[S.action];
+      screen.innerHTML = '<div class="done"><div class="big">'+(S.action==='cancel'?'↩️':'✅')+'</div>'+
+        '<div class="m">'+esc(msg)+' แล้ว</div>'+
+        '<div class="s">(ตัวอย่าง) ของจริงบันทึกเป็นร่างก่อน แล้วเผยแพร่ให้ทุกคนเห็น</div>'+
+        '<div class="cta"><button class="btn primary" data-home="1">ลองการกระทำอื่น</button></div></div>';
+      return;
+    }
+  }
+
+  var SEARCH_SVG = '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" style="color:var(--muted)"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>';
+  function filterBar(){
+    return '<div class="pick-filters">'+
+      '<div class="pick-ta"><input class="pick-ta-input" id="fPerson" autocomplete="off" placeholder="ทุกคน" value="'+esc(S.fPerson||'')+'"><span class="pick-ta-clear" data-clear="fPerson">✕</span></div>'+
+      '<div class="pick-ta"><input class="pick-ta-input" id="fDate" autocomplete="off" placeholder="ทุกวัน" value="'+esc(S.fDate||'')+'"><span class="pick-ta-clear" data-clear="fDate">✕</span></div>'+
+    '</div>'+
+    '<div class="pick-search-box">'+SEARCH_SVG+'<input id="fQuery" autocomplete="off" placeholder="ค้นหารหัสตำแหน่ง..." value="'+esc(S.fQuery||'')+'"></div>'+
+    '<div class="pick-count" id="pickCount"></div>';
+  }
+  function wirePick(kind){
+    ['fPerson','fDate','fQuery','fName'].forEach(function(idn){
+      var el=document.getElementById(idn); if(!el) return;
+      el.addEventListener('input', function(){
+        if(idn==='fPerson')S.fPerson=el.value; else if(idn==='fDate')S.fDate=el.value; else if(idn==='fQuery')S.fQuery=el.value; else S.fName=el.value;
+        fillList(kind);
+      });
+    });
+    Array.prototype.forEach.call(document.querySelectorAll('[data-clear]'), function(c){
+      c.addEventListener('click', function(){ var f=c.getAttribute('data-clear'); S[f]=''; var el=document.getElementById(f); if(el)el.value=''; fillList(kind); });
+    });
+    fillList(kind);
+  }
+  function fillList(kind){
+    var listEl=document.getElementById('pickList'), cntEl=document.getElementById('pickCount');
+    var pf=(S.fPerson||'').trim(), df=(S.fDate||'').trim(), qf=(S.fQuery||'').trim().toLowerCase();
+    var rows='', n=0;
+    if(kind==='person'){
+      var nf=(S.fName||'').trim();
+      NAMES.forEach(function(x){ if(x.n===YOU) return; if(nf && x.n.indexOf(nf)<0 && x.k.indexOf(nf)<0) return; n++;
+        rows+='<button class="prow" data-pick="person:'+esc(x.n)+'"><span><span class="nm">'+esc(x.k)+'</span> <span class="orig" style="font-style:normal;">('+esc(x.n)+')</span></span><span class="chev">›</span></button>'; });
+    } else {
+      var SRC = kind==='other'?OTHERS:OFFERED;
+      SRC.forEach(function(s){
+        var person = kind==='other'?s.holder:s.giver;
+        if(pf && person.indexOf(pf)<0 && (s.orig||'').indexOf(pf)<0) return;
+        if(df && s.date.indexOf(df)<0) return;
+        if(qf && s.pos.toLowerCase().indexOf(qf)<0) return;
+        n++;
+        rows += kind==='other'
+          ? rowHTML({holder:s.holder,orig:s.orig,pos:s.pos,date:s.date,round:s.round,ds:'other:'+s.id})
+          : rowHTML({nm:'จาก '+s.giver,orig:s.orig,pos:s.pos,date:s.date,round:s.round,ds:'offered:'+s.id});
+      });
+    }
+    if(cntEl) cntEl.textContent = n+' รายการ';
+    if(listEl) listEl.innerHTML = rows || '<div class="recap-empty">ไม่พบตามที่กรอง</div>';
+  }
+
+  function rowHTML(o){
+    var nameHTML = o.holder
+      ? '<span class="nm"><span class="lead">ถืออยู่ </span>'+esc(o.holder)+'</span>'+(o.orig?'<span class="orig">เดิมของ '+esc(o.orig)+'</span>':'')
+      : '<span class="nm">'+esc(o.nm)+'</span>';
+    return '<button class="prow" data-pick="'+esc(o.ds)+'"><span>'+nameHTML+
+      '<span class="meta"><span class="date">'+esc(o.date)+'</span><span class="pos">'+esc(o.pos)+'</span></span></span>'+
+      '<span style="display:flex;align-items:center;gap:8px;"><span class="badge">'+esc(o.round)+'</span><span class="chev">›</span></span></button>';
+  }
+
+  // ── CONCESSION step (= _lwwTransferConfirm, for swap + receive/add) ──
+  function concessionHTML(){
+    var swap = S.action==='swap';
+    var tShift = swap ? S.other : S.offered;
+    var holder = swap ? S.other.holder : S.offered.giver;
+    var kindLabel = swap ? 'แลกกับ' : 'รับจาก';
+    var title = swap ? 'ยืนยันการแลกเวร' : 'ยืนยันการรับเวร';
+    return '<div class="lww-title"><span class="t">'+title+'</span></div>'+
+      '<div class="lww-info"><span>ℹ️</span><div>ช่องนี้ตอนนี้เป็นของ <b>'+esc(holder)+'</b> · ลงเมื่อ '+esc(tShift.at)+'</div></div>'+
+      '<label class="lww-lab">'+kindLabel+' (แตะเพื่อเลือก/แก้ชื่อ)</label>'+
+      '<div class="lww-field" id="lwwField"><span class="v" id="lwwVal">'+esc(S.fromName)+'</span><span class="car">▾</span></div>'+
+      '<div class="lww-hint">↑ ระบุชื่อผู้สัมปทานเวร — ไดอะแกรมข้างล่างเปลี่ยนตามทันที</div>'+
+      '<div class="diag-wrap"><div class="dw-h">ผลของรายการนี้</div><div id="diagArea">'+ diagramHTML() +'</div></div>'+
+      '<div class="lww-btns">'+
+        '<button class="lbtn" data-home="1">ยกเลิก</button>'+
+        '<button class="lbtn ok" data-confirm="1">ยืนยัน · เผยแพร่</button>'+
+      '</div>';
+  }
+  function wireConcession(){
+    var field = document.getElementById('lwwField');
+    if (field) field.addEventListener('click', openNamePicker);
+  }
+  function openNamePicker(){
+    npOv.hidden = false;
+    backBtn.classList.add('on');
+    function draw(q){
+      var list = NAMES.filter(function(x){ q=(q||'').trim(); return !q || x.n.indexOf(q)>=0 || x.k.indexOf(q)>=0; });
+      return list.map(function(x){
+        return '<div class="np-row'+(x.n===S.fromName?' cur':'')+'" data-name="'+esc(x.n)+'"><span class="nn">'+esc(x.k)+'</span><span class="nk">('+esc(x.n)+')</span></div>';
+      }).join('') || '<div style="padding:14px;color:var(--sub);font-size:13px;">ไม่พบชื่อ</div>';
+    }
+    npOv.innerHTML = '<div class="np-box"><div class="np-h"><span class="t">ระบุชื่อผู้สัมปทานเวร</span>'+
+      '<button type="button" id="npX" style="border:none;background:none;font-size:18px;cursor:pointer;color:var(--sub);">✕</button></div>'+
+      '<input class="np-search" id="npSearch" placeholder="พิมพ์ค้นหาชื่อ / ชื่อเล่น…" autocomplete="off">'+
+      '<div class="np-list" id="npList">'+draw('')+'</div></div>';
+    document.getElementById('npX').addEventListener('click', function(){ npOv.hidden=true; backBtn.classList.toggle('on', stack.length>1); });
+    document.getElementById('npSearch').addEventListener('input', function(){ document.getElementById('npList').innerHTML = draw(this.value); });
+    npOv.querySelector('#npList').addEventListener('click', function(e){
+      var row = e.target.closest('[data-name]'); if(!row) return;
+      S.fromName = row.getAttribute('data-name');
+      npOv.hidden = true; backBtn.classList.toggle('on', stack.length>1);
+      document.getElementById('lwwVal').textContent = S.fromName;
+      document.getElementById('diagArea').innerHTML = diagramHTML();   // LIVE update
+    });
+  }
+
+  // ── plain confirm (give / cancel — no concession) ──
+  function confirmPlainHTML(){
+    var swap=false;
+    return '<div class="sc-title">'+(S.action==='give'?'ยืนยันการยกเวร':'ยืนยันการยกเลิก')+'</div>'+
+      '<div class="sc-sub">ตรวจทิศทางก่อนเผยแพร่ให้ทุกคนเห็น</div>'+
+      '<div class="diag-wrap"><div class="dw-h">ผลของรายการนี้</div>'+ diagramHTML() +'</div>'+
+      '<div class="cta"><button class="btn" data-home="1">ยกเลิก</button>'+
+      '<button class="btn '+(S.action==='cancel'?'danger':'primary')+'" data-confirm="1">'+(S.action==='cancel'?'ยืนยันยกเลิก':'เสร็จสิ้น · เผยแพร่')+'</button></div>';
+  }
+
+  function pn(name, opts){ opts=opts||{};
+    return '<div class="pn'+(opts.me?' me':'')+'">'+usr()+'<span class="n">'+esc(name)+'</span>'+(opts.hold?'<span class="hold">'+esc(opts.hold)+'</span>':'')+'</div>'; }
+  function ride(dir, code, cls, txt){
+    var chip='<span class="rc">'+esc(code)+'</span>', head='<span class="rh">'+(dir==='r'?'▶':'◀')+'</span>';
+    return '<div class="ride '+cls+'">'+(dir==='r'?chip+head:head+chip)+'</div>'+(txt?'<div class="rt">'+esc(txt)+'</div>':''); }
+  function chainHTML(nodes){
+    var inner = nodes.map(function(nd,i){
+      var nm='<span class="cn'+(nd.you?' you':'')+(nd.now?' now':'')+'">'+esc(nd.name)+'</span>';
+      if(i===nodes.length-1) return nm;
+      return nm+'<span class="cseg"><span class="ca">'+(nd.arr||'→')+'</span><span class="ct">'+esc(nd.arrT||'ยกให้')+'</span></span>';
+    }).join('');
+    return '<div class="chain"><div class="lab">สัมปทาน — เวรนี้ส่งต่อกันมา</div><div class="chain-line">'+inner+'</div></div>';
+  }
+
+  function ppl(items){
+    return '<div class="pline">'+items.map(function(it){
+      if(it.a) return '<span class="par"><span class="s">'+it.a.sym+'</span>'+(it.a.label?'<span class="l">'+esc(it.a.label)+'</span>':'')+'</span>';
+      var p=it.p;
+      return '<span class="pp'+(p.me?' me':'')+(p.now?' now':'')+'">'+usr()+'<span class="nm">'+esc(p.name)+'</span>'+(p.sub?'<span class="sub">'+esc(p.sub)+'</span>':'')+'</span>';
+    }).join('')+'</div>';
+  }
+
+  function diagramHTML(){
+    if (S.action==='swap'){
+      var o=S.other, me=S.mine, B=S.fromName, A=null;
+      // A → B ⟷ C. A = the name the schedule shows that ISN'T the real person you deal with:
+      if (B !== o.holder) A = o.holder;      // you named a real holder different from the schedule owner
+      else if (o.orig) A = o.orig;           // recorded concession (เดิมของ)
+      var items=[];
+      if(A){ items.push({p:{name:A,sub:'เจ้าของเดิม'}}); items.push({a:{sym:'→',label:'ยกให้'}}); }
+      items.push({p:{name:B,sub:'คนถือจริง',now:true}});
+      items.push({a:{sym:'⟷',label:'สลับ'}});
+      items.push({p:{name:YOU,sub:'เรา',me:true}});
+      return ppl(items)+
+        '<div class="result">'+
+          '<div class="rowo">• คุณให้ <b>'+esc(me.pos)+'</b> ('+esc(me.date)+') → ได้ <b>'+esc(o.pos)+'</b> ('+esc(o.date)+')</div>'+
+          '<div class="rowo">• หลังสลับ: คุณถือ <b>'+esc(o.pos)+'</b> · '+esc(B)+' ถือ <b>'+esc(me.pos)+'</b></div>'+
+          (A?'<div style="margin-top:5px;">สลับกับ <b>'+esc(B)+'</b> คนถือจริง <span class="warn">ไม่ใช่ '+esc(A)+' (ชื่อในตาราง)</span></div>':'')+
+        '</div>';
+    }
+    if (S.action==='give'){
+      var m2=S.mine;
+      return ppl([{p:{name:YOU,sub:'เรา',me:true}},{a:{sym:'→',label:'ยกให้'}},{p:{name:S.person,sub:'ผู้รับ'}}])+
+        '<div class="result">เวร <b>'+esc(m2.pos)+'</b> ('+esc(m2.date)+') จะไปเป็นของ <b>'+esc(S.person)+'</b>. คุณจะไม่มีเวรนี้แล้ว.</div>';
+    }
+    if (S.action==='receive'){
+      var f=S.offered, B=S.fromName, A=null;
+      // Same A→B→C rule as swap: A = the schedule-shown owner when the real giver differs.
+      if (B !== f.giver) A = f.giver;        // you named a real giver different from the schedule owner
+      else if (f.orig) A = f.orig;           // recorded concession
+      var items=[];
+      if(A){ items.push({p:{name:A,sub:'เจ้าของเดิม'}}); items.push({a:{sym:'→',label:'ยกให้'}}); }
+      items.push({p:{name:B,sub:'ผู้ให้จริง',now:true}});
+      items.push({a:{sym:'→',label:'รับมา'}});
+      items.push({p:{name:YOU,sub:'เรา',me:true}});
+      return ppl(items)+
+        '<div class="result">เวร <b>'+esc(f.pos)+'</b> ('+esc(f.date)+') รับจาก <b>'+esc(B)+'</b> จะมาเป็นของ <b>คุณ</b>.'+
+        (A?'<div style="margin-top:5px;">รับจาก <b>'+esc(B)+'</b> ผู้ให้จริง <span class="warn">ไม่ใช่ '+esc(A)+' (ชื่อในตาราง)</span></div>':'')+'</div>';
+    }
+    var c=S.cancel;
+    return ppl([{p:{name:YOU,sub:'เรา',me:true}},{a:{sym:'↩',label:'คืนกลับ'}},{p:{name:c.from,sub:'เจ้าของเดิม'}}])+
+      '<div class="result">เวร <b>'+esc(c.pos)+'</b> ที่คุณ'+esc(c.via)+'จาก <b>'+esc(c.from)+'</b> จะ<span class="warn">กลับไปเป็นของ '+esc(c.from)+'</span> เหมือนเดิม.</div>';
+  }
+
+  screen.addEventListener('click', function(e){
+    var a=e.target.closest('[data-act]');
+    if(a){ var k=a.getAttribute('data-act'); S={action:k};
+      if(k==='receive') go('pickOffered'); else if(k==='cancel') go('pickCancel'); else go('pickMine'); return; }
+    var p=e.target.closest('[data-pick]');
+    if(p){ var v=p.getAttribute('data-pick').split(':'), kind=v[0], val=v.slice(1).join(':');
+      if(kind==='mine'){ S.mine=MINE.filter(function(x){return x.id===val;})[0]; go(S.action==='swap'?'pickOther':'pickPerson'); }
+      else if(kind==='other'){ S.other=OTHERS.filter(function(x){return x.id===val;})[0]; S.fromName=S.other.holder; go('concession'); }
+      else if(kind==='person'){ S.person=val; go('confirmPlain'); }
+      else if(kind==='offered'){ S.offered=OFFERED.filter(function(x){return x.id===val;})[0]; S.fromName=S.offered.giver; go('concession'); }
+      else if(kind==='cancel'){ S.cancel=CHANGED.filter(function(x){return x.id===val;})[0]; go('confirmPlain'); }
+      return; }
+    if(e.target.closest('[data-confirm]')){ go('done'); return; }
+    if(e.target.closest('[data-home]')){ S={}; stack=['home']; npOv.hidden=true; render('home'); return; }
+  });
+
+  document.getElementById('qbox').innerHTML =
+    '<b>flow จริงตอนนี้:</b> สลับ = เลือกเวรคุณ → เลือกเวรคนอื่น → <b>ระบุชื่อผู้สัมปทานเวร (แลกกับ ▾)</b> → เผยแพร่ · รับ = เลือกเวรที่เสนอ → <b>รับจาก ▾</b> → เผยแพร่ · ยก/ยกเลิก = ไม่มีสัมปทาน.<br>'+
+    'แตะช่อง “แลกกับ/รับจาก ▾” เปิด “ระบุชื่อผู้สัมปทานเวร” (ค้นหา+เลือก) แล้วดูไดอะแกรมเปลี่ยนสด. เช็คว่า ตำแหน่งขั้นสัมปทาน + หน้าตา dialog ตรงของจริงหรือยัง (<code>_lwwTransferConfirm</code>).';
+
+  stack=['home']; render('home');
+})();
+</script>
