@@ -2760,7 +2760,9 @@ window.allPharmacistNames = [];
       const ghosts = [];
 
       // Pass 0: bilateral synth — for viewers named as partnerName in someone else's overlay
-      if (Array.isArray(pathBOverlays) && pathBOverlays.length > 0) {
+      // v3.49 สมุดส่วนตัว: เมื่อปิดเผยแพร่ → ไม่ "รับ" เวรจาก overlay ของคนอื่นอัตโนมัติ.
+      //   ต่างคนต่างจดในสมุดตัวเอง (own 'add' อยู่ Pass 1) → ข้าม bilateral synth ทั้งก้อน.
+      if (window._publishEnabled && Array.isArray(pathBOverlays) && pathBOverlays.length > 0) {
         const ownReceivedKeys = new Set();
         actions.forEach(a => {
           if (a.action === 'add' && a.shiftKey) ownReceivedKeys.add('add::' + a.shiftKey);
@@ -2947,6 +2949,25 @@ window.allPharmacistNames = [];
       console.log('[sync publish] ' + (on ? 'ON (persisted)' : 'OFF'));
     };
 
+    // v3.49 — "สมุดส่วนตัว" (personal book) mode. Flag: window._publishEnabled.
+    //   Klui ตัดสินใจถอยกลับ concept "สมุดของแต่ละคน" สำหรับ launch: ปิดการเผยแพร่ขึ้น
+    //   "สมุดกลาง" ทั้งหมด → ไม่มี overlay ข้ามคน = ไม่มี conflict ข้ามคนตั้งแต่ต้น.
+    //   DEFAULT OFF (personal book). ทุกอย่างที่ผู้ใช้บันทึก = ร่างในสมุดตัวเอง (draft ใน
+    //   OverlayManager) ซึ่งซิงค์ข้ามเครื่องตัวเองผ่าน addAction→_phxScheduleSync อยู่แล้ว
+    //   (ไม่ผูกกับ flag นี้) → ICS / Google Calendar / Export ยังอ่าน effective data ของตัวเองได้ครบ.
+    //   ⚠️ 100% reversible: ปิด = "กรอง" overlay สาธารณะของคนอื่นออกจาก view + ซ่อนปุ่มเผยแพร่
+    //      ไม่ได้ลบข้อมูลอะไร. เปิดกลับด้วย setPublishEnabled(true) → ทุกอย่างกลับมาเหมือนเดิม.
+    //   หมายเหตุ: draft ไม่เคยโผล่ให้คนอื่นเห็นอยู่แล้ว (PBOverlays/ghosts/notes skip draft) —
+    //      flag นี้เพิ่มการซ่อน overlay ที่ "public" ของคนอื่น (ที่เคยเผยแพร่ก่อนหน้า) ด้วย.
+    window._publishEnabled = (function() { try { return localStorage.getItem('publish_enabled') === '1'; } catch (e) { return false; } })();
+    window.setPublishEnabled = function(on) {
+      window._publishEnabled = !!on;
+      try { localStorage.setItem('publish_enabled', on ? '1' : '0'); } catch (e) {}
+      if (typeof invalidateGhostCache === 'function') invalidateGhostCache();
+      if (typeof triggerUpdate === 'function') triggerUpdate();
+      console.log('[publish] ' + (on ? 'ON — สมุดกลาง (เผยแพร่ได้)' : 'OFF — สมุดส่วนตัว (persisted)'));
+    };
+
     function _lwwViewerRecords(monthId, viewerName) {
       var pub = (Array.isArray(pathBOverlays) ? pathBOverlays : []).filter(function(o) { return o && String(o._visibility || 'public') !== 'draft'; });
       if (!viewerName || typeof OverlayManager === 'undefined') return pub;
@@ -3053,7 +3074,8 @@ window.allPharmacistNames = [];
         let ghosts = [];
         if (user) {
           ghosts = buildGhostRows(rawData || [], mid, user);
-        } else if (Array.isArray(pathBOverlays) && pathBOverlays.length > 0) {
+        } else if (window._publishEnabled && Array.isArray(pathBOverlays) && pathBOverlays.length > 0) {
+          // v3.49 สมุดส่วนตัว: view แบบไม่ระบุชื่อ (ห้อง/วัน) จะไม่ synth ghost ของคนอื่นเมื่อปิดเผยแพร่
           // v3.42.7: no name filter (room/date view) — collect ghosts for every recipient
           //          so the current holder shows up next to the giver's struck-out row.
           const recipients = new Set();
@@ -3362,6 +3384,9 @@ window.allPharmacistNames = [];
         if (!o || String(o.action) !== 'note') return;
         var vis = String(o._visibility || 'public');
         if (vis === 'draft' || vis === 'private') return;   // only public notes reach other people
+        // v3.49 สมุดส่วนตัว: ปิดเผยแพร่ → ไม่แสดงโน้ตสาธารณะของ "คนอื่น" (เก็บเฉพาะของตัวเอง
+        //   ซึ่งมาจาก own side ด้านล่างอยู่แล้ว). โน้ตของเรายังเห็น/แก้ได้ปกติ.
+        if (!window._publishEnabled && (!viewer || String(o.viewerName || '') !== String(viewer))) return;
         var id = String(o.actionId || o.id || ''); if (!id) return;
         byId[id] = norm(id, o);
       });
@@ -3539,6 +3564,7 @@ window.allPharmacistNames = [];
       if (typeof triggerUpdate === 'function') triggerUpdate();
     }
     function _pbPopupPublish(mid, id) {
+      if (!window._publishEnabled) { if (typeof _p2bShowToast === 'function') _p2bShowToast('โหมดสมุดส่วนตัว — บันทึกไว้ในสมุดของคุณแล้ว', 'ok'); return; }   // v3.49
       var ids = _collectConnectedChain(mid, id);
       ids.forEach(function(x) { OverlayManager.publishAction(mid, x); });
       _pbReconcile(mid);
@@ -3553,6 +3579,7 @@ window.allPharmacistNames = [];
       renderPublishModal();
     }
     function _pbPublishAllDrafts(mid) {
+      if (!window._publishEnabled) return;   // v3.49 สมุดส่วนตัว — ไม่เผยแพร่
       var viewer = (typeof _pbGetLoggedInName === 'function') ? _pbGetLoggedInName() : null;
       if (!mid || !viewer) return;
       // v3.45: include retro hops this login recorded for others (_retroBy) — same
@@ -4139,7 +4166,11 @@ window.allPharmacistNames = [];
         // v3.44 Step 4b: a DRAFT record must never strike/affect anyone else's row.
         //   (This was the 103(1)* desync: a private draft leaked into the public view.)
         const overlays = (Array.isArray(pathBOverlays) ? pathBOverlays : [])
-          .filter(o => o && String(o._visibility || 'public') !== 'draft');
+          .filter(o => o && String(o._visibility || 'public') !== 'draft')
+          // v3.49 สมุดส่วนตัว: เมื่อปิดเผยแพร่ → ไม่ให้ overlay สาธารณะของ "คนอื่น" มาขีดฆ่าแถวใน
+          //   view ของเรา. เก็บเฉพาะที่เราเป็นคนทำเอง (viewerName===เรา; รวม retro mirror ของตัวเอง).
+          //   own drafts ยังขีดฆ่าผ่าน OverlayManager (om) ใน _combinedUsedMap อยู่แล้ว.
+          .filter(o => window._publishEnabled || (loggedInName && String(o.viewerName || '') === String(loggedInName)));
         const map = {};
         const colors = {};
         let idx = 0;
@@ -4749,6 +4780,7 @@ window.allPharmacistNames = [];
       const _unpubBtn = e.target.closest('[data-pb-unpublish]');
       const btn = _pubBtn || _unpubBtn;
       if (!btn) return;
+      if (_pubBtn && !window._publishEnabled) { e.stopPropagation(); return; }   // v3.49 สมุดส่วนตัว
       e.stopPropagation();
       const mid = btn.getAttribute('data-pb-mid');
       const ids = (_pubBtn ? btn.getAttribute('data-pb-publish') : btn.getAttribute('data-pb-unpublish'))
@@ -4791,6 +4823,7 @@ window.allPharmacistNames = [];
     document.addEventListener('click', function(e) {
       const btn = e.target.closest('[data-pb-publish-row]');
       if (!btn) return;
+      if (!window._publishEnabled) { e.stopPropagation(); return; }   // v3.49 สมุดส่วนตัว
       e.stopPropagation();
       const mid = btn.getAttribute('data-pb-mid');
       const rootId = btn.getAttribute('data-pb-publish-row');
@@ -6155,6 +6188,8 @@ window.allPharmacistNames = [];
         rowsHtml = _swfRowHtml(tgtShift, false);
         miniLabel = 'เวรที่รับมา';
       }
+      // v3.49 สมุดส่วนตัว: เมื่อปิดเผยแพร่ ปุ่ม "เสร็จสิ้น" = บันทึกในสมุดตัวเอง (ไม่ push ขึ้นสมุดกลาง)
+      var _pbOn = !!window._publishEnabled;
       var title = kind === 'swap' ? '🔄 ยืนยันการแลกเวร'
                 : (kind === 'give' ? '🎁 ยืนยันการยกเวร'
                 : '🤝 ยืนยันการรับเวร');
@@ -6170,13 +6205,17 @@ window.allPharmacistNames = [];
       ov.innerHTML = '<div style="background:var(--surface); width:100%; max-width:440px; max-height:88vh; overflow-y:auto; border-radius:16px; padding:18px; font-family:inherit;">' +
         '<div style="display:flex; align-items:center; gap:7px;"><div style="font-weight:700; font-size:16px;">' + title + '</div>' +
         '<button type="button" id="swfX" style="margin-left:auto; border:none; background:none; color:var(--sub); font-size:18px; cursor:pointer;">✕</button></div>' +
-        '<div style="font-size:12px; color:var(--sub); margin:3px 0 12px; text-align:center;">ตรวจสอบก่อนเผยแพร่ให้ทุกคนเห็น</div>' +
+        '<div style="font-size:12px; color:var(--sub); margin:3px 0 12px; text-align:center;">' +
+          (_pbOn ? 'ตรวจสอบก่อนเผยแพร่ให้ทุกคนเห็น' : 'บันทึกไว้ในสมุดของคุณ') + '</div>' +
         '<div class="swf-summary">' + _swfSummaryHtml(action, viewer, myShift, tgtShift) + '</div>' +
         tableHtml +
-        '<div class="swf-draft-note">💾 <div>บันทึกเป็น <b>ฉบับร่าง</b> ไว้แล้ว — เน็ตหลุดก็ไม่หาย กด <b>"เสร็จสิ้น"</b> เพื่อเผยแพร่ให้คนอื่นเห็น</div></div>' +
+        (_pbOn
+          ? '<div class="swf-draft-note">💾 <div>บันทึกเป็น <b>ฉบับร่าง</b> ไว้แล้ว — เน็ตหลุดก็ไม่หาย กด <b>"เสร็จสิ้น"</b> เพื่อเผยแพร่ให้คนอื่นเห็น</div></div>'
+          : '<div class="swf-draft-note">💾 <div>บันทึกใน<b>สมุดของคุณ</b>แล้ว — เน็ตหลุดก็ไม่หาย และซิงค์เข้าเครื่องอื่นของคุณเอง</div></div>') +
         '<div class="swf-btns">' +
-        '<button type="button" id="swfKeep" class="swf-btn">เก็บร่างไว้ก่อน</button>' +
-        '<button type="button" id="swfDone" class="swf-btn swf-primary">✓ เสร็จสิ้น · เผยแพร่</button>' +
+        (_pbOn ? '<button type="button" id="swfKeep" class="swf-btn">เก็บร่างไว้ก่อน</button>' : '') +
+        '<button type="button" id="swfDone" class="swf-btn swf-primary">' +
+          (_pbOn ? '✓ เสร็จสิ้น · เผยแพร่' : '✓ บันทึกในสมุดของฉัน') + '</button>' +
         '</div>' +
         '<button type="button" id="swfDiscard" class="swf-link-cancel">ยกเลิกรายการนี้ (ทิ้งร่าง)</button>' +
         '</div>';
@@ -6185,12 +6224,19 @@ window.allPharmacistNames = [];
       //   pending-drafts popup reminds on the next edit-mode entry.
       ov.addEventListener('click', function(e) { if (e.target === ov) _swfClose(); });
       document.getElementById('swfX').addEventListener('click', _swfClose);
-      document.getElementById('swfKeep').addEventListener('click', function() {
+      var _swfKeepBtn = document.getElementById('swfKeep');   // v3.49: absent in personal-book mode
+      if (_swfKeepBtn) _swfKeepBtn.addEventListener('click', function() {
         // "เก็บร่างไว้ก่อน" — the draft is already saved (addAction). Just close; publish later.
         _swfClose();
         if (typeof _p2bShowToast === 'function') _p2bShowToast('เก็บเป็นร่างแล้ว — ยังไม่เผยแพร่', 'ok');
       });
       document.getElementById('swfDone').addEventListener('click', function() {
+        // v3.49 สมุดส่วนตัว: ปิดเผยแพร่ → แค่ปิดหน้าต่าง (บันทึกในสมุดตัวเองไปแล้วตอน addAction).
+        if (!_pbOn) {
+          _swfClose();
+          if (typeof _p2bShowToast === 'function') _p2bShowToast('บันทึกในสมุดของคุณแล้ว', 'ok');
+          return;
+        }
         var bound = (typeof _pbGetLoggedInName === 'function') ? _pbGetLoggedInName() : null;
         _swfClose();
         if (!bound) {
@@ -6221,6 +6267,8 @@ window.allPharmacistNames = [];
     //   them (and since the inline 🌐 was removed they'd otherwise have no publish surface).
     //   Returns null when there's no logged-in identity / month. Shared by the popup + tab banner.
     function _swfCollectDrafts(mid) {
+      // v3.49 สมุดส่วนตัว: ไม่มีการเผยแพร่ → ไม่มี "ร่างค้างรอเผยแพร่" → ซ่อนแบนเนอร์/ป๊อปอัพนี้ทั้งหมด.
+      if (!window._publishEnabled) return null;
       var bound = (typeof _pbGetLoggedInName === 'function') ? _pbGetLoggedInName() : null;
       if (!bound) return null;                  // publishing needs a logged-in identity
       mid = mid || getCurrentMonthId();
