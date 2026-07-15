@@ -5406,10 +5406,7 @@ window.allPharmacistNames = [];
       actionState.usedInfo = null;
       renderActionModal();
       document.getElementById('actionModal').style.display = 'flex';
-      // v3.47: focus the code box SYNCHRONOUSLY (still inside the tap gesture) so the mobile keyboard
-      //   opens — a deferred setTimeout focus doesn't raise the keyboard on phones.
-      var _inp = document.getElementById('pickerSearchInput');
-      if (_inp) { try { _inp.focus(); } catch (e) {} }
+      // v3.49: ไม่ auto-focus ช่องค้นหาแล้ว — บนมือถือคีย์บอร์ดจะเด้งขึ้นมาบัง UI. ให้ผู้ใช้แตะช่องเองเมื่อพร้อมพิมพ์ (Klui).
     }
 
     function closeActionModal() {
@@ -5472,13 +5469,7 @@ window.allPharmacistNames = [];
         var _plc = document.getElementById('pickerListContent');
         if (_plc) _plc.innerHTML = '<div class="pick-empty">กำลังโหลด…</div>';
         setTimeout(function() { try { updatePickerListContent(); } catch(e){} }, 0);
-        setTimeout(function() {
-          const inp = document.getElementById('pickerSearchInput');
-          if (inp) {
-            inp.focus();
-            try { inp.setSelectionRange(inp.value.length, inp.value.length); } catch(e) {}
-          }
-        }, 30);
+        // v3.49: ไม่ auto-focus/auto-cursor ช่องค้นหา — บนมือถือคีย์บอร์ดจะเด้งมาบัง. ให้ผู้ใช้แตะเอง (Klui).
       }
     }
 
@@ -5988,7 +5979,7 @@ window.allPharmacistNames = [];
       search.addEventListener('input', render);
       render();
       // v3.45.2: free-text opt-in removed — known-names-only (see picker header comment).
-      setTimeout(function() { try { search.focus(); } catch (e) {} }, 60);
+      // v3.49: ไม่ auto-focus ช่องค้นหาชื่อ — บนมือถือคีย์บอร์ดจะเด้งมาบัง. ให้ผู้ใช้แตะเอง (Klui).
     }
 
     // ═══════════════════════════════════════════════════════════
