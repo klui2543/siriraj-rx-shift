@@ -5894,6 +5894,16 @@ window.allPharmacistNames = [];
       const aid = actionState.usedInfo && actionState.usedInfo.actionId;
       closeActionModal();
       if (!aid) { triggerUpdate(); return; }
+      // v3.49 สมุดส่วนตัว: ไม่มี "สมุดกลาง" ให้ปกป้องแล้ว → ยกเลิกได้อิสระ ไม่ต้องรหัสผ่าน/
+      //   ไม่ติดกฎ tail-only. ลบทั้ง "เชน" ที่เชื่อมกัน (พ่อ+ลูก) พร้อมกัน กัน hop ค้าง/orphan —
+      //   ครอบคลุมเชนเก่าที่ค้างมาจากตอนยังเปิดเผยแพร่ (Klui: "บางเวรที่สลับไว้ก่อนหน้ายกเลิกไม่ได้").
+      if (!window._publishEnabled) {
+        var _ids = (typeof _collectConnectedChain === 'function') ? _collectConnectedChain(mid, aid) : [aid];
+        if (!_ids.length) _ids = [aid];
+        _ids.forEach(function(x){ try { OverlayManager.removeAction(mid, x); } catch(e){} });
+        triggerUpdate();
+        return;
+      }
       // v3.45: undo is DRAFT-only. A published record must go through the cancel
       //   flow (reason + password → permanent audit) — no silent revert of a
       //   public transaction (chain safety + no cheating).
