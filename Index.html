@@ -11201,6 +11201,9 @@ table.exp-tbl .tm{margin-left:3px;opacity:0.75;}
       </div>
 
       <div id="ecmPanel2" style="display:none;">
+        <!-- v3.49 D1: พรีเซ็ตห้อง + คนที่จะปริ้น (แยกจากฟิลเตอร์ตารางหลัก, เอกเทศต่อคน) -->
+        <div id="ecmPeoplePanel" class="ecm-card" style="padding:12px 14px; margin-bottom:10px;"></div>
+
         <!-- v3.37: รูปแบบ toggle (ปฏิทิน / ตาราง / รวม) -->
         <div class="ecm-card" style="padding:10px 14px;">
           <div style="font-size:9px; font-weight:700; color:var(--sub); text-transform:uppercase; letter-spacing:0.3px; margin-bottom:6px;">รูปแบบ</div>
@@ -11242,10 +11245,38 @@ table.exp-tbl .tm{margin-left:3px;opacity:0.75;}
       from { transform: translateY(100%); opacity: 0; }
       to { transform: translateY(0); opacity: 1; }
     }
+    /* v3.49 D1 — export people/preset panel */
+    #ecmPeoplePanel .ecm-mine { font-size:10.5px; color:var(--sub); text-align:center; margin-bottom:11px; }
+    #ecmPeoplePanel .ecm-seclab { font-size:11px; font-weight:700; color:var(--sub); margin:0 0 7px; }
+    #ecmPeoplePanel .ecm-seclab.mt { margin-top:14px; }
+    #ecmPeoplePanel .ecm-chips { display:flex; flex-wrap:wrap; gap:7px; }
+    #ecmPeoplePanel .ecm-preset { display:inline-flex; align-items:center; gap:5px; padding:7px 11px; border-radius:999px; border:1px solid var(--border); background:var(--surface); font-family:inherit; font-size:12.5px; font-weight:600; color:var(--text); cursor:pointer; }
+    #ecmPeoplePanel .ecm-preset .co { font-size:10px; color:var(--sub); }
+    #ecmPeoplePanel .ecm-preset .px { color:var(--sub); font-size:12px; margin-left:2px; padding:0 2px; border-radius:4px; }
+    #ecmPeoplePanel .ecm-preset .px:hover { color:#dc2626; background:rgba(220,38,38,0.08); }
+    #ecmPeoplePanel .ecm-preset.ecm-add { border-style:dashed; color:var(--accent); font-weight:700; }
+    #ecmPeoplePanel .ecm-people { display:flex; flex-wrap:wrap; gap:6px; align-items:center; }
+    #ecmPeoplePanel .ecm-pchip { display:inline-flex; align-items:center; gap:5px; padding:5px 10px; border-radius:8px; background:var(--accent-bg); border:1px solid var(--accent-border,#bfdbfe); color:var(--name,#1e3a8a); font-size:12px; font-weight:600; }
+    #ecmPeoplePanel .ecm-pchip .x { color:var(--sub); cursor:pointer; font-size:13px; }
+    #ecmPeoplePanel .ecm-addp { padding:5px 10px; border-radius:8px; border:1px dashed var(--accent-border,#bfdbfe); background:none; color:var(--accent); font-size:12px; font-weight:700; cursor:pointer; font-family:inherit; }
+    #ecmPeoplePanel .ecm-people-empty { font-size:11.5px; color:var(--sub); padding:5px 2px; }
+    #ecmPeoplePanel .ecm-sheet { margin-top:9px; border:1px solid var(--accent); border-radius:10px; overflow:hidden; display:none; }
+    #ecmPeoplePanel .ecm-sheet.show { display:block; }
+    #ecmPeoplePanel .ecm-sheet input { width:100%; padding:9px 11px; border:none; border-bottom:1px solid var(--border); font-family:inherit; font-size:13px; background:var(--bg); color:var(--text); outline:none; }
+    #ecmPeoplePanel .ecm-sheet-list { max-height:150px; overflow-y:auto; }
+    #ecmPeoplePanel .ecm-sheet-row { padding:9px 11px; border-bottom:1px solid var(--border); cursor:pointer; font-size:13px; display:flex; justify-content:space-between; align-items:center; color:var(--text); }
+    #ecmPeoplePanel .ecm-sheet-row:last-child { border-bottom:none; }
+    #ecmPeoplePanel .ecm-sheet-row.picked { color:var(--sub); }
+    #ecmPeoplePanel .ecm-sheet-row .k { color:var(--sub); font-size:11px; }
+    #ecmPeoplePanel .ecm-sheet-save { display:flex; gap:8px; padding:9px 11px; }
+    #ecmPeoplePanel .ecm-sheet-save input { flex:1; border:1px solid var(--border); border-radius:7px; border-bottom:1px solid var(--border); }
+    #ecmPeoplePanel .ecm-sheet-save button { border:1px solid var(--accent); background:var(--accent); color:#fff; font-family:inherit; font-size:12.5px; font-weight:700; border-radius:7px; padding:0 14px; cursor:pointer; }
   </style>
 
   <script>
     function openExportCalendarModal() {
+      // v3.49 D1: เตรียมรายชื่อ export จากฟิลเตอร์หลักก่อน (กันค่าค้างจากครั้งก่อน) แล้วค่อยเช็ค/วาดพาเนล
+      try { _ecmSeedExportPeople(); } catch(e) {}
       // v3.37: รองรับ multi-name (chips หลายคน) — ICS ยังจำกัด 1 คน แต่ PDF batch ได้
       const targets = (typeof _ecmGetExportTargets === 'function') ? _ecmGetExportTargets() : [];
       if (targets.length === 0) {
@@ -11267,6 +11298,8 @@ table.exp-tbl .tm{margin-left:3px;opacity:0.75;}
       try { _ecmLoadRound3State(); } catch(e) {}
       // v3.37: refresh info + button states for Tab 2
       try { _ecmUpdateExportInfo(); } catch(e) {}
+      // v3.49 D1: วาดพาเนลพรีเซ็ต/คน (seed ทำที่ต้นฟังก์ชันแล้ว)
+      try { _ecmRenderPeoplePanel(); } catch(e) {}
     }
 
     // v3.15: device detection — Apple family (iPhone/iPad/iPod/Mac) vs everything else
@@ -12263,10 +12296,142 @@ table.exp-tbl .tm{margin-left:3px;opacity:0.75;}
     }
 
     function _ecmGetExportTargets() {
+      // v3.49 D1: ถ้าผู้ใช้แก้รายชื่อในหน้า export (พรีเซ็ต/เพิ่ม/ลบ) → ใช้ลิสต์นั้น (แยกจากฟิลเตอร์ตารางหลัก)
+      if (Array.isArray(window._ecmExportPeople)) return window._ecmExportPeople.slice();
       const sel = window.selectedPharmacists || [];
       if (sel.length > 0) return sel.slice();
       const target = (typeof _getTargetPerson === 'function') ? _getTargetPerson() : null;
       return target ? [target] : [];
+    }
+
+    // ═══ v3.49 D1 — Export presets (พรีเซ็ตห้อง) — เก็บใน user prefs (เอกเทศต่อคน, sync ตาม login) ═══
+    window._ecmExportPeople = null;   // null = ใช้ selectedPharmacists; array = ลิสต์ที่ผู้ใช้แก้ในหน้า export
+    function _ecmGetPresets() {
+      try { var p = (typeof phxGetPrefs === 'function') ? phxGetPrefs() : {}; return Array.isArray(p.exportPresets) ? p.exportPresets : []; }
+      catch (e) { return []; }
+    }
+    function _ecmSavePresets(arr) {
+      try { if (typeof phxSetPref === 'function') phxSetPref('exportPresets', Array.isArray(arr) ? arr : []); } catch (e) {}
+    }
+    // seed the editable export list from the LIVE main-filter selection (called on modal open).
+    //   อ่านจาก selectedPharmacists ตรงๆ (ไม่อ่าน _ecmExportPeople เดิม เพื่อไม่ให้ค้างค่าเก่า)
+    function _ecmSeedExportPeople() {
+      var sel = (window.selectedPharmacists || []).slice();
+      if (!sel.length) {
+        var t = (typeof _getTargetPerson === 'function') ? _getTargetPerson() : null;
+        if (t) sel = [t];
+      }
+      window._ecmExportPeople = sel;
+    }
+    function _ecmEscHtml(s) { return String(s == null ? '' : s).replace(/[&<>"']/g, function(c){ return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]; }); }
+    function _ecmPeopleList() { return Array.isArray(window._ecmExportPeople) ? window._ecmExportPeople : []; }
+    function _ecmDisp(n) { try { return (typeof displayName === 'function') ? displayName(n) : n; } catch (e) { return n; } }
+    function _ecmPresetChipsHtml() {
+      var h = _ecmGetPresets().map(function(p){
+        return '<button type="button" class="ecm-preset" data-load="' + _ecmEscHtml(p.id) + '">' + _ecmEscHtml(p.name) +
+               ' <span class="co">·' + ((p.people && p.people.length) || 0) + '</span>' +
+               '<span class="px" data-del="' + _ecmEscHtml(p.id) + '" title="ลบพรีเซ็ต">✕</span></button>';
+      }).join('');
+      return h + '<button type="button" class="ecm-preset ecm-add" data-saveopen>+ บันทึกกลุ่มนี้</button>';
+    }
+    function _ecmPeopleChipsHtml() {
+      var list = _ecmPeopleList();
+      var addBtn = '<button type="button" class="ecm-addp" data-addopen>+ เพิ่มชื่อ</button>';
+      if (!list.length) return '<span class="ecm-people-empty">ยังไม่เลือกคน — แตะพรีเซ็ต หรือ + เพิ่มชื่อ</span>' + addBtn;
+      return list.map(function(n){
+        return '<span class="ecm-pchip">' + _ecmEscHtml(_ecmDisp(n)) + '<span class="x" data-remove="' + _ecmEscHtml(n) + '">✕</span></span>';
+      }).join('') + addBtn;
+    }
+    function _ecmDrawAddList(q) {
+      var listEl = document.getElementById('ecmAddList'); if (!listEl) return;
+      var all = (window.allPharmacistNames || []).slice();
+      var cur = _ecmPeopleList(); q = (q || '').trim();
+      var rows = all.filter(function(n){
+        if (!q) return true;
+        try { if (typeof _nkNameMatches === 'function') return _nkNameMatches(n, q); } catch (e) {}
+        return String(n).toLowerCase().indexOf(q.toLowerCase()) >= 0;
+      }).map(function(n){
+        var picked = cur.indexOf(n) >= 0, disp = _ecmDisp(n);
+        var sub = (disp !== n) ? ' <span class="k">(' + _ecmEscHtml(n) + ')</span>' : '';
+        return '<div class="ecm-sheet-row' + (picked ? ' picked' : '') + '" data-add="' + _ecmEscHtml(n) + '"><span>' + _ecmEscHtml(disp) + sub + '</span><span>' + (picked ? '✓' : '+') + '</span></div>';
+      }).join('');
+      listEl.innerHTML = rows || '<div style="padding:11px;color:var(--sub);font-size:12px;">ไม่พบชื่อ</div>';
+    }
+    function _ecmSyncPeopleUI() {
+      var pl = document.getElementById('ecmPeopleList'); if (pl) pl.innerHTML = _ecmPeopleChipsHtml();
+      try { _ecmUpdateExportInfo(); } catch (e) {}
+      var as = document.getElementById('ecmAddSheet');
+      if (as && as.classList.contains('show')) _ecmDrawAddList((document.getElementById('ecmAddSearch') || {}).value || '');
+    }
+    function _ecmRenderPeoplePanel() {
+      var panel = document.getElementById('ecmPeoplePanel'); if (!panel) return;
+      panel.innerHTML =
+        '<div class="ecm-mine">🔒 พรีเซ็ตเป็นของคุณเอง — คนอื่นไม่เห็น</div>' +
+        '<div class="ecm-seclab">พรีเซ็ตห้องของฉัน</div>' +
+        '<div class="ecm-chips" id="ecmPresetList">' + _ecmPresetChipsHtml() + '</div>' +
+        '<div class="ecm-sheet" id="ecmSaveSheet"><div class="ecm-sheet-save"><input id="ecmPresetName" placeholder="ตั้งชื่อพรีเซ็ต เช่น ห้องยา 103" autocomplete="off"><button type="button" data-saveconfirm>บันทึก</button></div></div>' +
+        '<div class="ecm-seclab mt">คนที่จะปริ้น</div>' +
+        '<div class="ecm-people" id="ecmPeopleList">' + _ecmPeopleChipsHtml() + '</div>' +
+        '<div class="ecm-sheet" id="ecmAddSheet"><input id="ecmAddSearch" placeholder="พิมพ์ค้นหาชื่อ / ชื่อเล่น…" autocomplete="off"><div class="ecm-sheet-list" id="ecmAddList"></div></div>';
+      var srch = document.getElementById('ecmAddSearch');
+      if (srch) srch.addEventListener('input', function(){ _ecmDrawAddList(this.value); });
+      if (!panel._ecmWired) { panel._ecmWired = true; panel.addEventListener('click', _ecmPanelClick); }
+    }
+    function _ecmPanelClick(e) {
+      var t = e.target; if (!t || !t.closest) return;
+      var delBtn = t.closest('[data-del]'), loadBtn = t.closest('[data-load]'),
+          rmBtn = t.closest('[data-remove]'), addOpen = t.closest('[data-addopen]'),
+          saveOpen = t.closest('[data-saveopen]'), saveConf = t.closest('[data-saveconfirm]'),
+          addRow = t.closest('[data-add]');
+      // ลบพรีเซ็ต (✕ อยู่ในปุ่ม load) → เช็คก่อน load
+      if (delBtn) {
+        e.stopPropagation();
+        var did = delBtn.getAttribute('data-del');
+        _ecmSavePresets(_ecmGetPresets().filter(function(p){ return String(p.id) !== String(did); }));
+        var pld = document.getElementById('ecmPresetList'); if (pld) pld.innerHTML = _ecmPresetChipsHtml();
+        return;
+      }
+      if (loadBtn) {
+        var p = _ecmGetPresets().find(function(x){ return String(x.id) === String(loadBtn.getAttribute('data-load')); });
+        if (p) { window._ecmExportPeople = (p.people || []).slice(); _ecmSyncPeopleUI(); }
+        return;
+      }
+      if (rmBtn) {
+        var nm = rmBtn.getAttribute('data-remove');
+        window._ecmExportPeople = _ecmPeopleList().filter(function(x){ return x !== nm; });
+        _ecmSyncPeopleUI(); return;
+      }
+      if (addOpen) {
+        var ssA = document.getElementById('ecmSaveSheet'); if (ssA) ssA.classList.remove('show');
+        var asA = document.getElementById('ecmAddSheet');
+        if (asA) { asA.classList.toggle('show'); if (asA.classList.contains('show')) { var si = document.getElementById('ecmAddSearch'); if (si) si.value = ''; _ecmDrawAddList(''); } }
+        return;
+      }
+      if (saveOpen) {
+        if (!_ecmPeopleList().length) { if (typeof _p2bShowToast === 'function') _p2bShowToast('เลือกคนก่อนบันทึกพรีเซ็ต', 'warn'); return; }
+        var asS = document.getElementById('ecmAddSheet'); if (asS) asS.classList.remove('show');
+        var ssS = document.getElementById('ecmSaveSheet');
+        if (ssS) { ssS.classList.toggle('show'); if (ssS.classList.contains('show')) { var pn0 = document.getElementById('ecmPresetName'); if (pn0) pn0.value = ''; } }
+        return;
+      }
+      if (saveConf) {
+        var nameEl = document.getElementById('ecmPresetName');
+        var nm2 = ((nameEl && nameEl.value) || '').trim();
+        var people = _ecmPeopleList().slice();
+        if (!nm2 || !people.length) { return; }
+        var presets = _ecmGetPresets();
+        presets.push({ id: 'ep_' + Date.now(), name: nm2, people: people });
+        _ecmSavePresets(presets);
+        var ssC = document.getElementById('ecmSaveSheet'); if (ssC) ssC.classList.remove('show');
+        var plC = document.getElementById('ecmPresetList'); if (plC) plC.innerHTML = _ecmPresetChipsHtml();
+        if (typeof _p2bShowToast === 'function') _p2bShowToast('บันทึกพรีเซ็ต "' + nm2 + '" แล้ว', 'ok');
+        return;
+      }
+      if (addRow) {
+        var an = addRow.getAttribute('data-add'), cl = _ecmPeopleList();
+        window._ecmExportPeople = (cl.indexOf(an) < 0) ? cl.concat([an]) : cl.filter(function(x){ return x !== an; });
+        _ecmSyncPeopleUI(); return;
+      }
     }
 
     function _ecmUpdateExportInfo() {
