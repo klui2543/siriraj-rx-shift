@@ -32,3 +32,4 @@ static_srv.js
 
 # 6) กัน mockup/prototype (ไฟล์ออกแบบ ไม่ใช่โค้ดแอปจริง) — ต้องอยู่ท้ายสุดเพื่อชนะ !*.html
 swap_easier_mockup.html
+mode_export_mockup.html

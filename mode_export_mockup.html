@@ -1,0 +1,258 @@
+<title>Mock — ทุกอย่างเป็นร่าง + conflict + พรีเซ็ต Export</title>
+<style>
+  :root {
+    --bg:#f8fafc; --surface:#fff; --text:#1e293b; --sub:#64748b; --muted:#94a3b8;
+    --border:#e2e8f0; --accent:#2563eb; --accent-bg:#eff6ff; --accent-border:#bfdbfe; --name:#1e3a8a;
+    --warn-bg:#fff7ed; --warn-fg:#9a3412; --warn-bd:#fed7aa;
+    --dang:#dc2626; --dang-bg:#fef2f2; --dang-bd:#fecaca;
+  }
+  :root.dark {
+    --bg:#0b1220; --surface:#1f2937; --text:#f1f5f9; --sub:#94a3b8; --muted:#64748b;
+    --border:#374151; --accent:#3b82f6; --accent-bg:#1e3a5f; --accent-border:#1d4ed8; --name:#93c5fd;
+    --warn-bg:#3a2408; --warn-fg:#fcd9b0; --warn-bd:#7c4a11;
+    --dang:#f87171; --dang-bg:#450a0a; --dang-bd:#7f1d1d;
+  }
+  @media (prefers-color-scheme:dark){ :root:not(.light){
+    --bg:#0b1220; --surface:#1f2937; --text:#f1f5f9; --sub:#94a3b8; --muted:#64748b;
+    --border:#374151; --accent:#3b82f6; --accent-bg:#1e3a5f; --accent-border:#1d4ed8; --name:#93c5fd;
+    --warn-bg:#3a2408; --warn-fg:#fcd9b0; --warn-bd:#7c4a11;
+    --dang:#f87171; --dang-bg:#450a0a; --dang-bd:#7f1d1d;
+  }}
+  *{box-sizing:border-box;}
+  body{margin:0;background:var(--bg);color:var(--text);font-family:'Kanit','IBM Plex Sans Thai','Noto Sans Thai',system-ui,sans-serif;-webkit-font-smoothing:antialiased;line-height:1.5;}
+  .outer{max-width:430px;margin:0 auto;padding:16px 14px 60px;}
+  .intro{font-size:12px;color:var(--sub);text-align:center;margin:0 0 14px;line-height:1.55;}
+  .intro b{color:var(--text);}
+  .lbl{font-size:11px;font-weight:700;color:var(--sub);letter-spacing:.04em;margin:26px 0 10px;padding-bottom:6px;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:7px;}
+  .lbl .tag{font-size:9.5px;font-weight:700;padding:2px 7px;border-radius:4px;background:var(--accent-bg);color:var(--accent);border:1px solid var(--accent-border);}
+
+  .card{background:var(--surface);border:1px solid var(--border);border-radius:16px;padding:16px;box-shadow:0 4px 18px rgba(15,23,42,.06);position:relative;}
+  .tv-title{font-size:17px;font-weight:800;margin:0 0 3px;}
+  .tv-sub{font-size:11.5px;color:var(--sub);margin-bottom:12px;}
+  .draft-banner{font-size:11.5px;line-height:1.55;background:var(--warn-bg);color:var(--warn-fg);border:1px solid var(--warn-bd);border-radius:9px;padding:10px 12px;margin-bottom:14px;}
+  .draft-banner b{font-weight:700;}
+
+  .acts{display:grid;grid-template-columns:1fr 1fr;gap:9px;}
+  .act{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px;padding:16px 8px;border-radius:13px;border:1px solid var(--border);font-family:inherit;font-size:13.5px;font-weight:700;cursor:pointer;}
+  .act .ic{font-size:22px;line-height:1;}
+  .act.swap{background:#eff6ff;border-color:#bfdbfe;color:#1d4ed8;}
+  .act.give{background:#fefce8;border-color:#fde68a;color:#a16207;}
+  .act.recv{background:#f0fdf4;border-color:#bbf7d0;color:#15803d;}
+  .act.cancel{background:#fef2f2;border-color:#fecaca;color:#dc2626;}
+  :root.dark .act.swap{background:#1e3a5f;border-color:#1d4ed8;color:#93c5fd}
+  :root.dark .act.give{background:#3a2e08;border-color:#a16207;color:#fde047}
+  :root.dark .act.recv{background:#052e16;border-color:#15803d;color:#86efac}
+  :root.dark .act.cancel{background:#450a0a;border-color:#b91c1c;color:#fca5a5}
+
+  .drafts{margin-top:16px;border-top:1px solid var(--border);padding-top:13px;}
+  .drafts-h{font-size:12px;font-weight:700;color:var(--text);margin-bottom:9px;display:flex;align-items:center;gap:6px;}
+  .drafts-h .n{background:var(--warn-bg);color:var(--warn-fg);font-size:10px;font-weight:800;border-radius:999px;padding:1px 8px;}
+  .draft-row{display:flex;align-items:center;gap:9px;background:var(--bg);border:1px solid var(--border);border-radius:10px;padding:9px 11px;margin-bottom:7px;}
+  .draft-row .d{flex:1;min-width:0;}
+  .draft-row .t{font-size:12.5px;font-weight:600;}
+  .draft-row .s{font-size:10.5px;color:var(--sub);margin-top:1px;}
+  .btn-pub{border:1px solid var(--accent);background:var(--accent);color:#fff;font-size:11px;font-weight:700;border-radius:7px;padding:6px 12px;cursor:pointer;font-family:inherit;white-space:nowrap;}
+  .btn-fix{border:1px solid var(--dang);background:var(--dang-bg);color:var(--dang);font-size:11px;font-weight:700;border-radius:7px;padding:6px 12px;cursor:pointer;font-family:inherit;white-space:nowrap;}
+  .draft-note{font-size:10.5px;border-radius:7px;padding:7px 10px;margin:-2px 0 8px;line-height:1.5;}
+  .draft-note.warn{color:var(--warn-fg);background:var(--warn-bg);}
+  .draft-row.conflict{border-color:var(--dang-bd);background:var(--dang-bg);}
+  .draft-row.conflict .t{color:var(--dang);}
+  .pub-all{width:100%;margin-top:5px;padding:11px;border:none;border-radius:9px;background:var(--accent);color:#fff;font-family:inherit;font-size:13.5px;font-weight:700;cursor:pointer;}
+
+  /* export */
+  .ex-h2{font-size:14px;font-weight:700;text-align:center;margin:0 0 4px;}
+  .ex-mine{font-size:10.5px;color:var(--muted);text-align:center;margin-bottom:14px;}
+  .ex-seclab{font-size:11px;font-weight:700;color:var(--sub);margin:0 0 7px;display:flex;justify-content:space-between;align-items:center;}
+  .chips{display:flex;flex-wrap:wrap;gap:7px;margin-bottom:6px;}
+  .preset{display:inline-flex;align-items:center;gap:5px;padding:7px 12px;border-radius:999px;border:1px solid var(--border);background:var(--surface);font-family:inherit;font-size:12.5px;font-weight:600;color:var(--text);cursor:pointer;}
+  .preset.active{background:var(--accent-bg);border-color:var(--accent-border);color:var(--accent);}
+  .preset .co{font-size:10px;color:var(--muted);}
+  .preset .pen{font-size:11px;color:var(--muted);margin-left:2px;}
+  .preset.add{border-style:dashed;color:var(--accent);}
+  .people{display:flex;flex-wrap:wrap;gap:6px;margin:10px 0 4px;min-height:34px;align-items:flex-start;}
+  .pchip{display:inline-flex;align-items:center;gap:5px;padding:5px 10px;border-radius:8px;background:var(--accent-bg);border:1px solid var(--accent-border);color:var(--name);font-size:12px;font-weight:600;}
+  .pchip .x{color:var(--muted);cursor:pointer;font-size:13px;}
+  .addp{padding:5px 10px;border-radius:8px;border:1px dashed var(--accent-border);background:none;color:var(--accent);font-size:12px;font-weight:700;cursor:pointer;font-family:inherit;}
+  .people-empty{font-size:11.5px;color:var(--muted);padding:6px 2px;}
+  .ex-count{font-size:10.5px;color:var(--muted);margin:2px 0 12px;font-weight:600;}
+  .ex-fmt{display:flex;border:1px solid var(--border);border-radius:9px;overflow:hidden;margin-bottom:12px;}
+  .ex-fmt button{flex:1;padding:8px 0;font-family:inherit;font-size:12px;font-weight:600;border:none;background:var(--surface);color:var(--sub);cursor:pointer;}
+  .ex-fmt button.active{background:var(--accent);color:#fff;}
+  .ex-fmt button+button{border-left:1px solid var(--border);}
+  .ex-btn{width:100%;padding:12px;border:none;border-radius:10px;background:var(--accent);color:#fff;font-family:inherit;font-size:14px;font-weight:700;cursor:pointer;}
+
+  /* inline name search (เพิ่มชื่อ / ตั้งชื่อ preset) */
+  .sheet{margin-top:8px;border:1px solid var(--accent);border-radius:10px;overflow:hidden;display:none;}
+  .sheet.show{display:block;}
+  .sheet-h{font-size:11.5px;font-weight:700;color:var(--accent);padding:9px 11px;border-bottom:1px solid var(--border);display:flex;justify-content:space-between;align-items:center;}
+  .sheet-h .x{cursor:pointer;color:var(--muted);}
+  .sheet input{width:100%;padding:9px 11px;border:none;border-bottom:1px solid var(--border);font-family:inherit;font-size:13px;background:var(--bg);color:var(--text);outline:none;}
+  .sheet-list{max-height:150px;overflow-y:auto;}
+  .sheet-row{padding:9px 11px;border-bottom:1px solid var(--border);cursor:pointer;font-size:13px;display:flex;justify-content:space-between;align-items:center;}
+  .sheet-row:last-child{border-bottom:none;}
+  .sheet-row .k{color:var(--sub);font-size:11px;}
+  .sheet-row.picked{color:var(--muted);}
+  .sheet-save{display:flex;gap:8px;padding:9px 11px;}
+  .sheet-save input{flex:1;border:1px solid var(--border);border-radius:7px;}
+  .sheet-save button{border:1px solid var(--accent);background:var(--accent);color:#fff;font-family:inherit;font-size:12.5px;font-weight:700;border-radius:7px;padding:0 14px;cursor:pointer;}
+
+  .note{font-size:12px;color:var(--sub);line-height:1.6;margin:11px 2px 0;}
+  .note b{color:var(--text);}
+  code{font-family:ui-monospace,Menlo,monospace;font-size:11.5px;background:var(--bg);padding:1px 5px;border-radius:5px;border:1px solid var(--border);}
+  .toggle{position:fixed;top:10px;right:10px;z-index:50;}
+  .toggle button{border:1px solid var(--border);background:var(--surface);color:var(--text);border-radius:8px;padding:5px 11px;font-size:11.5px;font-weight:600;cursor:pointer;font-family:inherit;}
+  @media (prefers-reduced-motion:reduce){*{transition:none!important;}}
+</style>
+
+<div class="toggle"><button id="themeBtn" type="button">สลับธีม</button></div>
+
+<div class="outer">
+  <p class="intro"><b>Mock v2</b> — ไอเดีย 1 ปรับเป็น <b>“ทุกอย่างเป็นร่างก่อน”</b> (ตัด toggle) + โชว์ conflict · ไอเดีย 2 เพิ่ม “เพิ่มชื่อ/ตั้งชื่อ preset” + เป็นของแต่ละคน.</p>
+
+  <!-- A -->
+  <div class="lbl">หน้าแลกเวร — ทุกอย่างเป็นร่างก่อน <span class="tag">ไอเดีย 1 (ปรับใหม่)</span></div>
+  <div class="card">
+    <div class="tv-title">แลกเวร</div>
+    <div class="tv-sub">เลือกสิ่งที่ต้องการทำกับเวรของคุณ</div>
+    <div class="draft-banner">📓 ทุกอย่างที่ทำจะเก็บเป็น <b>ร่างในสมุดของคุณ</b> ก่อน — ยังไม่ขึ้นสมุดกลาง จนกว่าคุณจะกด <b>เผยแพร่</b></div>
+
+    <div class="acts">
+      <button class="act swap"><span class="ic">🔄</span>สลับเวร</button>
+      <button class="act give"><span class="ic">🎁</span>ยกเวรให้</button>
+      <button class="act recv"><span class="ic">🤝</span>รับเวร</button>
+      <button class="act cancel"><span class="ic">↩️</span>ยกเลิกเวร</button>
+    </div>
+
+    <div class="drafts">
+      <div class="drafts-h">ร่างของฉัน · ยังไม่เผยแพร่ <span class="n">3</span></div>
+
+      <div class="draft-row">
+        <div class="d"><div class="t">ยก OPD-1 (15 ก.ค.) ให้ มะปราง</div><div class="s">บันทึกเมื่อ 09:12</div></div>
+        <button class="btn-pub">เผยแพร่</button>
+      </div>
+      <div class="draft-note warn">⚠️ เกี่ยวกับ <b>มะปราง</b> — ต้องเผยแพร่ให้เห็น ถึงจะมีผลจริง (กันเวรว่าง)</div>
+
+      <div class="draft-row">
+        <div class="d"><div class="t">สลับ ER-2 ↔ OPD-3 กับ โต้ง</div><div class="s">บันทึกเมื่อ 08:40</div></div>
+        <button class="btn-pub">เผยแพร่</button>
+      </div>
+
+      <div class="draft-row conflict">
+        <div class="d"><div class="t">รับ OPD-5 (17 ก.ค.) จาก มะปราง</div><div class="s" style="color:var(--dang);">ขัดแย้ง: โต้ง รับเวรนี้ไปแล้วเมื่อ 09:15</div></div>
+        <button class="btn-fix">ตรวจใหม่</button>
+      </div>
+
+      <button class="pub-all">เผยแพร่ทั้งหมดที่ผ่าน (2)</button>
+    </div>
+  </div>
+  <p class="note"><b>โมเดล:</b> ไม่มีสวิตช์โหมด — <b>ทำอะไรก็เป็นร่างในสมุดตัวเอง</b> โดยอัตโนมัติ, เผยแพร่รายอันหรือทั้งหมด. ต่อยอด “ร่าง” เดิม (<code>swfOpenConfirm</code>).<br>
+  <b>Conflict:</b> ตรวจตอนกดเผยแพร่ — ถ้าคนอื่นจัดการเวรไปก่อน ร่างนั้นขึ้น<span style="color:var(--dang);font-weight:700;">แดง “ขัดแย้ง”</span> ไม่ทับ ให้กด “ตรวจใหม่” (first-publish-wins).</p>
+
+  <!-- B -->
+  <div class="lbl">Export — พรีเซ็ตห้อง <span class="tag">ไอเดีย 2 (ดีแล้ว + เพิ่มรายละเอียด)</span></div>
+  <div class="card">
+    <div class="ex-h2">Export / ปริ้นตารางเวร</div>
+    <div class="ex-mine">🔒 พรีเซ็ตเป็นของคุณเอง — คนอื่นไม่เห็น (เอกเทศต่อคน)</div>
+
+    <div class="ex-seclab"><span>พรีเซ็ตห้องของฉัน</span></div>
+    <div class="chips" id="presetChips">
+      <button class="preset" data-preset="p1">ห้องยา 103 <span class="co">·4</span></button>
+      <button class="preset" data-preset="p2">IPD เวรดึก <span class="co">·3</span></button>
+      <button class="preset" data-preset="p3">OPD เช้า <span class="co">·5</span></button>
+      <button class="preset add" id="savePresetBtn">+ บันทึกกลุ่มนี้</button>
+    </div>
+
+    <div class="ex-seclab" style="margin-top:14px;"><span>คนที่จะปริ้น</span></div>
+    <div class="people" id="peopleBox"><span class="people-empty">ยังไม่เลือกคน — แตะพรีเซ็ต หรือ + เพิ่มชื่อ</span></div>
+    <div class="ex-count" id="exCount">0 คน</div>
+
+    <!-- inline: เพิ่มชื่อ -->
+    <div class="sheet" id="addSheet">
+      <div class="sheet-h"><span>+ เพิ่มชื่อเข้ากลุ่ม</span><span class="x" id="addClose">✕</span></div>
+      <input id="addSearch" placeholder="พิมพ์ค้นหาชื่อ / ชื่อเล่น…" autocomplete="off">
+      <div class="sheet-list" id="addList"></div>
+    </div>
+
+    <!-- inline: ตั้งชื่อ preset -->
+    <div class="sheet" id="saveSheet">
+      <div class="sheet-h"><span>ตั้งชื่อพรีเซ็ต (บันทึกคนกลุ่มนี้ไว้)</span><span class="x" id="saveClose">✕</span></div>
+      <div class="sheet-save"><input id="presetName" placeholder="เช่น ห้องยา 103" autocomplete="off"><button id="saveConfirm">บันทึก</button></div>
+    </div>
+
+    <div class="ex-fmt"><button class="active">ปฏิทิน</button><button>ตาราง</button><button>รวม</button></div>
+    <button class="ex-btn">📄 ปริ้น / Export PDF</button>
+  </div>
+  <p class="note"><b>เพิ่มชื่อ:</b> ปุ่ม <b>+ เพิ่มชื่อ</b> ในกลุ่ม → ค้นหา+แตะเพิ่มทีละคน (ชื่อจริง/ชื่อเล่น). <b>ตั้งชื่อ preset:</b> เลือกคนครบ → “+ บันทึกกลุ่มนี้” → ตั้งชื่อ. <b>เอกเทศ:</b> พรีเซ็ตเก็บใน preference ของแต่ละคน (<code>Phase_Z_H_Preferences.js</code>) คนอื่นไม่เห็น/ไม่กระทบกัน.</p>
+
+  <p class="note" style="margin-top:22px;">ลองเล่น: แตะพรีเซ็ต → คนโหลดเข้ามา · แตะ “+ เพิ่มชื่อ” ค้นหาเพิ่ม · “+ บันทึกกลุ่มนี้” ตั้งชื่อ. บอกได้เลยว่าตรงไหมครับ</p>
+</div>
+
+<script>
+(function(){
+  var r=document.documentElement;
+  document.getElementById('themeBtn').addEventListener('click',function(){
+    var d=r.classList.contains('dark')||(!r.classList.contains('light')&&window.matchMedia('(prefers-color-scheme:dark)').matches);
+    r.classList.remove('dark','light');r.classList.add(d?'light':'dark');
+  });
+
+  var PRESETS={ p1:['เอ๋','โต้ง','มะปราง','บอส'], p2:['ก้อย','แนน','โต้ง'], p3:['เอ๋','มะปราง','บอส','ก้อย','แนน'] };
+  var NAMES=[['เอ๋','เอกพล'],['โต้ง','ธนโชติ'],['มะปราง','ปรางทิพย์'],['บอส','ภูริช'],['ก้อย','กัญญา'],['แนน','นันทน์'],['ปาล์ม','ปิยะ'],['จูน','จุฑามาศ']];
+  var peopleBox=document.getElementById('peopleBox'), exCount=document.getElementById('exCount'), chips=document.getElementById('presetChips');
+
+  function current(){ return Array.prototype.map.call(peopleBox.querySelectorAll('.pchip'),function(c){return c.getAttribute('data-n');}); }
+  function render(list){
+    if(!list.length){ peopleBox.innerHTML='<span class="people-empty">ยังไม่เลือกคน — แตะพรีเซ็ต หรือ + เพิ่มชื่อ</span>'; }
+    else { peopleBox.innerHTML=list.map(function(n){return '<span class="pchip" data-n="'+n+'">'+n+'<span class="x">✕</span></span>';}).join('')+'<button class="addp" id="addBtn">+ เพิ่มชื่อ</button>'; }
+    if(list.length) attachAdd();
+    exCount.textContent=list.length+' คน';
+  }
+  function attachAdd(){ var b=document.getElementById('addBtn'); if(b) b.addEventListener('click',openAdd); }
+
+  chips.addEventListener('click',function(e){
+    var b=e.target.closest('[data-preset]'); if(!b) return;
+    Array.prototype.forEach.call(chips.querySelectorAll('.preset'),function(x){x.classList.remove('active');});
+    b.classList.add('active'); render((PRESETS[b.getAttribute('data-preset')]||[]).slice());
+  });
+  peopleBox.addEventListener('click',function(e){
+    if(!e.target.classList.contains('x')) return;
+    e.target.closest('.pchip').remove(); render(current());
+  });
+
+  // เพิ่มชื่อ sheet
+  var addSheet=document.getElementById('addSheet'), addList=document.getElementById('addList');
+  function drawAdd(q){
+    var cur=current();
+    addList.innerHTML=NAMES.filter(function(x){ q=(q||'').trim(); return !q||x[0].indexOf(q)>=0||x[1].indexOf(q)>=0; }).map(function(x){
+      var picked=cur.indexOf(x[0])>=0;
+      return '<div class="sheet-row'+(picked?' picked':'')+'" data-n="'+x[0]+'"><span>'+x[1]+' <span class="k">('+x[0]+')</span></span><span>'+(picked?'✓':'+')+'</span></div>';
+    }).join('')||'<div style="padding:11px;color:var(--sub);font-size:12px;">ไม่พบชื่อ</div>';
+  }
+  function openAdd(){ document.getElementById('saveSheet').classList.remove('show'); addSheet.classList.add('show'); document.getElementById('addSearch').value=''; drawAdd(''); }
+  document.getElementById('addClose').addEventListener('click',function(){ addSheet.classList.remove('show'); });
+  document.getElementById('addSearch').addEventListener('input',function(){ drawAdd(this.value); });
+  addList.addEventListener('click',function(e){
+    var row=e.target.closest('[data-n]'); if(!row) return;
+    var n=row.getAttribute('data-n'), cur=current();
+    if(cur.indexOf(n)<0){ cur.push(n); render(cur); }
+    drawAdd(document.getElementById('addSearch').value);
+  });
+
+  // ตั้งชื่อ preset sheet
+  var saveSheet=document.getElementById('saveSheet');
+  document.getElementById('savePresetBtn').addEventListener('click',function(){
+    if(!current().length){ return; }
+    addSheet.classList.remove('show'); saveSheet.classList.toggle('show');
+  });
+  document.getElementById('saveClose').addEventListener('click',function(){ saveSheet.classList.remove('show'); });
+  document.getElementById('saveConfirm').addEventListener('click',function(){
+    var nm=document.getElementById('presetName').value.trim()||'พรีเซ็ตใหม่', cur=current();
+    var btn=document.createElement('button'); btn.className='preset active'; btn.setAttribute('data-preset','pnew_'+Date_now());
+    btn.innerHTML=nm+' <span class="co">·'+cur.length+'</span>';
+    PRESETS[btn.getAttribute('data-preset')]=cur.slice();
+    Array.prototype.forEach.call(chips.querySelectorAll('.preset'),function(x){x.classList.remove('active');});
+    chips.insertBefore(btn, document.getElementById('savePresetBtn'));
+    saveSheet.classList.remove('show'); document.getElementById('presetName').value='';
+  });
+  var _c=0; function Date_now(){ return (++_c); } // avoid Date.now (not needed)
+})();
+</script>
