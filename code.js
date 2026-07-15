@@ -245,7 +245,7 @@ function getScheduleData(monthId) {
   try {
     const pbLabel = String(label || '').trim();
     if (pbLabel) {
-      const pbMonthId = 'm_' + pbLabel.replace(/\s+/g, '_');   // 'มิถุนายน 2569' → 'm_มิถุนายน_2569'
+      const pbMonthId = monthKeyFromLabel_(pbLabel);   // 'มิถุนายน 2569' → 'm_มิถุนายน_2569' (pbLabel trimmed แล้ว)
       const pbRes = phxGetAllActiveOverlaysForMonth(pbMonthId);
       if (pbRes && pbRes.ok && Array.isArray(pbRes.overlays)) {
         pbOverlays = pbRes.overlays;
@@ -377,7 +377,7 @@ function uploadLocalFile(base64Data, filename, token) {
     const saved = saveMonthToDatabase_(result.label, JSON.stringify(payload), sheetUrl, result.diagnostics, _consistentMonthId);
 
     // 🚀 ยิงข้อมูลขึ้น Firebase คู่ขนานกันไปเลย!
-    const monthIdForFirebase = "m_" + result.label.replace(/\s+/g, '_');
+    const monthIdForFirebase = monthKeyFromLabel_(result.label);
     pushToFirebase_(monthIdForFirebase, payload);
 
     // 🌟 Phase I — Note Block ingest (Tier 0 + 1 + 2)
@@ -507,6 +507,14 @@ function sendAuditAlertEmail_(label, filename, auditResult, severity) {
   MailApp.sendEmail(ADMIN_EMAIL, subject, body);
 }
 
+
+// v3.49 ก้อน B — สูตร "เดียว" แปลงป้ายเดือน → Firebase month key (ฝั่ง server).
+//   ⚠️ ต้องตรงกับ client Index.html `monthKeyFromLabel` เป๊ะ — server เขียน schedules/<key>,
+//   client อ่าน schedules/<key> ด้วยสูตรเดียวกัน. ถ้าเพี้ยน client จะอ่าน node ผิด = "Firebase ดับ".
+//   สูตร = 'm_' + ป้าย (ยุบช่องว่างทุกชุดเป็น _). ไม่ trim (ผู้เรียกที่ต้อง trim ให้ trim ก่อนส่งเข้ามา).
+function monthKeyFromLabel_(label) {
+  return 'm_' + String(label == null ? '' : label).replace(/\s+/g, '_');
+}
 
 function pushToFirebase_(monthId, payload) {
   if (!FIREBASE_DB_URL || !FIREBASE_DB_URL.startsWith("http")) return;
@@ -1129,7 +1137,7 @@ function syncAllSchedulesToFirebase() {
       }
 
       // Push ไป Firebase ด้วย monthId format เดียวกับ uploadLocalFile
-      const firebaseMonthId = "m_" + m.label.replace(/\s+/g, '_');
+      const firebaseMonthId = monthKeyFromLabel_(m.label);
       const payload = {
         data: data.schedule,
         sheets: data.sheets,
@@ -1163,7 +1171,7 @@ function syncMonthToFirebase(monthLabel) {
   const data = getScheduleData(m.id);
   if (data.error) throw new Error(data.error);
 
-  const firebaseMonthId = "m_" + m.label.replace(/\s+/g, '_');
+  const firebaseMonthId = monthKeyFromLabel_(m.label);
   const payload = {
     data: data.schedule,
     sheets: data.sheets,

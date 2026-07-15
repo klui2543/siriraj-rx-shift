@@ -4113,7 +4113,7 @@ window.allPharmacistNames = [];
         const sel = document.getElementById('mainMonthSelector');
         if (!sel) { console.warn('[LWWCompare] month selector (#mainMonthSelector) not found'); return; }
         const months = Array.from(sel.options)
-          .map(o => ({ value: o.value, mid: 'm_' + String(o.text || '').trim().replace(/\s+/g, '_') }))
+          .map(o => ({ value: o.value, mid: monthKeyFromLabel(String(o.text || '').trim()) }))
           .filter(m => m.value);
         const fetch1 = (v) => new Promise((res, rej) => {
           try { google.script.run.withSuccessHandler(res).withFailureHandler(rej).getScheduleData(v); }
@@ -4264,11 +4264,18 @@ window.allPharmacistNames = [];
       }
     };
 
+    // v3.49 ก้อน B — สูตร "เดียว" แปลงป้ายเดือน → Firebase/overlay month key. เดิมคำนวณกระจายหลายจุด
+    //   (บางจุด .trim() บางจุดไม่) เสี่ยง key เพี้ยน → client อ่าน node ผิด = อาการ "Firebase ดับ".
+    //   ⚠️ ต้องตรงกับ server code.js `monthKeyFromLabel_` เป๊ะ (server เขียน schedules/<key>).
+    //   สูตร = 'm_' + ป้าย (ยุบช่องว่างทุกชุดเป็น _). ไม่ trim — ให้ตรงกับที่ server เขียนลง Firebase.
+    function monthKeyFromLabel(label) {
+      return 'm_' + String(label == null ? '' : label).replace(/\s+/g, '_');
+    }
     function getCurrentMonthId() {
       var sel = document.getElementById('mainMonthSelector');
       if (!sel || !sel.value) return '';
       var label = sel.options[sel.selectedIndex] ? sel.options[sel.selectedIndex].text : '';
-      return 'm_' + label.replace(/\s+/g, '_');
+      return monthKeyFromLabel(label);
     }
     function getCurrentUser() {
       var names = window.selectedPharmacists || [];
@@ -7456,7 +7463,11 @@ window.allPharmacistNames = [];
           .withFailureHandler(err => {
             if (!isDataLoadedInSession) {
               toggleLoading(false);
-              alert("⚠️ ระบบดึงข้อมูลขัดข้อง: " + err.message);
+              // v3.49 ก้อน B: ข้อความไม่ตกใจ (เดิม "⚠️ ระบบดึงข้อมูลขัดข้อง" ทำ User กลัวว่าระบบล่ม).
+              //   ที่จริงแค่โหลดรอบนี้ไม่สำเร็จ — ข้อมูลยังอยู่ครบ ลองรีเฟรชก็กลับมา.
+              console.warn('[fetch] getScheduleData failed:', err && err.message);
+              if (typeof _p2bShowToast === 'function') _p2bShowToast('โหลดข้อมูลไม่สำเร็จชั่วคราว — ลองรีเฟรชอีกครั้ง', 'warn');
+              else alert('โหลดข้อมูลไม่สำเร็จชั่วคราว — ลองรีเฟรชอีกครั้ง');
             }
           })
           .getScheduleData(selectEl.value);
@@ -7466,7 +7477,7 @@ window.allPharmacistNames = [];
       if (currentFbRef) { try { currentFbRef.off(); } catch(e){} currentFbRef = null; }
 
       const selectedLabel = selectEl.options[selectEl.selectedIndex].text;
-      const firebaseKey = "m_" + selectedLabel.replace(/\s+/g, '_');
+      const firebaseKey = monthKeyFromLabel(selectedLabel);
       currentFirebaseKey = firebaseKey;
 
       const fallbackTimer = setTimeout(() => { fetchViaGAS(); }, 6000);
@@ -11765,7 +11776,7 @@ table.exp-tbl .tm{margin-left:3px;opacity:0.75;}
       const monthSel = document.getElementById('mainMonthSelector');
       if (!monthSel || !monthSel.value) return;
       const monthLabel = monthSel.options[monthSel.selectedIndex].text;
-      const mid = 'm_' + monthLabel.replace(/\s+/g, '_');
+      const mid = monthKeyFromLabel(monthLabel);
       const person = (typeof _getTargetPerson === 'function') ? _getTargetPerson() : null;
       if (!person) return;
       const usedMap = _combinedUsedMap(mid, person);
@@ -16392,7 +16403,7 @@ table.exp-tbl .tm{margin-left:3px;opacity:0.75;}
       const sel = document.getElementById('mainMonthSelector');
       if (!sel || !sel.value) return;
       const monthLabelDisplay = sel.options[sel.selectedIndex].text;
-      const monthId = 'm_' + monthLabelDisplay.replace(/\s+/g, '_');
+      const monthId = monthKeyFromLabel(monthLabelDisplay);
 
       window._phxNoteState.monthLabel = monthId;
       document.getElementById('phxNoteModal').classList.add('show');
@@ -17233,7 +17244,7 @@ table.exp-tbl .tm{margin-left:3px;opacity:0.75;}
       const sel = document.getElementById('mainMonthSelector');
       if (!sel || !sel.value) return;
       const monthLabel = sel.options[sel.selectedIndex].text;
-      const monthId = 'm_' + monthLabel.replace(/\s+/g, '_');
+      const monthId = monthKeyFromLabel(monthLabel);
 
       window._phxPosNoteState.currentPos = cleanPos;
       window._phxPosNoteState.monthLabel = monthId;
