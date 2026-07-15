@@ -7947,7 +7947,9 @@ window.allPharmacistNames = [];
         // v3.43: dashed strike when the action behind this strikethrough is still a draft.
         //   Only the author's OverlayManager holds drafts, so _isActionDraft returns true only in their session.
         const _strikeActionId = _used ? _used.actionId : (_isGhost ? i._ghostActionId : null);
-        const _isDraftLocal = _strikeActionId ? _isActionDraft(_strikeActionId) : false;
+        // v3.49 สมุดส่วนตัว: ไม่มี draft/published → ไม่โชว์เส้นประ (มุมซ้าย/ขีดฆ่า) ให้ render
+        //   เหมือนแถวปกติทั่วไป. (undo ยังเช็ค _isActionDraft จริงตามเดิม ไม่กระทบ logic)
+        const _isDraftLocal = (window._publishEnabled && _strikeActionId) ? _isActionDraft(_strikeActionId) : false;
         const _strike = _used ? (_isDraftLocal ? 'shift-line-through-draft' : 'shift-line-through') : '';
         // v3.44: inline publish button removed — publishing is centralized in the single
         //   "🌐 เผยแพร่" FAB modal (openPublishModal). Draft rows still render with the dashed
@@ -8277,7 +8279,7 @@ window.allPharmacistNames = [];
           }
           // v3.43: dashed outline on the badge when the underlying action is a private draft
           const _calDraftAid = _calUsed ? _calUsed.actionId : (_isGhostBadge ? s._ghostActionId : null);
-          if (_calDraftAid && _isActionDraft(_calDraftAid)) _calExtraCls += ' cal-badge-draft';
+          if (window._publishEnabled && _calDraftAid && _isActionDraft(_calDraftAid)) _calExtraCls += ' cal-badge-draft';   // v3.49: ไม่โชว์เส้นประ draft ในโหมดสมุดส่วนตัว
           // v14: pair-color dot for swaps
           let _calDot = '';
           let _pairColor = null;
