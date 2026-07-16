@@ -1216,36 +1216,56 @@
     body[data-tab="swap"] .phx-schedule-only,
     body[data-tab="me"]   .phx-schedule-only { display: none !important; }
 
-    .phx-tv-title { font-size: 17px; font-weight: 800; color: var(--text); margin: 2px 0 3px; }
-    .phx-tv-sub { font-size: 11.5px; color: var(--sub); margin-bottom: 14px; line-height: 1.55; }
+    /* v3.50: หัวแท็บแลกเวร — เส้นคาดกรมท่าผูกกับแถบหัวแอปที่อยู่เหนือมันพอดี.
+       .phx-tv-title/.phx-tv-sub ใช้เฉพาะแท็บแลกเวร (เช็คแล้ว ไม่มีใครอื่นเรียก) */
+    #phxViewSwap { padding: 0 0 24px; }   /* .phx-tabview 16px/14px ยังคุม #phxViewMe เหมือนเดิม */
+    .phx-sw-head { padding: 18px 14px 14px; border-bottom: 1px solid var(--navy); margin-bottom: 16px; }
+    .phx-tv-eyebrow { font-size: 9.5px; font-weight: 500; letter-spacing: 0.16em; color: var(--sub); margin-bottom: 7px; }
+    .phx-tv-eyebrow:empty { display: none; }
+    .phx-tv-title { font-size: 21px; font-weight: 600; color: var(--text); letter-spacing: -0.01em; line-height: 1.15; margin: 0; }
+    .phx-tv-sub { font-size: 11.5px; font-weight: 300; color: var(--sub); line-height: 1.6; margin: 6px 0 0; }
+    /* กล่อง = แพตเทิร์น .swf-tbl-wrap ของแอป (ขอบ 1px + มุมโค้ง 10px). พื้น = สีเส้น →
+       ช่องว่าง 1px ระหว่างเซลล์กลายเป็นเส้นตารางเอง ไม่ต้องวาดขอบทีละใบ */
+    .phx-sw-group { margin: 0 14px 24px; }
+    .phx-sw-box { border: 1px solid var(--border); border-radius: 10px; overflow: hidden; background: var(--border); }
     .phx-tv-empty { text-align: center; color: var(--muted); font-size: 12.5px; padding: 38px 16px; line-height: 1.75; }
 
     /* v3.47c: FAB repurposed as a quick-note button (was the edit pencil; edit is entered
        from the แลกเวร tab now). #phxFab now opens the note-shift picker. */
     /* แลกเวร tab uses the schedule-style .swf-tbl template (see swap-confirm) */
-    .phx-swap-sec-label { font-size: 10.5px; font-weight: 700; color: var(--muted); letter-spacing: 0.04em; margin: 18px 2px 8px; }
-    .phx-swap-sec-label:first-child { margin-top: 4px; }
+    /* v3.50: ป้ายหมวด = กรมท่า + ตัวนับทางขวา. เดิมใช้ var(--muted) #94a3b8 บนพื้นขาว =
+       contrast 2.56 (เกณฑ์ 4.5) → อ่านแทบไม่ออก. --muted คือสีตัวหนังสือ placeholder ไม่ใช่สีป้าย */
+    .phx-swap-sec-label {
+      display: flex; align-items: baseline; justify-content: space-between; gap: 10px;
+      padding: 0 2px 14px;
+    }
+    .phx-swap-sec-label .t { font-size: 10.5px; font-weight: 600; color: var(--navy); letter-spacing: 0.12em; }
+    .phx-swap-sec-label .n { font-size: 10.5px; font-weight: 400; color: var(--sub); font-variant-numeric: tabular-nums; }
     tr.phx-swap-actionable { cursor: pointer; }
     tr.phx-swap-actionable:hover td,
     tr.phx-swap-actionable:active td { background: var(--accent-bg); }
     .phx-swap-tag { display: inline-block; font-size: 9px; font-weight: 700; padding: 1px 6px; border-radius: 999px; margin-left: 5px; vertical-align: middle; white-space: nowrap; }
     .phx-swap-tag.recv { background: #dcfce7; color: #15803d; }
     .phx-swap-tag.gave { background: #f1f5f9; color: #64748b; }
-    /* v3.47b: action-first buttons on the แลกเวร tab (สลับ/ยก/รับ/ยกเลิก) */
-    .phx-swap-actions { display: grid; grid-template-columns: 1fr 1fr; gap: 9px; margin: 2px 0 4px; }
+    /* v3.50: ปุ่ม 4 อัน = ตารางจริง (ช่องว่าง 1px = เส้นตาราง) ไม่ใช่การ์ดลอย 4 ใบ.
+       พื้นขาว สีบอกชนิดอยู่ที่ "ตัวอักษร" — ค่าสีเดิมของแอปทั้งชุด ไม่มีสีใหม่.
+       เอาอีโมจิออก (🔄🎁🤝↩️ วาดคนละสไตล์ + เปลี่ยนรูปตามเครื่อง) → ใส่คำอธิบายบอกว่าจะเกิดอะไรแทน */
+    .phx-swap-actions { display: grid; grid-template-columns: 1fr 1fr; gap: 1px; }
     .phx-swap-act-btn {
-      display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 5px;
-      padding: 15px 8px; border-radius: 13px; border: 1px solid var(--border); background: var(--surface);
-      font-family: 'Kanit', sans-serif; font-size: 13.5px; font-weight: 700; color: var(--text);
-      cursor: pointer; transition: transform 0.1s, box-shadow 0.15s;
+      display: flex; flex-direction: column; align-items: flex-start; justify-content: flex-start; gap: 3px;
+      padding: 14px 13px 15px; border: 0; background: var(--surface); text-align: left;
+      font-family: 'Kanit', sans-serif; min-height: 76px;
+      cursor: pointer; transition: filter 0.12s;
     }
-    .phx-swap-act-btn:active { transform: scale(0.97); }
-    .phx-swap-act-btn:hover { box-shadow: 0 2px 10px rgba(0,0,0,0.06); }
-    .phx-swap-act-btn .ic { font-size: 22px; line-height: 1; }
-    .phx-swap-act-btn.swap   { background:#eff6ff; border-color:#bfdbfe; color:#1d4ed8; }
-    .phx-swap-act-btn.give   { background:#fefce8; border-color:#fde68a; color:#a16207; }
-    .phx-swap-act-btn.recv   { background:#f0fdf4; border-color:#bbf7d0; color:#15803d; }
-    .phx-swap-act-btn.cancel { background:#fef2f2; border-color:#fecaca; color:#dc2626; }
+    .phx-swap-act-btn:hover { filter: brightness(0.97); }
+    .phx-swap-act-btn:active { filter: brightness(0.94); }
+    .phx-swap-act-btn:focus-visible { outline: 2px solid var(--navy); outline-offset: -2px; }
+    .phx-swap-act-btn .lbl { font-size: 14px; font-weight: 600; line-height: 1.3; }
+    .phx-swap-act-btn .dsc { font-size: 10.5px; font-weight: 300; color: var(--sub); line-height: 1.45; }
+    .phx-swap-act-btn.swap   .lbl { color: #1d4ed8; }
+    .phx-swap-act-btn.give   .lbl { color: #a16207; }
+    .phx-swap-act-btn.recv   .lbl { color: #15803d; }
+    .phx-swap-act-btn.cancel .lbl { color: #dc2626; }
     /* v3.47: pending-draft manager banner on the แลกเวร tab */
     .phx-draft-banner {
       display: flex; align-items: center; gap: 9px; width: 100%;
@@ -1261,20 +1281,26 @@
     .phx-draft-banner .tx b { font-weight: 800; }
     .phx-draft-banner .go { font-weight: 700; flex-shrink: 0; white-space: nowrap; }
     body.dark-theme .phx-draft-banner { background: #3f2d10; border-color: #78571c; color: #fcd34d; }
-    /* v3.47: ประวัติการแลกเวร — transaction timeline (newest→oldest, scrollable) */
-    .phx-tl-scroll { max-height: 46vh; overflow-y: auto; padding: 4px 2px 2px; }
-    .phx-tl { position: relative; margin-left: 6px; }
-    .phx-tl-item { position: relative; padding: 0 0 15px 18px; border-left: 2px solid var(--border); }
-    .phx-tl-item:last-child { border-left-color: transparent; padding-bottom: 2px; }
-    .phx-tl-item::before {
-      content: ''; position: absolute; left: -6px; top: 3px; width: 10px; height: 10px;
-      border-radius: 50%; background: var(--muted); border: 2px solid var(--surface); box-sizing: border-box;
+    /* v3.50: ประวัติการแลกเวร = สมุดบัญชี — วันที่แยกคอลัมน์ซ้าย เลขเรียงตรงกันทุกแถว (tabular)
+       ⚠️ .phx-tl-scroll ต้องคงชื่อ + เป็นตัวที่ scroll จริง — phxRenderSwapView จำ/คืน scrollTop
+          ผ่าน querySelector('.phx-tl-scroll') (fix "ประวัติเด้งขึ้นบนตอน poll", commit 6557b13)
+       ⚠️ กล่อง .phx-sw-box อยู่ "นอก" ตัว scroll → ขอบกับมุมโค้งอยู่นิ่ง ไม่เลื่อนหนีตาม
+       ไม่มีแถบสีบอกชนิดแล้ว — ข้อความบอกอยู่แล้ว ("คุณแลก/ยก/รับ") + แถบของแต่ละแถวชนกันสนิท
+          จนกลายเป็นริบบิ้นหลากสีเส้นเดียว (Klui ทัก) */
+    .phx-tl-scroll { max-height: 46vh; overflow-y: auto; }
+    .phx-tl-item {
+      display: grid; grid-template-columns: 28px 1fr; gap: 8px;
+      padding: 11px 13px 12px 10px; background: var(--surface);
+      border-bottom: 1px solid var(--border);
     }
-    .phx-tl-item.swap::before { background: #3b82f6; }
-    .phx-tl-item.give::before { background: #f59e0b; }
-    .phx-tl-item.add::before  { background: #22c55e; }
-    .phx-tl-summary { font-size: 13px; color: var(--text); line-height: 1.5; }
-    .phx-tl-meta { font-size: 11px; color: var(--sub); margin-top: 2px; display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+    .phx-tl-item:last-child { border-bottom: 0; }
+    .phx-tl-date { text-align: right; padding-top: 1px; }
+    .phx-tl-date .dd { font-size: 15px; font-weight: 400; color: var(--text); line-height: 1.1; font-variant-numeric: tabular-nums; }
+    .phx-tl-date .dw { font-size: 9.5px; font-weight: 300; color: var(--sub); line-height: 1.4; }
+    .phx-tl-summary { font-size: 12.5px; font-weight: 300; color: var(--text); line-height: 1.55; }
+    .phx-tl-summary b { font-weight: 600; color: var(--navy); }   /* ชื่อคน = กรมท่า ตาม .swf-c-name */
+    .phx-tl-summary code { font-family: 'Kanit', sans-serif; font-weight: 500; color: var(--text); font-variant-numeric: tabular-nums; }
+    .phx-tl-meta { font-size: 10px; font-weight: 300; color: var(--sub); margin-top: 3px; display: flex; align-items: center; gap: 6px; flex-wrap: wrap; font-variant-numeric: tabular-nums; }
     .phx-tl-status { font-size: 9.5px; font-weight: 700; padding: 1px 7px; border-radius: 999px; white-space: nowrap; }
     .phx-tl-status.draft { background: #fef3c7; color: #92400e; }
     .phx-tl-status.pub { background: #dcfce7; color: #15803d; }
@@ -2248,14 +2274,27 @@
 
     <!-- ===== v3.47: TAB VIEW — แลกเวร (my shifts) ===== -->
     <div id="phxViewSwap" class="phx-tabview">
-      <div class="phx-tv-title">แลกเวร</div>
-      <div class="phx-tv-sub">เลือกสิ่งที่ต้องการทำกับเวรของคุณ</div>
-      <!-- v3.47b: action-first buttons (สลับ/ยก/รับ/ยกเลิก) — launch straight into the flow -->
-      <div class="phx-swap-actions" id="phxSwapActions">
-        <button type="button" class="phx-swap-act-btn swap" onclick="phxSwapAction('swap')"><span class="ic">🔄</span>สลับเวร</button>
-        <button type="button" class="phx-swap-act-btn give" onclick="phxSwapAction('give')"><span class="ic">🎁</span>ยกเวรให้</button>
-        <button type="button" class="phx-swap-act-btn recv" onclick="phxSwapAction('receive')"><span class="ic">🤝</span>รับเวร</button>
-        <button type="button" class="phx-swap-act-btn cancel" onclick="phxSwapAction('cancel')"><span class="ic">↩️</span>ยกเลิกเวร</button>
+      <div class="phx-sw-head">
+        <div class="phx-tv-eyebrow" id="phxSwapMonth"></div>
+        <div class="phx-tv-title">แลกเวร</div>
+        <div class="phx-tv-sub">เลือกรายการที่ต้องการทำกับเวรของคุณ</div>
+      </div>
+      <!-- v3.47b: action-first buttons (แลก/ยก/รับ/ยกเลิก) — launch straight into the flow.
+           v3.50: id ย้ายมาอยู่ที่ "กล่องนอก" — phxRenderSwapView ซ่อนปุ่มชุดนี้ตอนยังไม่เลือกชื่อ
+           ถ้า id ยังอยู่ที่ตัว grid ข้างใน จะเหลือกล่องขอบเปล่า ๆ ค้างอยู่ -->
+      <div class="phx-sw-group" id="phxSwapActions">
+        <div class="phx-sw-box">
+          <div class="phx-swap-actions">
+            <button type="button" class="phx-swap-act-btn swap" onclick="phxSwapAction('swap')">
+              <span class="lbl">แลกเวร</span><span class="dsc">แลกเวรกับเพื่อน คนละหนึ่งเวร</span></button>
+            <button type="button" class="phx-swap-act-btn give" onclick="phxSwapAction('give')">
+              <span class="lbl">ยกเวร</span><span class="dsc">ให้เวรของคุณกับคนอื่น</span></button>
+            <button type="button" class="phx-swap-act-btn recv" onclick="phxSwapAction('receive')">
+              <span class="lbl">รับเวร</span><span class="dsc">รับเวรที่คนอื่นยกให้</span></button>
+            <button type="button" class="phx-swap-act-btn cancel" onclick="phxSwapAction('cancel')">
+              <span class="lbl">ยกเลิกรายการ</span><span class="dsc">ย้อนรายการที่ทำไปแล้ว</span></button>
+          </div>
+        </div>
       </div>
       <!-- v3.47c: recap only — "แลกเวรเดือนนี้ไปแล้ว" (ตาราง/ปฏิทินย้ายไปอยู่ในหน้า picker ตอนกดปุ่มแล้ว) -->
       <div id="phxSwapBody"></div>
@@ -5522,7 +5561,7 @@ window.allPharmacistNames = [];
       const titles = {
         menu: 'แก้ไขเวรนี้',
         ghostMenu: 'จัดการเวรที่รับมา',
-        swap: 'สลับเวร — เลือกเวรของอีกฝ่าย',
+        swap: 'แลกเวร — เลือกเวรของอีกฝ่าย',
         give: 'ยกเวร — เลือกผู้รับ',
         add: 'เพิ่มเวร — เลือกเวรที่ต้องการรับ',
         undo: 'ยกเลิกการแก้ไข'
@@ -5581,7 +5620,7 @@ window.allPharmacistNames = [];
         ? '<button class="act-btn" style="background:#eef2ff; color:#3730a3; border-color:#c7d2fe;" onclick="_noteEditFromMenu()">📝 โน้ตเวรนี้</button>'
         : '';
       return '<div class="act-prompt">ต้องการทำอะไรกับเวรนี้?</div>' +
-             '<button class="act-btn act-btn-primary" onclick="actionGoTo(\'swap\')">สลับเวรกับ...</button>' +
+             '<button class="act-btn act-btn-primary" onclick="actionGoTo(\'swap\')">แลกเวรกับ...</button>' +
              '<button class="act-btn act-btn-danger" onclick="actionGoTo(\'give\')">ยกเวรให้คนอื่น</button>' +
              noteBtn +
              clinicBtn +
@@ -5599,7 +5638,7 @@ window.allPharmacistNames = [];
         : '';
       // ต่อเวร on a received shift is fine — it's already truly yours (the add/swap committed).
       return '<div class="act-prompt">เวรนี้คุณรับมาจากคนอื่น — ต้องการทำอะไรต่อ?</div>' +
-             '<button class="act-btn act-btn-primary" onclick="actionGoTo(\'swap\')">สลับเวรนี้กับคนอื่น</button>' +
+             '<button class="act-btn act-btn-primary" onclick="actionGoTo(\'swap\')">แลกเวรนี้กับคนอื่น</button>' +
              '<button class="act-btn" style="background:#fef3c7; color:#92400e; border-color:#fcd34d;" onclick="actionGoTo(\'give\')">ยกเวรนี้ให้คนอื่น</button>' +
              noteBtn +
              clinicBtn +
@@ -6336,16 +6375,28 @@ window.allPharmacistNames = [];
       if (m) { e.stopPropagation(); e.preventDefault(); _noteView(m.getAttribute('data-note-key')); }
     }, true);
     // Centered action summary — same wording the timeline uses.
-    function _swfSummaryHtml(act, viewer, myShift, tgtShift) {
-      var me = '<span style="font-weight:700;">' + _pbEsc(displayName(viewer)) + '</span>';
+    // v3.50: `opts.you` = พูดกับเจ้าของรายการตรง ๆ ("คุณแลก …") + ห่อรหัสเวรด้วย <code> แทน <b>
+    //   (ไทม์ไลน์ทำชื่อคนเป็นสีกรมท่าผ่าน `b` → รหัสเวรต้องไม่ใช่ `b` ไม่งั้นโดนย้อมไปด้วย)
+    //   ⚠️ ใช้ได้เฉพาะที่การันตีว่า viewer = คนที่ล็อกอินอยู่จริง = ไทม์ไลน์แท็บแลกเวรที่เดียว.
+    //   อีก 4 ที่ที่เรียกฟังก์ชันนี้ (กล่องยืนยัน / ป๊อปอัพร่างค้าง / ยกเลิกเวร / ยกเลิกของแอดมิน)
+    //   ส่ง viewer เป็น "คนอื่น" ได้ — เช่นแอดมินเปิดดูรายการของคนอื่น — ถ้าขึ้น "คุณ" จะเป็นข้อความโกหก
+    //   → ไม่ส่ง opts มา = ได้ผลลัพธ์เดิมเป๊ะทุกไบต์
+    function _swfSummaryHtml(act, viewer, myShift, tgtShift, opts) {
+      var you = !!(opts && opts.you);
+      var me = you ? 'คุณ' : '<span style="font-weight:700;">' + _pbEsc(displayName(viewer)) + '</span>';
+      var sp = you ? '' : ' ';                       // "คุณแลก" ติดกัน แต่ "<ชื่อ> แลก" มีเว้นวรรค
       var partner = '<b>' + _pbEsc(displayName(act.partnerName || '?')) + '</b>';
+      var code = function (s) { return you ? ('<code>' + _pbEsc(s) + '</code>') : ('<b>' + _pbEsc(s) + '</b>'); };
+      var myPos = myShift ? myShift.pos : '?', tgtPos = tgtShift ? tgtShift.pos : '?';
       if (act.action === 'swap') {
-        return me + ' แลก <b>' + _pbEsc(myShift ? myShift.pos : '?') + '</b> ↔ <b>' + _pbEsc(tgtShift ? tgtShift.pos : '?') + '</b> กับ ' + partner;
+        return you
+          ? me + sp + 'แลก ' + code(myPos) + ' กับ ' + code(tgtPos) + ' ของ ' + partner
+          : me + ' แลก ' + code(myPos) + ' ↔ ' + code(tgtPos) + ' กับ ' + partner;
       }
       if (act.action === 'give') {
-        return me + ' ยก <b>' + _pbEsc(myShift ? myShift.pos : '?') + '</b> ให้ ' + partner;
+        return me + sp + 'ยก ' + code(myPos) + ' ให้ ' + partner;
       }
-      return me + ' รับ <b>' + _pbEsc(tgtShift ? tgtShift.pos : '?') + '</b> จาก ' + partner;
+      return me + sp + 'รับ ' + code(tgtPos) + ' จาก ' + partner;
     }
     function _swfClose() { var e = document.getElementById('swfConfirmOverlay'); if (e) e.remove(); }
 
@@ -14450,7 +14501,7 @@ table.exp-tbl .tm{margin-left:3px;opacity:0.75;}
       const partner = action.partnerName || '?';
       let typeLabel = '', detail = '';
       if (t === 'swap') {
-        typeLabel = 'สลับเวร';
+        typeLabel = 'แลกเวร';
         detail = myShift + ' ↔ ' + partner + ' (' + partnerShift + ')';
       } else if (t === 'give') {
         typeLabel = 'ให้เวร';
@@ -18405,6 +18456,18 @@ table.exp-tbl .tm{margin-left:3px;opacity:0.75;}
     }
     // v3.47: "ประวัติการแลกเวร" — my own transaction records (swap/give/receive) as a timeline,
     //   newest → oldest. Notes are excluded ("เฉพาะ Transaction"). Returns '' when there are none.
+    // v3.50: แยกวันที่ออกมาเป็นคอลัมน์ซ้าย. รูปแบบจริงของ field `date` = "14/07 (จ.)"
+    //   (code.js:604 = formatDate "dd/MM" + " (" + วัน + ")") · ของเก่ามี "15/3/2569 (จ.)" ปนอยู่ด้วย
+    //   → เอาเลขตัวแรก = วันที่ · เอาในวงเล็บ = ชื่อวัน · ตัดเดือน/ปีทิ้ง เพราะหัวแท็บบอกเดือนอยู่แล้ว
+    function _tlDateParts(s){
+      s = String(s || '').trim();
+      var dow = s.match(/\(([^)]+)\)/);
+      var day = s.match(/^\s*(\d{1,2})\b/);
+      return {
+        dd: day ? day[1] : s.replace(/\s*\([^)]*\)\s*/, '').trim(),
+        dw: dow ? dow[1] : ''
+      };
+    }
     function _swapTimelineHtml(mid, me){
       var acts = [];
       try { if (typeof OverlayManager !== 'undefined') acts = OverlayManager.getActions(mid, me) || []; } catch(e){}
@@ -18413,33 +18476,55 @@ table.exp-tbl .tm{margin-left:3px;opacity:0.75;}
       acts.sort(function(a,b){ return String(b.createdAt||'').localeCompare(String(a.createdAt||'')); });  // newest first
       var rows = acts.map(function(a){
         var sh = (typeof _swfActionShifts==='function') ? _swfActionShifts(a) : {my:null,tgt:null};
-        var summary = (typeof _swfSummaryHtml==='function') ? _swfSummaryHtml(a, a.viewerName||me, sh.my, sh.tgt) : '';
+        // getActions(mid, me) คืนเฉพาะรายการของเราเอง → viewer = เราเสมอ. เช็คซ้ำอีกชั้นกันเหนียว:
+        //   ถ้าไม่ตรงจริง ๆ ให้ตกไปใช้ชื่อจริงแทน "คุณ" ดีกว่าเสี่ยงขึ้นข้อความผิดคน
+        var viewer = a.viewerName || me;
+        var summary = (typeof _swfSummaryHtml==='function')
+          ? _swfSummaryHtml(a, viewer, sh.my, sh.tgt, { you: String(viewer) === String(me) }) : '';
         var main = sh.my || sh.tgt;
-        var dateStr = (main && main.date) ? esc(main.date) : '';
+        var dp = _tlDateParts(main && main.date);
         var when = _tlWhen(a.createdAt);
         var isDraft = String(a._visibility)==='draft';
         // v3.49 สมุดส่วนตัว: ไม่มีเรื่องเผยแพร่ → ไม่โชว์ป้าย "ร่าง/เผยแพร่แล้ว" (ทุกอย่างอยู่ในสมุดตัวเอง)
         var status = !window._publishEnabled ? ''
                    : (isDraft ? '<span class="phx-tl-status draft">ร่าง</span>' : '<span class="phx-tl-status pub">เผยแพร่แล้ว</span>');
-        var kind = (a.action==='swap') ? 'swap' : (a.action==='give' ? 'give' : 'add');
-        return '<div class="phx-tl-item '+kind+'">' +
-            '<div class="phx-tl-summary">'+summary+'</div>' +
-            '<div class="phx-tl-meta">'+(dateStr?('เวร '+dateStr):'')+(when?(' · '+when):'')+status+'</div>' +
+        return '<div class="phx-tl-item">' +
+            '<div class="phx-tl-date"><div class="dd">'+esc(dp.dd)+'</div><div class="dw">'+esc(dp.dw)+'</div></div>' +
+            '<div>' +
+              '<div class="phx-tl-summary">'+summary+'</div>' +
+              '<div class="phx-tl-meta">'+(when||'')+status+'</div>' +
+            '</div>' +
           '</div>';
       }).join('');
-      return '<div class="phx-swap-sec-label">ประวัติการแลกเวร</div>' +
-             '<div class="phx-tl-scroll"><div class="phx-tl">'+rows+'</div></div>';
+      // ⚠️ .phx-tl-scroll ต้องเป็นตัวที่ scroll จริง — phxRenderSwapView จำ/คืน scrollTop จาก class นี้
+      //    (fix "ประวัติเด้งขึ้นบนตอน poll", 6557b13). กล่องขอบอยู่นอกมัน ขอบจะได้ไม่เลื่อนหนี
+      return '<div class="phx-sw-group">' +
+               '<div class="phx-swap-sec-label"><span class="t">ประวัติการแลกเวร</span>' +
+                 '<span class="n">'+acts.length+' รายการ</span></div>' +
+               '<div class="phx-sw-box"><div class="phx-tl-scroll">'+rows+'</div></div>' +
+             '</div>';
+    }
+    // v3.50: ชื่อเดือนบนหัวแท็บ — อ่านจาก selector ตัวเดียวกับที่ getCurrentMonthId ใช้ (4356)
+    //   ประวัติตัดเดือนออกจากคอลัมน์วันที่แล้ว → ต้องมีตรงนี้บอกว่ากำลังดูเดือนไหน
+    function _swMonthLabel(){
+      try {
+        var sel = document.getElementById('mainMonthSelector');
+        if (!sel || !sel.value) return '';
+        return (sel.options[sel.selectedIndex] ? sel.options[sel.selectedIndex].text : '').trim();
+      } catch(e){ return ''; }
     }
     window.phxRenderSwapView = function(){
       var body = document.getElementById('phxSwapBody');
       if (!body) return;
+      var mo = document.getElementById('phxSwapMonth');
+      if (mo) mo.textContent = _swMonthLabel();   // :empty ใน CSS ซ่อนให้เองถ้าว่าง
       var me = curName();
       if (!me){
         var sa0 = document.getElementById('phxSwapActions'); if (sa0) sa0.style.display = 'none';
         body.removeAttribute('data-swf-fp');   // v3.49: reset fingerprint so login re-renders timeline
-        body.innerHTML = '<div class="phx-tv-empty">ยังไม่ได้เลือกชื่อของคุณ<br>' +
+        body.innerHTML = '<div class="phx-sw-group"><div class="phx-tv-empty">ยังไม่ได้เลือกชื่อของคุณ<br>' +
           'ไปที่แท็บ <b>ตารางเวร</b> แล้วพิมพ์ชื่อ (หรือเข้าสู่ระบบ) เพื่อจัดการเวรของคุณ' +
-          '<div style="margin-top:18px;"><button class="phx-me-cta" style="max-width:220px;margin:0 auto;" onclick="phxSetTab(\'schedule\')">ไปที่ตารางเวร</button></div></div>';
+          '<div style="margin-top:18px;"><button class="phx-me-cta" style="max-width:220px;margin:0 auto;" onclick="phxSetTab(\'schedule\')">ไปที่ตารางเวร</button></div></div></div>';
         return;
       }
       var sa = document.getElementById('phxSwapActions'); if (sa) sa.style.display = '';
@@ -18447,16 +18532,18 @@ table.exp-tbl .tm{margin-left:3px;opacity:0.75;}
 
       // v3.47d: tab body = ประวัติการแลกเวร (transaction timeline, newest → oldest, scrollable).
       var html = _swapTimelineHtml(mid, me);
-      if (!html) html = '<div class="phx-tv-empty" style="padding:26px 12px;">ยังไม่มีการแลก / ยก / รับเวรเดือนนี้</div>';
+      // v3.50: หน้านี้ไม่มี padding ที่ตัว container แล้ว (ขอบอยู่ที่ .phx-sw-group ทีละก้อน)
+      //   → empty state กับแบนเนอร์ต้องห่อ group เอง ไม่งั้นชนขอบจอ
+      if (!html) html = '<div class="phx-sw-group"><div class="phx-tv-empty" style="padding:26px 12px;">ยังไม่มีการแลก / ยก / รับเวรเดือนนี้</div></div>';
       // v3.47: pending-draft manager — if this login has unpublished ร่าง, surface a way to จัดการ
       //   (ทำต่อ / เผยแพร่ทั้งหมด) right here on the แลกเวร tab.
       var draftN = (typeof swfPendingDraftCount === 'function') ? swfPendingDraftCount(mid) : 0;
       var draftBanner = draftN
-        ? '<button type="button" class="phx-draft-banner" onclick="swfShowPendingDrafts()">' +
+        ? '<div class="phx-sw-group"><button type="button" class="phx-draft-banner" onclick="swfShowPendingDrafts()">' +
             '<span class="ic">📝</span>' +
             '<span class="tx">มีร่างค้าง <b>'+draftN+'</b> รายการ — ยังไม่เผยแพร่ให้คนอื่นเห็น</span>' +
             '<span class="go">จัดการ ›</span>' +
-          '</button>'
+          '</button></div>'
         : '';
       // v3.49 FIX "ประวัติเด้งขึ้นบน": การ poll (phxRefreshActiveTab ~ทุก 30-60 วิ) เรียกซ้ำ →
       //   เดิม rebuild body.innerHTML ทุกครั้ง → กล่องเลื่อน .phx-tl-scroll ถูกสร้างใหม่ → scroll เด้งกลับบน.
