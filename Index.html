@@ -150,15 +150,17 @@
        🎨 ชิปใช้ class `badge-*` ตัวจริงจากตาราง (badge-s3 ฯลฯ) → สี "ตรงกับป้ายที่เห็นในตารางเป๊ะ"
           ทั้งธีมสว่าง+มืด โดยอัตโนมัติ และไม่ต้องก๊อปค่าสีมาเก็บซ้ำ (สีรอบซ้ำ 3 ที่ในไฟล์นี้อยู่แล้ว).
           ⚠️ อย่าเซ็ต background/color ตรงนี้ เดี๋ยวจะทับสีของ badge-* → กลับไปไม่ตรงของจริงอีก.
-       ติ๊ก/ไม่ติ๊ก: ไม่ติ๊ก = จาง · ติ๊ก = สีเต็ม + ขอบในสีเดียวกับป้าย (currentColor = อยู่ในโทนป้ายเสมอ)
-       + ✓ ที่จองที่ไว้ตลอด (visibility) → กดแล้วชิปไม่ขยับ/ไม่ดันบรรทัดใหม่ */
+       ติ๊ก/ไม่ติ๊ก: ตัวบอกหลักคือ ✓ + ขอบใน currentColor (อยู่ในโทนป้ายเสมอ ไม่ทับสี)
+       ✓ จองที่ไว้ตลอดด้วย visibility → กดแล้วชิปไม่ขยับ/ไม่ดันบรรทัดใหม่
+       ⚠️ opacity ตอนไม่ติ๊กห้ามต่ำมาก: ป้ายเป็นพาสเทลอ่อนอยู่แล้ว จางอีกจะ "ซีด" อ่านสีไม่ออก
+          (เคยใช้ .45 → Klui: "สีรอบดูซีดจางไปหน่อย") — .85 = ยังเห็นสีจริง แต่ยังต่างจากตัวที่ติ๊ก */
     .rnd-chips { display: flex; flex-wrap: wrap; gap: 6px; }
     .rnd-chip {
       display: inline-flex; align-items: center; gap: 3px;
       border-radius: 6px; padding: 4px 9px;
       font-size: 11px; font-weight: 700; line-height: 1.35;
       cursor: pointer; font-family: 'Kanit', sans-serif; user-select: none; white-space: nowrap;
-      opacity: 0.45;
+      opacity: 0.85;
       transition: opacity .12s, box-shadow .12s;
     }
     .rnd-chip:active { transform: scale(0.97); }
@@ -11684,16 +11686,18 @@ table.exp-tbl .tm{margin-left:3px;opacity:0.75;}
         detail: 'ย้ายเลขเวอร์ชันมาไว้ใต้ปุ่มบันทึกลงปฏิทิน — กดแล้วเห็นว่าแต่ละรุ่นอัปเดตอะไรบ้าง ย้อนหลังได้' },
       { v: 'v3.44', date: '2026-07-10', title: 'ชื่อเล่น + ค้นหา/ตัวกรองแบบพิมพ์แล้วเจอ',
         detail: 'ตั้งชื่อเล่นให้ตัวเองหรือเพื่อนได้ + ช่องค้นหาและตัวกรองขึ้นรายชื่อให้เลือกทันที (พิมพ์ I10 เจอ I-10)' },
-      { v: 'v3.44', date: '2026-07-09', title: 'แก้เผยแพร่แล้วคนอื่นไม่เห็น',
+      { v: 'v3.44', date: '2026-07-09', title: 'แก้เผยแพร่แล้วคนอื่นไม่เห็น', needs: 'publish',
         detail: 'เดิมกดเผยแพร่แล้วข้อมูลไม่ถึงเซิร์ฟเวอร์ ตอนนี้ส่งถึงจริง คนอื่นรีเฟรชแล้วเห็นทันที' }
     ];
     function _clClose() { var e = document.getElementById('clOverlay'); if (e) e.remove(); }
     function openChangelog() {
       _clClose();
       var esc = (typeof _pbEsc === 'function') ? _pbEsc : function (s) { return String(s == null ? '' : s); };
+      // v3.49: ซ่อน entry ของฟีเจอร์ที่ปิดอยู่ (ดู `needs` ด้านบน) — "ล่าสุด" จะไปเกาะ entry ที่เห็นได้จริงตัวบนสุด
+      //   เพิ่มฟีเจอร์ใหม่ที่ปิดได้ → เติม key ตรงนี้ + ใส่ needs:'<key>' ที่ entry
+      var _featOn = { notes: !!window._notesEnabled, publish: !!window._publishEnabled };
       var items = (APP_CHANGELOG || []).filter(function (e) {
-        // v3.49: ซ่อน entry ของฟีเจอร์ที่ปิดอยู่ (ดู `needs` ด้านบน) — "ล่าสุด" จะไปเกาะ entry ที่เห็นได้จริงตัวบนสุด
-        if (e && e.needs === 'notes' && !window._notesEnabled) return false;
+        if (e && e.needs && !_featOn[e.needs]) return false;
         return true;
       }).map(function (e, i) {
         var latest = (i === 0);
