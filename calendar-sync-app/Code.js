@@ -23,8 +23,10 @@
 var CAL_TZ = 'Asia/Bangkok';
 var QUIET_START_HOUR = 22;   // 22:00
 var QUIET_END_HOUR = 6;      // 06:00 — ไม่เตือนช่วงนอน
-var ALARM_OFFSETS_MIN = [60, 18 * 60];  // (timed event เดิม — คงไว้เผื่อใช้)
-var ALLDAY_REMIND_MIN = 240;            // v3.47: all-day event → เตือน 20:00 คืนก่อน (240 นาทีก่อนเที่ยงคืนวันเวร)
+// v3.49: ALARM_OFFSETS_MIN + _buildReminderMinutes เอาออกแล้ว — ถูกแทนด้วย _smartReminderMins()
+//   ที่ลอกตรรกะจาก ICS มาเป๊ะ (ดู git history ถ้าต้องการของเดิม)
+var ALLDAY_REMIND_MIN = 240;            // เตือน 20:00 คืนก่อน — ใช้กับ all-day เท่านั้น (คลินิก/ไม่รู้เวลา)
+                                        //   event ทั้งวันนับถอยหลังจากเที่ยงคืน → เตือนตามเวลาเวรไม่ได้
 
 var EVENT_COLORS = {
   'เวรกลางวัน': 2, 'เวรเช้า': 2,
@@ -115,7 +117,7 @@ function _parseShiftDateTime(shift) {
 }
 
 // v3.47: all-day date (midnight ของวันเวร) จาก timestamp — ไม่ต้องใช้ range.
-//   Klui: sync Google Calendar ให้เป็น all-day event ไปเลย (เวลาคลินิก/รอบไม่แน่นอน)
+//   ⚠️ v3.49: ใช้กับ "เวรที่ไม่รู้เวลา" เท่านั้นแล้ว (คลินิก / range อ่านไม่ออก) — ดู _shiftTimes()
 function _shiftAllDayStart(shift) {
   if (!shift || !shift.timestamp) return null;
   var ts = String(shift.timestamp);
@@ -127,24 +129,75 @@ function _shiftAllDayStart(shift) {
   return isNaN(d.getTime()) ? null : d;
 }
 
-function _isQuietHour(date) {
-  var h = date.getHours();
-  return h >= QUIET_START_HOUR || h < QUIET_END_HOUR;
+// v3.49: เวลาเริ่ม/จบจริงของเวร (Klui: "แก้ Gcal sync ให้เป็นตาม ICS เรื่องเวลา")
+//   เดิม v3.47 sync เป็น all-day ทุกใบ → เวลาเวรหาย ปฏิทินโชว์ 7 โมงเช้า (บั๊กเดียวกับ ICS ที่เพิ่งกู้)
+//   กติกาเดียวกับ ICS เป๊ะ: คลินิก = เวลาไม่แน่นอนจริง → all-day · อ่าน range ไม่ออก → all-day
+//   · นอกนั้น → timed ตามเวลาจริง
+//   วันที่มาจาก timestamp (ฝั่งแอปเลื่อนรอบ 3 มาให้แล้ว) + เวลามาจาก range
+//   ♻️ ใช้ _parseShiftDateTime() ที่มีอยู่แล้ว (v3.47 ตัดสายทิ้งจนกลายเป็นโค้ดตาย) — มันทำ
+//      timestamp+range → start/end + ทดวันตอนข้ามคืนไว้ครบแล้ว ไม่ต้องเขียนใหม่ให้ซ้ำซ้อน
+//   → { start, end, allDay }  |  null ถ้าอ่านวันที่ไม่ได้
+function _shiftTimes(shift) {
+  var base = _shiftAllDayStart(shift);
+  if (!base) return null;
+  if (_isClinicShift(shift)) return { start: base, end: base, allDay: true };
+  var t = _parseShiftDateTime(shift);
+  if (!t) return { start: base, end: base, allDay: true };
+  return { start: t.start, end: t.end, allDay: false };
 }
 
-function _buildReminderMinutes(shiftStart) {
-  var out = [];
-  ALARM_OFFSETS_MIN.forEach(function (offMin) {
-    var alarmAt = new Date(shiftStart.getTime() - offMin * 60 * 1000);
-    if (!_isQuietHour(alarmAt)) out.push(offMin);
-  });
-  if (out.length === 0) {
-    [30, 15].forEach(function (m) {
-      var alarmAt = new Date(shiftStart.getTime() - m * 60 * 1000);
-      if (!_isQuietHour(alarmAt)) out.push(m);
-    });
+// v3.49: ลอก _buildSmartAlarms (Index.html — ตัวสร้าง ICS) มาให้ตรงกันเป๊ะ แต่คืน "นาทีก่อนเข้าเวร"
+//   แทน trigger string เพราะ GCal ใช้ addPopupReminder(minutesBefore)
+//   ค่า default = เตือน 18:00 วันก่อน + อีกที 5 ชม. ก่อนเข้าเวร (เลี่ยงช่วงนอน 22:00-06:00)
+//   userSettings = {eveningTime:'HH:MM', hoursBefore:'1-24'} ส่งมาจากแอปหลัก (ค่าเดียวกับ ICS)
+//   ⚠️ ถ้าแก้ตรรกะที่ Index.html ต้องมาแก้ที่นี่ด้วย ไม่งั้น ICS กับ GCal จะเตือนคนละจังหวะ
+//   ♻️ ช่วงนอนใช้ QUIET_START_HOUR/QUIET_END_HOUR ที่ไฟล์นี้มีอยู่แล้ว (22/06 = ค่าเดียวกับฝั่ง ICS)
+function _smartReminderMins(startH, startM, userSettings) {
+  var SLEEP_START = QUIET_START_HOUR, SLEEP_END = QUIET_END_HOUR;
+  var startMins = startH * 60 + startM;
+  var evH = 18, evM = 0, hoursBefore = 5, useEv = true, useHb = true;
+  if (userSettings && (userSettings.eveningTime || userSettings.hoursBefore)) {
+    useEv = !!userSettings.eveningTime;
+    useHb = !!userSettings.hoursBefore;
+    if (useEv) {
+      var m = String(userSettings.eveningTime).match(/^(\d{1,2}):(\d{1,2})$/);
+      if (m) { evH = parseInt(m[1], 10); evM = parseInt(m[2], 10); } else { useEv = false; }
+    }
+    if (useHb) {
+      var hb = parseInt(userSettings.hoursBefore, 10);
+      if (!isNaN(hb) && hb >= 1 && hb <= 24) hoursBefore = hb; else useHb = false;
+    }
+  }
+  var out = [], alarm1 = -1;
+  // เตือน 1: เวลา evH:evM ของวันก่อนเข้าเวร
+  if (useEv) {
+    alarm1 = (1440 - (evH * 60 + evM)) + startMins;
+    if (alarm1 > 0) out.push(alarm1);
+  }
+  // เตือน 2: hoursBefore ชม. ก่อนเข้าเวร — ถ้าตกช่วงนอนให้เลื่อน
+  if (useHb) {
+    var baseOffset = hoursBefore * 60;
+    var natural = (startMins - baseOffset + 1440 * 2) % 1440;
+    var naturalH = Math.floor(natural / 60);
+    var inSleep = (naturalH >= SLEEP_START || naturalH < SLEEP_END);
+    var alarm2;
+    if (!inSleep) alarm2 = baseOffset;
+    else if (startH >= SLEEP_END && startH < 11) alarm2 = startMins - SLEEP_END * 60;  // เวรเช้า → 06:00 วันเวร
+    else if (startH < SLEEP_END) alarm2 = 180 + startMins;                             // เวรดึก → 21:00 คืนก่อน
+    else alarm2 = baseOffset;
+    if (alarm2 > 0 && alarm2 !== alarm1) out.push(alarm2);
   }
   return out;
+}
+
+// v3.49: ตั้งแจ้งเตือนให้ event — timed = ตามเวลาเวรจริง · all-day = 20:00 คืนก่อน (เตือนตามเวลาไม่ได้
+//   เพราะ event ทั้งวันนับถอยหลังจากเที่ยงคืนเท่านั้น)
+function _applyReminders(ev, shift, t, userSettings) {
+  ev.removeAllReminders();
+  if (t.allDay) { ev.addPopupReminder(ALLDAY_REMIND_MIN); return; }
+  var mins = _smartReminderMins(t.start.getHours(), t.start.getMinutes(), userSettings);
+  if (!mins.length) mins = [ALLDAY_REMIND_MIN];
+  mins.forEach(function (m) { try { ev.addPopupReminder(m); } catch (e) {} });
 }
 
 // v3.47: clinic detection (shift มี ⚠️ หรือ range = 'ตรวจสอบ')
@@ -256,7 +309,7 @@ function _resolveCalendar() {
 /**
  * Sync เวรของผู้ใช้ (ที่แอปหลักคำนวณ overlay แล้วส่งเข้ามา) ลงปฏิทินของผู้ใช้เอง
  *
- * @param {Object} payload { monthValue: string, shifts: Array<shift> }
+ * @param {Object} payload { monthValue: string, shifts: Array<shift>, reminder?: {eveningTime,hoursBefore} }
  *   shift = { date, timestamp(YYYYMMDD), range("HH:MM-HH:MM"), name, pos, shift, room }
  * @return { ok, created, updated, deleted, skipped, total, calendarName, errors[] }
  */
@@ -266,6 +319,9 @@ function syncEffectiveShifts(payload) {
 
   var monthValue = String(payload.monthValue);
   var email = Session.getEffectiveUser().getEmail();
+  // v3.49: ค่าตั้งค่าแจ้งเตือนของผู้ใช้ (มาจากแอปหลัก — ตัวเดียวกับที่ ICS ใช้) → ICS/GCal เตือนตรงกัน
+  //   ไม่ส่งมา = null → _smartReminderMins ใช้ค่า default (18:00 วันก่อน + 5 ชม.ก่อนเข้าเวร)
+  var reminderSettings = payload.reminder || null;
 
   // ปฏิทินปลายทาง
   var calRes = _resolveCalendar();
@@ -300,15 +356,16 @@ function syncEffectiveShifts(payload) {
     var key = toCreate[i];
     try {
       var shift = currentShifts[key];
-      var d = _shiftAllDayStart(shift);   // v3.47: all-day
-      if (!d) { errors.push({ key: key, error: 'parse_failed' }); continue; }
+      var t = _shiftTimes(shift);   // v3.49: timed ตามเวลาเวรจริง (คลินิก/ไม่รู้เวลา → all-day)
+      if (!t) { errors.push({ key: key, error: 'parse_failed' }); continue; }
       var title = _buildEventTitle(shift);
       var desc = _buildEventDescription(shift);
-      var ev = cal.createAllDayEvent(title, d, { description: desc, location: 'Siriraj Hospital' });
-      ev.removeAllReminders();
-      ev.addPopupReminder(ALLDAY_REMIND_MIN);
+      var ev = t.allDay
+        ? cal.createAllDayEvent(title, t.start, { description: desc, location: 'Siriraj Hospital' })
+        : cal.createEvent(title, t.start, t.end, { description: desc, location: 'Siriraj Hospital' });
+      _applyReminders(ev, shift, t, reminderSettings);
       try { ev.setColor(_getEventColorId(shift)); } catch (e) {}
-      existing[key] = { eventId: ev.getId(), fingerprint: _fingerprint(title, d, d, desc) };
+      existing[key] = { eventId: ev.getId(), fingerprint: _fingerprint(title, t.start, t.end, desc) };
       created++;
     } catch (e) {
       var msg = String(e.message || '');
@@ -326,27 +383,29 @@ function syncEffectiveShifts(payload) {
   toUpdate.forEach(function (key) {
     try {
       var shift = currentShifts[key];
-      var d = _shiftAllDayStart(shift);   // v3.47: all-day
-      if (!d) { errors.push({ key: key, error: 'parse_failed' }); return; }
+      var t = _shiftTimes(shift);   // v3.49: timed ตามเวลาเวรจริง (คลินิก/ไม่รู้เวลา → all-day)
+      if (!t) { errors.push({ key: key, error: 'parse_failed' }); return; }
       var title = _buildEventTitle(shift);
       var desc = _buildEventDescription(shift);
-      var fp = _fingerprint(title, d, d, desc);
+      var fp = _fingerprint(title, t.start, t.end, desc);
       if (existing[key].fingerprint === fp) { skipped++; return; }
 
       var ev = null;
       try { ev = cal.getEventById(existing[key].eventId); } catch (e) {}
       if (!ev) {
-        var ne = cal.createAllDayEvent(title, d, { description: desc, location: 'Siriraj Hospital' });
-        ne.removeAllReminders();
-        ne.addPopupReminder(ALLDAY_REMIND_MIN);
+        var ne = t.allDay
+          ? cal.createAllDayEvent(title, t.start, { description: desc, location: 'Siriraj Hospital' })
+          : cal.createEvent(title, t.start, t.end, { description: desc, location: 'Siriraj Hospital' });
+        _applyReminders(ne, shift, t, reminderSettings);
         try { ne.setColor(_getEventColorId(shift)); } catch (e) {}
         existing[key] = { eventId: ne.getId(), fingerprint: fp };
       } else {
         ev.setTitle(title);
-        ev.setAllDayDate(d);   // v3.47: converts a timed event to all-day too
+        // v3.49: setTime() แปลง all-day → timed ให้เอง / setAllDayDate() แปลงกลับได้
+        //   → event เก่าที่เคยเป็น all-day จะถูกย้ายมาเป็นเวลาจริง ไม่ต้องลบสร้างใหม่
+        if (t.allDay) ev.setAllDayDate(t.start); else ev.setTime(t.start, t.end);
         ev.setDescription(desc);
-        ev.removeAllReminders();
-        ev.addPopupReminder(ALLDAY_REMIND_MIN);
+        _applyReminders(ev, shift, t, reminderSettings);
         try { ev.setColor(_getEventColorId(shift)); } catch (e) {}
         existing[key].fingerprint = fp;
       }
@@ -430,7 +489,7 @@ function _autoSyncTick() {
     Object.keys(feed).forEach(function (monthValue) {
       var m = feed[monthValue];
       if (m && Array.isArray(m.shifts)) {
-        syncEffectiveShifts({ monthValue: monthValue, shifts: m.shifts });
+        syncEffectiveShifts({ monthValue: monthValue, shifts: m.shifts, reminder: m.reminder });
       }
     });
   } catch (e) {
@@ -480,7 +539,7 @@ function pullAndSyncFromFeed(appNameOpt) {
   Object.keys(feed).forEach(function (mv) {
     var m = feed[mv];
     if (m && Array.isArray(m.shifts)) {
-      var r = syncEffectiveShifts({ monthValue: mv, shifts: m.shifts });
+      var r = syncEffectiveShifts({ monthValue: mv, shifts: m.shifts, reminder: m.reminder });
       if (r && r.ok) { tot.created += r.created || 0; tot.updated += r.updated || 0; tot.deleted += r.deleted || 0; tot.months++; }
     }
   });

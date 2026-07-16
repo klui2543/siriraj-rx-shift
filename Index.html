@@ -18799,7 +18799,10 @@ table.exp-tbl .tm{margin-left:3px;opacity:0.75;}
       var encName = String(me).trim().replace(/[.$#\[\]\/\s]+/g,'_');  // ต้องตรงกับ _encName() ในเคาน์เตอร์
       if (typeof fbDb === 'undefined' || !fbDb){ toast('เชื่อม Firebase ไม่ได้ — รีเฟรชแล้วลองใหม่','warn'); return; }
       try {
-        fbDb.ref('calFeed/' + encName + '/' + mid).set({ shifts: shifts, updatedAt: Date.now() })
+        // v3.49: ส่งค่าตั้งค่าแจ้งเตือนของผู้ใช้ไปด้วย (ตัวเดียวกับที่ ICS ใช้ — เมนู "เตือนเวรลงปฏิทิน")
+        //   → ปฏิทินเตือนจังหวะเดียวกับ ICS. null = ยังไม่เคยตั้ง → ฝั่งปฏิทินใช้ค่า default
+        var _rem = (typeof _phxGetCachedReminderSettings === 'function') ? _phxGetCachedReminderSettings() : null;
+        fbDb.ref('calFeed/' + encName + '/' + mid).set({ shifts: shifts, updatedAt: Date.now(), reminder: _rem || null })
           .catch(function(err){ toast('เขียนเวรลง Firebase ไม่ได้ (ต้องเปิดสิทธิ์ calFeed): '+(err&&err.message?err.message:err),'warn'); });
       } catch(e){ toast('เขียนเวรลง Firebase ไม่สำเร็จ: '+(e&&e.message?e.message:e),'warn'); return; }
 
