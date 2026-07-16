@@ -301,6 +301,9 @@ function uploadLocalFile(base64Data, filename, token) {
   guardCheck_(token);
   let blobData = Utilities.newBlob(Utilities.base64Decode(base64Data), MimeType.MICROSOFT_EXCEL, filename);
   let newFile = DriveApp.getFolderById(INPUT_FOLDER_ID).createFile(blobData);
+  // v3.49 D2-xlsx: เก็บไฟล์ .xlsx ต้นฉบับไว้ให้ทุกคนดาวน์โหลดได้ (เดิม trash ทิ้งใน finally).
+  //   _keptOrig=true → finally จะไม่ trash newFile. บันทึก label→fileId ใน Script Property.
+  var _keptOrig = false;
   // v3.44: transient Excel→Sheet conversion — read by hydrate + Phase I/J below, then trashed in the
   //   finally. NO LONGER shared publicly (the public sheet was almost unused). A re-enable toggle may
   //   return in a later session (after the bottom-nav work).
@@ -375,6 +378,19 @@ function uploadLocalFile(base64Data, filename, token) {
     }
 
     const saved = saveMonthToDatabase_(result.label, JSON.stringify(payload), sheetUrl, result.diagnostics, _consistentMonthId);
+
+    // v3.49 D2-xlsx: เก็บไฟล์ต้นฉบับ + จำ label→fileId (ให้ phxGetOriginalXlsx อ่านมาแจกได้). non-fatal.
+    try {
+      var _xlsxKey = 'phx_xlsx_' + String(result.label || '').trim();
+      var _oldRaw = PropertiesService.getScriptProperties().getProperty(_xlsxKey);
+      if (_oldRaw) {   // อัปโหลดซ้ำเดือนเดิม → trash ไฟล์ต้นฉบับเก่า กัน orphan
+        var _oldId = String(_oldRaw).split('\n')[0];
+        if (_oldId && _oldId !== newFile.getId()) { try { DriveApp.getFileById(_oldId).setTrashed(true); } catch (e) {} }
+      }
+      try { newFile.setName(String(result.label || 'ตารางเวร') + ' — ต้นฉบับ.xlsx'); } catch (e) {}
+      PropertiesService.getScriptProperties().setProperty(_xlsxKey, newFile.getId() + '\n' + filename);
+      _keptOrig = true;
+    } catch (e) { console.warn('[xlsx keep] ' + e.message); }
 
     // 🚀 ยิงข้อมูลขึ้น Firebase คู่ขนานกันไปเลย!
     const monthIdForFirebase = monthKeyFromLabel_(result.label);
@@ -464,10 +480,30 @@ function uploadLocalFile(base64Data, filename, token) {
     return saved;
 
   } finally {
-    // v3.44: drop BOTH transient files so no public/orphan sheet piles up in Drive (covers the
-    //   CATASTROPHIC-throw path too). conv was the old "Public_" sheet.
+    // v3.44: drop the transient Sheet conversion (conv = old "Public_" sheet).
     try { DriveApp.getFileById(conv.id).setTrashed(true); } catch(e) {}
-    try { newFile.setTrashed(true); } catch(e) {}
+    // v3.49 D2-xlsx: trash newFile เฉพาะเมื่อ "ไม่ได้เก็บ" (เช่น audit CATASTROPHIC throw ก่อนบันทึก) —
+    //   ถ้าเก็บไว้เป็นไฟล์ต้นฉบับสำหรับดาวน์โหลดแล้ว (_keptOrig) จะไม่ trash.
+    if (!_keptOrig) { try { newFile.setTrashed(true); } catch(e) {} }
+  }
+}
+
+// v3.49 D2-xlsx: อ่านไฟล์ .xlsx ต้นฉบับของเดือน (ตาม label) แล้วส่ง base64 ให้ client ดาวน์โหลด.
+//   เปิดให้ทุกคนเรียกได้ (ข้อมูลเดียวกับตารางที่ทุกคนดูได้อยู่แล้ว). คืน {ok:false} ถ้าเดือนนั้น
+//   ยังไม่มีไฟล์เก็บไว้ (เดือนที่อัปโหลดก่อนอัปเดตระบบนี้).
+function phxGetOriginalXlsx(label) {
+  try {
+    var key = 'phx_xlsx_' + String(label == null ? '' : label).trim();
+    var raw = PropertiesService.getScriptProperties().getProperty(key);
+    if (!raw) return { ok: false, error: 'ยังไม่มีไฟล์ต้นฉบับสำหรับเดือนนี้ (มีเฉพาะเดือนที่อัปโหลดหลังอัปเดตระบบ)' };
+    var parts = String(raw).split('\n');
+    var fileId = parts[0], fname = (parts[1] || (String(label).trim() + '.xlsx'));
+    if (!fileId) return { ok: false, error: 'ไม่พบรหัสไฟล์' };
+    var file = DriveApp.getFileById(fileId);   // ต้องมีสิทธิ์ Drive (แอปมีอยู่แล้ว)
+    var b64 = Utilities.base64Encode(file.getBlob().getBytes());
+    return { ok: true, base64: b64, filename: fname };
+  } catch (e) {
+    return { ok: false, error: 'อ่านไฟล์ไม่สำเร็จ: ' + e.message };
   }
 }
 
