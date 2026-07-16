@@ -13368,10 +13368,13 @@ table.exp-tbl .tm{margin-left:3px;opacity:0.75;}
         if (list) list.style.display = 'none';
       }, 150);
     }
-    (function _phxRegNameListClickInit() {
-      document.addEventListener('click', function(e) {
+    // mousedown (not click) so the pick lands before the input's blur timer hides the list —
+    // same reason _pkTAPick uses onmousedown
+    (function _phxRegNameListPickInit() {
+      document.addEventListener('mousedown', function(e) {
         const row = e.target.closest && e.target.closest('.phx-combo-row');
         if (!row) return;
+        e.preventDefault();
         phxRegNamePick(decodeURIComponent(row.dataset.value));
       });
     })();
