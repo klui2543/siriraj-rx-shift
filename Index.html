@@ -11375,17 +11375,12 @@ table.exp-tbl .tm{margin-left:3px;opacity:0.75;}
 
   <script>
     function openExportCalendarModal() {
-      // v3.49 D1: เตรียมรายชื่อ export จากฟิลเตอร์หลักก่อน (กันค่าค้างจากครั้งก่อน) แล้วค่อยเช็ค/วาดพาเนล
+      // v3.49 D1: เตรียมรายชื่อ export (แยกจากฟิลเตอร์หลัก, เริ่มว่าง) แล้วค่อยวาดพาเนล
       try { _ecmSeedExportPeople(); } catch(e) {}
-      // v3.37: รองรับ multi-name (chips หลายคน) — ICS ยังจำกัด 1 คน แต่ PDF batch ได้
       const targets = (typeof _ecmGetExportTargets === 'function') ? _ecmGetExportTargets() : [];
-      if (targets.length === 0) {
-        alert('กรุณาเลือก/พิมพ์ชื่อเภสัชกร 1 คนก่อน');
-        return;
-      }
       document.getElementById('exportCalendarModal').style.display = 'block';
-      // multi-name → เปิดที่ Tab 2 (PDF/PNG) เลย เพราะ ICS ไม่รองรับ
-      ecmSwitchTab(targets.length > 1 ? 2 : 1);
+      // v3.49: ไม่บล็อกเมื่อยังไม่เลือกคน (เลือกในโมดัลได้) — 1 คน→แท็บ ICS, อื่นๆ (0/หลายคน)→แท็บเลือกคน+PDF
+      ecmSwitchTab(targets.length === 1 ? 1 : 2);
       // Patch ZZ2: reset shift selection on each open
       window._ecmSelectedShifts = null;
       const dpToggle = document.getElementById('ecmDayPickerToggle');
@@ -12413,15 +12408,10 @@ table.exp-tbl .tm{margin-left:3px;opacity:0.75;}
     function _ecmSavePresets(arr) {
       try { if (typeof phxSetPref === 'function') phxSetPref('exportPresets', Array.isArray(arr) ? arr : []); } catch (e) {}
     }
-    // seed the editable export list from the LIVE main-filter selection (called on modal open).
-    //   อ่านจาก selectedPharmacists ตรงๆ (ไม่อ่าน _ecmExportPeople เดิม เพื่อไม่ให้ค้างค่าเก่า)
+    // v3.49 (feedback Klui): "คนที่จะปริ้น" แยกจากฟิลเตอร์แท็บหลัก — ไม่ auto-match ชื่อที่ค้นค้างไว้.
+    //   เริ่มว่างเปล่าครั้งแรก แล้วจำค่าที่ผู้ใช้เลือกไว้ทั้ง session (ไม่ reseed จาก selectedPharmacists).
     function _ecmSeedExportPeople() {
-      var sel = (window.selectedPharmacists || []).slice();
-      if (!sel.length) {
-        var t = (typeof _getTargetPerson === 'function') ? _getTargetPerson() : null;
-        if (t) sel = [t];
-      }
-      window._ecmExportPeople = sel;
+      if (!Array.isArray(window._ecmExportPeople)) window._ecmExportPeople = [];
     }
     function _ecmEscHtml(s) { return String(s == null ? '' : s).replace(/[&<>"']/g, function(c){ return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]; }); }
     function _ecmPeopleList() { return Array.isArray(window._ecmExportPeople) ? window._ecmExportPeople : []; }
@@ -12529,6 +12519,9 @@ table.exp-tbl .tm{margin-left:3px;opacity:0.75;}
     }
     function _ecmPanelClick(e) {
       var t = e.target; if (!t || !t.closest) return;
+      // v3.49 (fix "เมนูหาย"): กันคลิกในพาเนลลอยไป trigger handler อื่นของแอป (มี document-click ~24 ตัว)
+      //   โดยเฉพาะตอนลบชื่อคนสุดท้าย — เดิมคลิก ✕ ลอยไปโดน handler อื่นจนเมนูหาย ต้องรีเฟรช.
+      e.stopPropagation();
       var C = function(sel){ return t.closest(sel); };
       // ── ควบคุม preset section ──
       if (C('[data-foldpreset]')) { window._ecmPresetFold = !window._ecmPresetFold; _ecmRenderPresetSection(); return; }
