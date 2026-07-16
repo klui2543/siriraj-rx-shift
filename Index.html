@@ -1250,7 +1250,8 @@
     /* v3.50: ปุ่ม 4 อัน = ตารางจริง (ช่องว่าง 1px = เส้นตาราง) ไม่ใช่การ์ดลอย 4 ใบ.
        พื้นขาว สีบอกชนิดอยู่ที่ "ตัวอักษร" — ค่าสีเดิมของแอปทั้งชุด ไม่มีสีใหม่.
        เอาอีโมจิออก (🔄🎁🤝↩️ วาดคนละสไตล์ + เปลี่ยนรูปตามเครื่อง) → ใส่คำอธิบายบอกว่าจะเกิดอะไรแทน */
-    .phx-swap-actions { display: grid; grid-template-columns: 1fr 1fr; gap: 1px; }
+    /* v3.50.2: เส้นแบ่ง 4 เมนูเข้มขึ้น (Klui: จางเกินไป) — เส้นคือพื้น grid ที่โผล่ตามช่อง gap 1px */
+    .phx-swap-actions { display: grid; grid-template-columns: 1fr 1fr; gap: 1px; background: #cbd5e1; }
     .phx-swap-act-btn {
       display: flex; flex-direction: column; align-items: flex-start; justify-content: flex-start; gap: 3px;
       padding: 14px 13px 15px; border: 0; background: var(--surface); text-align: left;
@@ -1293,7 +1294,18 @@
       display: grid; grid-template-columns: 30px 1fr; gap: 16px;
       padding: 11px 13px 12px 12px; background: var(--surface);
       border-bottom: 1px solid var(--border);
+      position: relative;
     }
+    /* v3.50.2: แถบสีบอกชนิดกลับมา (Klui: ไม่มีแล้วดูยาก) — ใช้สีเดียวกับตัวอักษรเมนู 4 ปุ่ม
+       ไม่ใช่ชุดสีเดิม (#3b82f6/#f59e0b) ที่ Klui บอกทึม. เว้นหัวท้าย 10px + มุมโค้ง →
+       แถบของแต่ละแถวแยกกันชัด ไม่ชนกันเป็นริบบิ้นเส้นเดียวแบบรอบก่อน (v3.49 sample) */
+    .phx-tl-item::before {
+      content: ''; position: absolute; left: 0; top: 10px; bottom: 10px; width: 3px;
+      border-radius: 0 3px 3px 0;
+    }
+    .phx-tl-item.swap::before { background: #1d4ed8; }
+    .phx-tl-item.give::before { background: #a16207; }
+    .phx-tl-item.add::before  { background: #15803d; }
     .phx-tl-item:last-child { border-bottom: 0; }
     .phx-tl-date { text-align: right; padding-top: 1px; }
     .phx-tl-date .dd { font-size: 15px; font-weight: 400; color: var(--text); line-height: 1.1; font-variant-numeric: tabular-nums; }
@@ -6145,8 +6157,12 @@ window.allPharmacistNames = [];
         '<div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px;"><div style="font-weight:700; font-size:15px;">ยืนยันการ' + (opts.kind === 'swap' ? 'แลกเวร' : (_isGive ? 'ยกเวร' : 'รับเวร')) + '</div>' +
         '<button type="button" onclick="_lwwTransferClose()" style="border:none;background:none;font-size:18px;cursor:pointer;color:var(--sub);">✕</button></div>' +
         '<div style="display:flex; gap:8px; background:#fff7ed; border-radius:8px; padding:9px 11px; margin-bottom:14px;"><span>ℹ️</span><div style="font-size:12px; color:#9a3412; line-height:1.55;">' + lvl1 + '</div></div>' +
-        '<label style="font-size:12px; color:var(--sub);">' + kindLabel + ' (แตะเพื่อเลือก/แก้ชื่อ)</label>' +
-        '<div id="lwwFromField" data-val="' + String(initFrom).replace(/"/g, '&quot;') + '" style="width:100%; margin:5px 0 12px; padding:10px 12px; border:1px solid var(--border); border-radius:6px; font-family:inherit; font-size:15px; cursor:pointer; display:flex; justify-content:space-between; align-items:center; box-sizing:border-box;"><span id="lwwFromVal">' + (initFrom || '— เลือกชื่อ —') + '</span><span style="color:var(--sub);">▾</span></div>' +
+        // v3.50.2: ยกเวรซ่อนช่องเลือกชื่อ (Klui: ซ้ำซ้อน คนงง) — ผู้รับถูกเลือกมาแล้วจากหน้าก่อน
+        //   (confirmPickName) และไดอะแกรมโชว์ชื่ออยู่แล้ว. คง element ไว้ใน DOM (display:none)
+        //   เพราะปุ่มยืนยันอ่านค่าจาก #lwwFromField data-val. สลับ/รับเวร ยังโชว์ช่องตามเดิม
+        //   (ที่นั่นมันมีหน้าที่จริง = แก้ชื่อผู้ถือเวรเมื่อข้อมูลบนจอเก่า)
+        (_isGive ? '' : '<label style="font-size:12px; color:var(--sub);">' + kindLabel + ' (แตะเพื่อเลือก/แก้ชื่อ)</label>') +
+        '<div id="lwwFromField" data-val="' + String(initFrom).replace(/"/g, '&quot;') + '" style="width:100%; margin:5px 0 12px; padding:10px 12px; border:1px solid var(--border); border-radius:6px; font-family:inherit; font-size:15px; cursor:pointer; display:flex; justify-content:space-between; align-items:center; box-sizing:border-box;' + (_isGive ? ' display:none;' : '') + '"><span id="lwwFromVal">' + (initFrom || '— เลือกชื่อ —') + '</span><span style="color:var(--sub);">▾</span></div>' +
         '<div class="lww-diag-wrap"><div class="lww-diag-h">ผลของรายการนี้</div><div id="lwwDiagArea">' + _lwwDiagHtml(opts.kind, initFrom, opts) + '</div></div>' +
         '<div style="display:flex; gap:8px;"><button type="button" onclick="_lwwTransferClose()" style="flex:1; padding:9px; border:1px solid var(--border); border-radius:6px; background:var(--surface); color:var(--text); font-family:inherit; cursor:pointer;">ยกเลิก</button>' +
         '<button type="button" id="lwwTransferOk" style="flex:1; padding:9px; border:1px solid #2563eb; border-radius:6px; background:#2563eb; color:#fff; font-family:inherit; cursor:pointer;">ยืนยัน</button></div>' +
@@ -18460,12 +18476,16 @@ table.exp-tbl .tm{margin-left:3px;opacity:0.75;}
     //   createdAt = new Date().toISOString() (UTC) → getDate/getDay/getHours = เวลาท้องถิ่น
     //   คนไทยเห็นถูก (เหมือน _tlWhen ที่ใช้ getHours อยู่แล้ว). วันในสัปดาห์ index เดียวกับ code.js:603
     var _TL_DAYS = ['อา.','จ.','อ.','พ.','พฤ.','ศ.','ส.'];
+    // v3.50.2: เดือนกำกับใน meta (Klui: "เช่น มิถุนายน 17:52") — คอลัมน์ซ้ายมีแค่วัน+DOW
+    //   ประวัติข้ามเดือนได้ (รายการ มิ.ย. โผล่ในเดือน ก.ค.) ไม่มีเดือนจะกำกวม
+    var _TL_MONTHS = ['มกราคม','กุมภาพันธ์','มีนาคม','เมษายน','พฤษภาคม','มิถุนายน','กรกฎาคม','สิงหาคม','กันยายน','ตุลาคม','พฤศจิกายน','ธันวาคม'];
     function _tlTxn(iso){
       try {
-        var d = new Date(iso); if (isNaN(d.getTime())) return { dd:'', dw:'', time:'' };
+        var d = new Date(iso); if (isNaN(d.getTime())) return { dd:'', dw:'', mo:'', time:'' };
         var p = function(n){ return (n<10?'0':'')+n; };
-        return { dd:String(d.getDate()), dw:_TL_DAYS[d.getDay()]||'', time:p(d.getHours())+':'+p(d.getMinutes()) };
-      } catch(e){ return { dd:'', dw:'', time:'' }; }
+        return { dd:String(d.getDate()), dw:_TL_DAYS[d.getDay()]||'', mo:_TL_MONTHS[d.getMonth()]||'',
+                 time:p(d.getHours())+':'+p(d.getMinutes()) };
+      } catch(e){ return { dd:'', dw:'', mo:'', time:'' }; }
     }
     // v3.47: "ประวัติการแลกเวร" — my own transaction records (swap/give/receive) as a timeline,
     //   newest → oldest. Notes are excluded ("เฉพาะ Transaction"). Returns '' when there are none.
@@ -18482,17 +18502,19 @@ table.exp-tbl .tm{margin-left:3px;opacity:0.75;}
         var viewer = a.viewerName || me;
         var summary = (typeof _swfSummaryHtml==='function')
           ? _swfSummaryHtml(a, viewer, sh.my, sh.tgt, { you: String(viewer) === String(me) }) : '';
-        // v3.50.1: หัวแถว = วันที่ "ทำรายการ" (createdAt) · meta = เวลาอย่างเดียว
+        // v3.50.1: หัวแถว = วันที่ "ทำรายการ" (createdAt) · v3.50.2: meta = เดือน + เวลา
         var tx = _tlTxn(a.createdAt);
         var isDraft = String(a._visibility)==='draft';
         // v3.49 สมุดส่วนตัว: ไม่มีเรื่องเผยแพร่ → ไม่โชว์ป้าย "ร่าง/เผยแพร่แล้ว" (ทุกอย่างอยู่ในสมุดตัวเอง)
         var status = !window._publishEnabled ? ''
                    : (isDraft ? '<span class="phx-tl-status draft">ร่าง</span>' : '<span class="phx-tl-status pub">เผยแพร่แล้ว</span>');
-        return '<div class="phx-tl-item">' +
+        // v3.50.2: class ชนิด (swap/give/add) กลับมา — แถบสีซ้ายใช้เลือกสี
+        var kind = (a.action==='swap') ? 'swap' : (a.action==='give' ? 'give' : 'add');
+        return '<div class="phx-tl-item '+kind+'">' +
             '<div class="phx-tl-date"><div class="dd">'+esc(tx.dd)+'</div><div class="dw">'+esc(tx.dw)+'</div></div>' +
             '<div>' +
               '<div class="phx-tl-summary">'+summary+'</div>' +
-              '<div class="phx-tl-meta">'+esc(tx.time)+status+'</div>' +
+              '<div class="phx-tl-meta">'+esc((tx.mo?tx.mo+' ':'')+tx.time)+status+'</div>' +
             '</div>' +
           '</div>';
       }).join('');
