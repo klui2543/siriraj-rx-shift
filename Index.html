@@ -9390,8 +9390,12 @@ async function _exportCalendarPDF_v2(personList) {
     window.renderRoundChips = function() {
       var box = document.getElementById('fltRoundChips');
       if (!box) return;
+      // ⚠️ ห้ามใช้ window.rawData — rawData ประกาศด้วย `let` (บรรทัด ~2441) จึง **ไม่เกาะ window**
+      //    (window.rawData = undefined เสมอ → หารอบไม่เจอ → ขึ้น "ยังไม่มีข้อมูลรอบในเดือนนี้").
+      //    ใช้ตัวแปรตรงๆ + typeof guard แบบเดียวกับที่โปรเจกต์นี้ใช้ทุกที่ (เช่น _origBuildRows).
+      var _raw = (typeof rawData !== 'undefined' && Array.isArray(rawData)) ? rawData : [];
       var present = {};
-      try { (window.rawData || []).forEach(function(r) { if (r) present[window._roundKeyOf(r.shift)] = 1; }); } catch (e) {}
+      try { _raw.forEach(function(r) { if (r) present[window._roundKeyOf(r.shift)] = 1; }); } catch (e) {}
       window.selectedRounds = (window.selectedRounds || []).filter(function(k) { return present[k]; });
       var avail = window.PHX_ROUNDS.filter(function(r) { return present[r.k]; });
       if (!avail.length) { box.innerHTML = '<span style="font-size:11px; color:var(--sub);">— ยังไม่มีข้อมูลรอบในเดือนนี้ —</span>'; return; }
