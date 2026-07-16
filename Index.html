@@ -1250,20 +1250,34 @@
     /* v3.50: ปุ่ม 4 อัน = ตารางจริง (ช่องว่าง 1px = เส้นตาราง) ไม่ใช่การ์ดลอย 4 ใบ.
        พื้นขาว สีบอกชนิดอยู่ที่ "ตัวอักษร" — ค่าสีเดิมของแอปทั้งชุด ไม่มีสีใหม่.
        เอาอีโมจิออก (🔄🎁🤝↩️ วาดคนละสไตล์ + เปลี่ยนรูปตามเครื่อง) → ใส่คำอธิบายบอกว่าจะเกิดอะไรแทน */
-    /* v3.50.2: เส้นแบ่ง 4 เมนูเข้มขึ้น (Klui: จางเกินไป) — เส้นคือพื้น grid ที่โผล่ตามช่อง gap 1px */
-    .phx-swap-actions { display: grid; grid-template-columns: 1fr 1fr; gap: 1px; background: #cbd5e1; }
+    /* v3.50.3: เส้นแบ่ง 4 เมนู — Klui ทักว่าจางไป "อีกรอบ" หลังผมลองเข้มสี (#cbd5e1) รอบที่แล้ว.
+       ต้นตอจริงไม่ใช่สี — เป็นความหนา: เดิมใช้ grid gap:1px (พื้นสีโผล่เป็นเส้นผ่านช่องว่าง)
+       ซึ่งบนจอ retina เส้น 1px มักเบลอจางกว่าที่ตั้งใจ. แอปเองมีแพตเทิร์น "เส้นแบ่งชัดเจน"
+       อยู่แล้วที่ .cal-cell (~285): border-bottom: 2px solid #cbd5e1 → ใช้ค่าเดียวกันแต่หนา 2px
+       ผ่าน border จริงแทน gap-background (border คมกว่าเสมอ ไม่ subpixel-blur เหมือน background-in-gap) */
+    .phx-swap-actions { display: grid; grid-template-columns: 1fr 1fr; }
     .phx-swap-act-btn {
       display: flex; flex-direction: column; align-items: flex-start; justify-content: flex-start; gap: 3px;
       padding: 14px 13px 15px; border: 0; background: var(--surface); text-align: left;
       font-family: 'Kanit', sans-serif; min-height: 76px;
       cursor: pointer; transition: filter 0.12s;
     }
+    /* เส้นแบ่งเป็น border จริงบนแต่ละปุ่ม — เฉพาะขอบ "ใน" ตาราง (ขอบนอกมี .phx-sw-box คุมอยู่แล้ว)
+       ลำดับ DOM คงที่: swap(บนซ้าย) give(บนขวา) recv(ล่างซ้าย) cancel(ล่างขวา) */
+    .phx-swap-act-btn.swap { border-right: 2px solid #cbd5e1; border-bottom: 2px solid #cbd5e1; }
+    .phx-swap-act-btn.give { border-bottom: 2px solid #cbd5e1; }
+    .phx-swap-act-btn.recv { border-right: 2px solid #cbd5e1; }
     .phx-swap-act-btn:hover { filter: brightness(0.97); }
     .phx-swap-act-btn:active { filter: brightness(0.94); }
     .phx-swap-act-btn:focus-visible { outline: 2px solid var(--navy); outline-offset: -2px; }
     .phx-swap-act-btn .lbl { font-size: 14px; font-weight: 600; line-height: 1.3; }
     .phx-swap-act-btn .dsc { font-size: 10.5px; font-weight: 300; color: var(--sub); line-height: 1.45; }
     .phx-swap-act-btn.swap   .lbl { color: #1d4ed8; }
+    /* v3.50.3: สี "ยกเวร" — Klui ทักซ้ำรอบ 2 ว่าน้ำตาลเหลืองทึม/หดหู่ (นี่คือสีปุ่มเดิมของแอปเองที่
+       ยกมาตรง ๆ ตั้งแต่ v3.50 ไม่ใช่สีที่ผมคิด). ลองหาทางออก: เหลืองสดที่ "ดูเหลืองจริง" (hue 45-55°)
+       ไม่มีเฉดไหนผ่านมาตรฐานอ่านออก 4.5:1 บนพื้นขาวเลย (เหลืองสดต้องสว่าง ตัดกับขาวไม่พอ)
+       ต้องหรี่ให้เข้มพอจะอ่านออก ซึ่งเฉดจะเอียงไปมัสตาร์ด/น้ำตาลเสมอ (ข้อจำกัดทางฟิสิกส์ ไม่ใช่รสนิยม)
+       → ทำ swatch จริงให้ Klui เลือกเอง แทนเดามั่ว ๆ รอบที่ 3 (ดู artifact ที่แนบ) */
     .phx-swap-act-btn.give   .lbl { color: #a16207; }
     .phx-swap-act-btn.recv   .lbl { color: #15803d; }
     .phx-swap-act-btn.cancel .lbl { color: #dc2626; }
@@ -1313,6 +1327,8 @@
     .phx-tl-summary { font-size: 12.5px; font-weight: 300; color: var(--text); line-height: 1.55; }
     .phx-tl-summary b { font-weight: 600; color: var(--navy); }   /* ชื่อคน = กรมท่า ตาม .swf-c-name */
     .phx-tl-summary code { font-family: 'Kanit', sans-serif; font-weight: 500; color: var(--text); font-variant-numeric: tabular-nums; }
+    /* v3.50.3: เวลาท้ายชื่อ (Klui) — margin-left คือ "เว้นช่องไฟ" (ไม่ใช้ space ตรง ๆ เพราะ HTML ยุบซ้ำ) */
+    .phx-tl-time { color: var(--sub); font-weight: 300; margin-left: 3px; font-variant-numeric: tabular-nums; white-space: nowrap; }
     .phx-tl-meta { font-size: 10px; font-weight: 300; color: var(--sub); margin-top: 3px; display: flex; align-items: center; gap: 6px; flex-wrap: wrap; font-variant-numeric: tabular-nums; }
     .phx-tl-status { font-size: 9.5px; font-weight: 700; padding: 1px 7px; border-radius: 999px; white-space: nowrap; }
     .phx-tl-status.draft { background: #fef3c7; color: #92400e; }
@@ -18502,7 +18518,7 @@ table.exp-tbl .tm{margin-left:3px;opacity:0.75;}
         var viewer = a.viewerName || me;
         var summary = (typeof _swfSummaryHtml==='function')
           ? _swfSummaryHtml(a, viewer, sh.my, sh.tgt, { you: String(viewer) === String(me) }) : '';
-        // v3.50.1: หัวแถว = วันที่ "ทำรายการ" (createdAt) · v3.50.2: meta = เดือน + เวลา
+        // v3.50.1: หัวแถว = วันที่ "ทำรายการ" (createdAt)
         var tx = _tlTxn(a.createdAt);
         var isDraft = String(a._visibility)==='draft';
         // v3.49 สมุดส่วนตัว: ไม่มีเรื่องเผยแพร่ → ไม่โชว์ป้าย "ร่าง/เผยแพร่แล้ว" (ทุกอย่างอยู่ในสมุดตัวเอง)
@@ -18510,11 +18526,16 @@ table.exp-tbl .tm{margin-left:3px;opacity:0.75;}
                    : (isDraft ? '<span class="phx-tl-status draft">ร่าง</span>' : '<span class="phx-tl-status pub">เผยแพร่แล้ว</span>');
         // v3.50.2: class ชนิด (swap/give/add) กลับมา — แถบสีซ้ายใช้เลือกสี
         var kind = (a.action==='swap') ? 'swap' : (a.action==='give' ? 'give' : 'add');
+        // v3.50.3: เวลาย้ายไปท้ายชื่อ (Klui) — ทั้ง 3 รูปประโยคใน _swfSummaryHtml (แลก/ยก/รับ)
+        //   ลงท้ายด้วยชื่อคู่กรณีเสมอ → ต่อท้าย summary ตรง ๆ ก็ตกท้ายชื่อพอดีทุกกรณี ไม่ต้องแยกชื่อออกมา.
+        //   ".phx-tl-time" คุมระยะห่างด้วย margin-left (เทียบเท่าเว้นวรรค 1-2 ตัวอักษร) แทนเคาะ space
+        //   ตรง ๆ เพราะ HTML ยุบช่องว่างซ้ำเหลือ 1 อยู่ดี. เดือนเหลืออยู่คนเดียวใน meta.
+        var timeHtml = tx.time ? ' <span class="phx-tl-time">('+esc(tx.time)+')</span>' : '';
         return '<div class="phx-tl-item '+kind+'">' +
             '<div class="phx-tl-date"><div class="dd">'+esc(tx.dd)+'</div><div class="dw">'+esc(tx.dw)+'</div></div>' +
             '<div>' +
-              '<div class="phx-tl-summary">'+summary+'</div>' +
-              '<div class="phx-tl-meta">'+esc((tx.mo?tx.mo+' ':'')+tx.time)+status+'</div>' +
+              '<div class="phx-tl-summary">'+summary+timeHtml+'</div>' +
+              '<div class="phx-tl-meta">'+esc(tx.mo)+status+'</div>' +
             '</div>' +
           '</div>';
       }).join('');
