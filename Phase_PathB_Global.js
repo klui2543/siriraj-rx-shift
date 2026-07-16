@@ -46,10 +46,16 @@ function phxGetAllActiveOverlaysForMonth(monthId) {
       // กรองเฉพาะเดือนนี้
       var rowMonth = String(r[2] || '').trim();
       if (rowMonth !== monthId) return;
-      
+
+      // v3.49 FIX: honor B3 tombstone (col 4 = type = '__deleted__'). phxRemoveAction ลบด้วยการ
+      //   ประทับตราคอลัมน์ 4 ไม่ได้แก้ payload → เดิม global layer นี้เช็คแค่ payload.status เลย
+      //   "คืนเวรที่ยกเลิกไปแล้ว" ให้ทุกคนเห็นค้าง (ต่างจาก phxPullAll ที่เช็ค tombstone ถูก).
+      //   ตอนนี้ตรงกันแล้ว: ลบแล้ว = หายจากกระดานของทุกคน.
+      if (String(r[3] || '').trim() === '__deleted__') return;
+
       var payload = {};
       try { payload = JSON.parse(r[4] || '{}'); } catch (e) { return; }
-      
+
       // skip ถ้า payload mark deleted
       if (String(payload.status || '').trim() === 'deleted') return;
       
