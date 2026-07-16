@@ -152,9 +152,22 @@ function _isClinicShift(shift) {
   return !!(shift && ((shift.shift && String(shift.shift).indexOf('⚠️') >= 0) ||
                       String(shift.range || '') === 'ตรวจสอบ'));
 }
+// v3.49: ลอกให้ตรงกับ ICS เป๊ะ (Index.html `normalizeShiftType` / `stripPrefix` ในตัวสร้าง ICS)
+//   ⚠️ ถ้าแก้ format ฝั่ง ICS ต้องมาแก้ 2 ฟังก์ชันนี้ให้ตรงกันด้วย ไม่งั้นชื่อ/รายละเอียดจะเพี้ยนกัน
+function _normalizeShiftType(shift) {
+  var s = String(shift || '').trim();
+  if (/รอบ\s*1/.test(s)) return 'รอบ 1';
+  if (/รอบ\s*2/.test(s)) return 'รอบ 2';
+  if (/รอบ\s*3/.test(s)) return 'รอบ 3';
+  if (s.indexOf('⚠️') >= 0) return 'คลินิกพิเศษ';
+  return s;   // เช้า, กลางวัน, ฯลฯ
+}
+function _stripPrefix(name) {
+  return String(name || '').replace(/^\s*(ภก\.|ภญ\.)\s*/i, '').trim();
+}
 function _shiftTypeLabel(shift) {
   if (_isClinicShift(shift)) return 'คลินิกพิเศษ';
-  return String(shift.shift || '').trim();
+  return _normalizeShiftType(shift.shift);   // v3.49: เดิมใช้ค่าดิบ → ได้ "รอบ 3 230-830" แทน "รอบ 3"
 }
 
 // v3.47: title format = ICS ("<ตำแหน่ง> <ประเภท>", คลินิกพิเศษ สำหรับเวรคลินิก)
@@ -163,22 +176,32 @@ function _buildEventTitle(shift) {
   if (shift.pos) parts.push(String(shift.pos).trim());
   var t = _shiftTypeLabel(shift);
   if (t) parts.push(t);
-  return parts.join(' ') || 'เวร';
+  var title = parts.join(' ') || 'เวร';
+  // v3.49: เวรที่รับ/แลกมา → ต่อท้าย " จาก <ชื่อ>" เหมือน ICS
+  if (shift._ghost && shift._ghostPartnerName) title += ' จาก ' + _stripPrefix(shift._ghostPartnerName);
+  return title;
 }
 
 // v3.47: description ลอก format จาก ICS — เภสัชกร / ตำแหน่ง / เวลา (ตัด "ประเภท:" + "ห้อง:" ออก).
 //   เวรคลินิกพิเศษ: เวลาไม่แน่นอน → "โปรดตรวจสอบจากตารางเวรอีกครั้ง"
 function _buildEventDescription(shift) {
   var lines = [];
-  if (shift.name) lines.push('เภสัชกร: ' + shift.name);
+  if (shift.name) lines.push('เภสัชกร: ' + _stripPrefix(shift.name));   // v3.49: ตัดคำนำหน้า ภก./ภญ. เหมือน ICS
   if (shift.pos) lines.push('ตำแหน่ง: ' + shift.pos);
   if (_isClinicShift(shift)) {
     lines.push('เวลา: โปรดตรวจสอบจากตารางเวรอีกครั้ง');
   } else if (shift.range && shift.range !== '-' && shift.range !== 'ตรวจสอบ') {
     lines.push('เวลา: ' + shift.range);
   }
-  lines.push('');
-  lines.push('— Siriraj Rx Shift —');
+  // v3.49: บรรทัดสัมปทานเวร เหมือน ICS
+  if (shift._ghost) {
+    if (shift._ghostType === 'swap' && shift._ghostPartnerName) {
+      lines.push('แลกเวรกับ: ' + _stripPrefix(shift._ghostPartnerName) +
+                 (shift._ghostSourcePos ? ' (เวรเดิม: ' + shift._ghostSourcePos + ')' : ''));
+    } else if (shift._ghostType === 'add' && shift._ghostPartnerName) {
+      lines.push('รับจาก: ' + _stripPrefix(shift._ghostPartnerName));
+    }
+  }
   return lines.join('\n');
 }
 

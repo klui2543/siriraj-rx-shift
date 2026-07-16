@@ -18709,13 +18709,38 @@ table.exp-tbl .tm{margin-left:3px;opacity:0.75;}
       var held = mine.filter(function(r){ return !usedMap[makeShiftKey(r)]; }).concat(ghosts);
       if (!held.length){ toast('ไม่มีเวรของคุณในเดือนนี้ให้ซิงค์','info'); return; }
 
+      // v3.49 [6]: "เลื่อนเวรรอบ 3 ไปวันถัดไป" — ใช้ pref ตัวเดียวกับ ICS (phxGetPrefs().round3Mode,
+      //   คุมด้วย checkbox #ecmRound3Toggle ในหน้า export) → ติ๊กครั้งเดียวมีผลทั้ง ICS และ Google Calendar.
+      //   เดิมปฏิทิน "ไม่เคยอ่าน toggle นี้เลย" → event ลงวันเดิมเสมอ. ปลอดภัยจากการเลื่อนซ้ำ เพราะ v3.36
+      //   หน้าจอหลักไม่เลื่อนวันแล้ว (rawData.date/timestamp = วันต้นฉบับเสมอ; pref อ่านตอน export เท่านั้น).
+      var _r3shift = false;
+      try { _r3shift = ((typeof phxGetPrefs === 'function' ? phxGetPrefs() : {}).round3Mode === 'next'); } catch(e){}
+      // YYYYMMDD + n วัน (ปฏิทินอ่านวันที่ลง event จาก timestamp ไม่ใช่ date)
+      var _tsPlusDays = function(ts, n){
+        var t = String(ts || ''); if (t.length !== 8) return ts;
+        var d = new Date(+t.substring(0,4), +t.substring(4,6) - 1, +t.substring(6,8));
+        if (isNaN(d.getTime())) return ts;
+        d.setDate(d.getDate() + n);
+        var p = function(x){ return (x < 10 ? '0' : '') + x; };
+        return '' + d.getFullYear() + p(d.getMonth() + 1) + p(d.getDate());
+      };
+
       // แปลงเป็น payload เบา ๆ (เฉพาะ field ที่ปฏิทินใช้) + resolve ช่วงเวลาคลินิก "ตรวจสอบ"
       var shifts = held.map(function(s){
         var range = s.range;
         if ((range==='ตรวจสอบ' || String(s.shift||'').indexOf('⚠️')>=0) && typeof estimateSpecialClinicRange==='function'){
           try { var est = estimateSpecialClinicRange(s); if (typeof est==='string' && est.indexOf('-')>0) range = est; } catch(e){}
         }
-        return { name: s.name, date: s.date, timestamp: s.timestamp, pos: s.pos, shift: s.shift, range: range, room: s.room };
+        // ลอก pattern ของ ICS: "ตัวตน" ยึดวันต้นฉบับ (date → _shiftKey ฝั่งปฏิทิน) แต่ "วันที่แสดง"
+        //   ใช้วันที่เลื่อนแล้ว (timestamp → _shiftAllDayStart) → ติ๊ก/ปลดติ๊ก toggle แล้ว event เดิม
+        //   ย้ายวัน (setAllDayDate) แทนที่จะสร้างซ้ำเป็นใบใหม่.
+        var ts = s.timestamp;
+        if (_r3shift && typeof _isRound3Shift === 'function' && _isRound3Shift(s)) ts = _tsPlusDays(ts, 1);
+        return { name: s.name, date: s.date, timestamp: ts, pos: s.pos, shift: s.shift, range: range, room: s.room,
+                 // v3.49 [5]: ส่งข้อมูล "เวรที่รับ/แลกมา" ให้ปฏิทินทำชื่อ+รายละเอียดได้เหมือน ICS
+                 //   (เดิมไม่ส่ง → ปฏิทินขึ้นชื่อ/รายละเอียดไม่ครบ เพราะไม่มีข้อมูลจะขึ้น)
+                 _ghost: !!s._ghost, _ghostType: s._ghostType || '',
+                 _ghostPartnerName: s._ghostPartnerName || '', _ghostSourcePos: s._ghostSourcePos || '' };
       });
 
       // ---- วิธี relay ผ่าน Firebase (เชื่อถือกว่า postMessage ที่ Apps Script sandbox กันไว้) ----
