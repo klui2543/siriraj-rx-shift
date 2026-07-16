@@ -2234,9 +2234,11 @@
 
           <!-- 🔖 v3.45: version → tap for the update history (openChangelog) -->
           <div style="text-align:center; margin-top:8px;">
-            <button type="button" onclick="openChangelog()"
+            <!-- v3.49: ข้อความถูกเขียนทับโดย _clStampVersion() ตอนโหลด (ดึงจาก APP_CHANGELOG)
+                 ค่าที่เขียนไว้ตรงนี้เป็นแค่ fallback ถ้า JS ยังไม่ทำงาน — อย่าอัปมือ ให้แก้ที่ APP_CHANGELOG -->
+            <button type="button" id="clVersionBtn" onclick="openChangelog()"
               style="background:none; border:none; color:var(--sub); font-size:11px; font-family:inherit; cursor:pointer; text-decoration:underline; text-underline-offset:2px;">
-              เวอร์ชัน v3.46
+              เวอร์ชัน
             </button>
           </div>
         </div>
@@ -3010,6 +3012,7 @@ window.allPharmacistNames = [];
       window._publishEnabled = !!on;
       try { localStorage.setItem('publish_enabled', on ? '1' : '0'); } catch (e) {}
       if (typeof invalidateGhostCache === 'function') invalidateGhostCache();
+      if (typeof _clStampVersion === 'function') _clStampVersion();   // v3.49: entry บนสุดอาจเปลี่ยน → เลขเวอร์ชันตามด้วย
       if (typeof triggerUpdate === 'function') triggerUpdate();
       console.log('[publish] ' + (on ? 'ON — สมุดกลาง (เผยแพร่ได้)' : 'OFF — สมุดส่วนตัว (persisted)'));
     };
@@ -3026,6 +3029,7 @@ window.allPharmacistNames = [];
       try { localStorage.setItem('notes_enabled', on ? '1' : '0'); } catch (e) {}
       if (typeof invalidateGhostCache === 'function') invalidateGhostCache();
       if (typeof phxUpdateFabUI === 'function') { try { phxUpdateFabUI(); } catch (e) {} }
+      if (typeof _clStampVersion === 'function') _clStampVersion();   // v3.49: entry บนสุดอาจเปลี่ยน → เลขเวอร์ชันตามด้วย
       if (typeof triggerUpdate === 'function') triggerUpdate();
       console.log('[notes] ' + (on ? 'ON — เปิดโน้ตเวร' : 'OFF — ปิดโน้ตเวร (ข้อมูลเดิมยังอยู่ครบ)'));
     };
@@ -7741,6 +7745,8 @@ window.allPharmacistNames = [];
     // ==========================================
     window.onload = function() {
       v12log('window.onload-start');
+      // v3.49: ปั๊มเลขเวอร์ชันจาก APP_CHANGELOG (ไม่ต้องรอข้อมูลเดือน — ใช้แค่ค่าคงที่ + flag)
+      if (typeof _clStampVersion === 'function') _clStampVersion();
       // PHASE 0.1: Device logging (anonymous — Index.html ไม่มี auth)
       logDeviceOncePerDay();
 
@@ -11680,6 +11686,8 @@ table.exp-tbl .tm{margin-left:3px;opacity:0.75;}
     var APP_CHANGELOG = [
       // v3.49: `needs` = ฟีเจอร์ที่ entry นี้พูดถึง — ถ้าฟีเจอร์ถูกปิดอยู่ entry จะถูกซ่อน
       //   (กันผู้ใช้อ่านเจอแล้วไปหาปุ่มที่ไม่มี). เปิดฟีเจอร์กลับ = entry กลับมาเอง.
+      { v: 'v3.49', date: '2026-07-16', title: 'ตัวกรองรอบเวร + ไดอะแกรมแลกเวร',
+        detail: 'กรองตารางตามรอบเวรได้ ติ๊กหลายรอบพร้อมกันก็ได้ + ก่อนกดยืนยันแลก/รับ/ยก/ยกเลิกเวร จะเห็นภาพว่าเวรกำลังจะไปอยู่กับใคร' },
       { v: 'v3.46', date: '2026-07-13', title: 'เพิ่มโน้ตในตารางเวร', needs: 'notes',
         detail: 'เขียนโน้ตติดไว้บนเวรของตัวเองได้ เลือกให้เพื่อนเห็น หรือเก็บเป็นส่วนตัวก็ได้ — แตะ 📝 บนเวรเพื่อดู' },
       { v: 'v3.45', date: '2026-07-11', title: 'ดูประวัติการอัปเดต',
@@ -11690,16 +11698,27 @@ table.exp-tbl .tm{margin-left:3px;opacity:0.75;}
         detail: 'เดิมกดเผยแพร่แล้วข้อมูลไม่ถึงเซิร์ฟเวอร์ ตอนนี้ส่งถึงจริง คนอื่นรีเฟรชแล้วเห็นทันที' }
     ];
     function _clClose() { var e = document.getElementById('clOverlay'); if (e) e.remove(); }
+    // v3.49: entry ที่ผู้ใช้เห็นจริง — ซ่อนของฟีเจอร์ที่ปิดอยู่ (ดู `needs` ด้านบน)
+    //   เพิ่มฟีเจอร์ใหม่ที่ปิดได้ → เติม key ใน _featOn + ใส่ needs:'<key>' ที่ entry
+    //   ใช้ร่วมกับ _clStampVersion() → เลขเวอร์ชันกับหัวข้อบนสุดของประวัติตรงกันเสมอ
+    function _clVisibleEntries() {
+      var _featOn = { notes: !!window._notesEnabled, publish: !!window._publishEnabled };
+      return (APP_CHANGELOG || []).filter(function (e) { return !(e && e.needs && !_featOn[e.needs]); });
+    }
+    // v3.49: เลขเวอร์ชันดึงจาก changelog เอง — เดิม hard-code ไว้ในมาร์กอัป แล้วลืมอัป
+    //   (ค้างที่ v3.46 ทั้งที่โค้ดไป v3.49 แล้ว). ผูกกับ entry ที่ "เห็นได้จริง" ตัวบนสุด
+    //   → เลขที่โชว์ตรงกับหัวข้อแรกที่ผู้ใช้กดเข้าไปอ่านเสมอ.
+    function _clStampVersion() {
+      try {
+        var btn = document.getElementById('clVersionBtn');
+        var vis = _clVisibleEntries();
+        if (btn && vis.length) btn.textContent = 'เวอร์ชัน ' + vis[0].v;
+      } catch (e) {}
+    }
     function openChangelog() {
       _clClose();
       var esc = (typeof _pbEsc === 'function') ? _pbEsc : function (s) { return String(s == null ? '' : s); };
-      // v3.49: ซ่อน entry ของฟีเจอร์ที่ปิดอยู่ (ดู `needs` ด้านบน) — "ล่าสุด" จะไปเกาะ entry ที่เห็นได้จริงตัวบนสุด
-      //   เพิ่มฟีเจอร์ใหม่ที่ปิดได้ → เติม key ตรงนี้ + ใส่ needs:'<key>' ที่ entry
-      var _featOn = { notes: !!window._notesEnabled, publish: !!window._publishEnabled };
-      var items = (APP_CHANGELOG || []).filter(function (e) {
-        if (e && e.needs && !_featOn[e.needs]) return false;
-        return true;
-      }).map(function (e, i) {
+      var items = _clVisibleEntries().map(function (e, i) {
         var latest = (i === 0);
         return '<div style="padding:12px 0; border-bottom:1px solid var(--border);">' +
           '<div style="display:flex; align-items:center; gap:8px;">' +
