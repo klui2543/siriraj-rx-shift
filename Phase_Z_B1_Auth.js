@@ -154,21 +154,39 @@ function phxVerifyToken(token) {
       return { success: false, error: 'ลิงก์หมดอายุแล้ว — โปรดสมัครใหม่' };
     }
 
-    // First claim: ผู้ใช้พิสูจน์แล้วว่าเปิดกล่องจดหมายนี้ได้จริง → บันทึกเป็น approvedEmail
+    // Master ถูกแตะที่จุดนี้จุดเดียว — หลังผู้ใช้พิสูจน์แล้วว่าเปิดกล่องจดหมายนี้ได้จริง
     // เขียนก่อนสร้าง user เพื่อว่าถ้าจองไม่ผ่านจะไม่มี user ค้างครึ่งทาง
     const claimEmail = String(found.approvedEmail || '').trim().toLowerCase();
-    const masterRow = _phxFindMasterRow(found.name);
-    if (masterRow && !masterRow.approvedEmail && claimEmail) {
-      const takenBy = _phxFindNameByEmailInMaster(claimEmail);
-      if (takenBy && takenBy !== found.name) {
-        return {
-          success: false,
-          error: 'อีเมลนี้ถูกใช้กับชื่ออื่นไปแล้ว — โปรดติดต่อ admin'
-        };
+    if (claimEmail) {
+      const masterRow = _phxFindMasterRow(found.name);
+      const curEmail = masterRow ? String(masterRow.approvedEmail || '').trim().toLowerCase() : '';
+
+      if (curEmail && curEmail !== claimEmail) {
+        // มีคนจองชื่อนี้ด้วยอีเมลอื่นไปก่อนแล้ว (หรือ admin แก้อีเมลระหว่างรอยืนยัน)
+        return { success: false, error: 'ชื่อนี้ถูกจองด้วยอีเมลอื่นไปแล้ว — โปรดติดต่อ admin' };
       }
-      _phxGetSheet('PHX_Pharmacists_Master')
-        .getRange(masterRow.rowIndex, 2)
-        .setValue(claimEmail);
+
+      if (!curEmail) {
+        const takenBy = _phxFindNameByEmailInMaster(claimEmail);
+        if (takenBy && takenBy !== found.name) {
+          return { success: false, error: 'อีเมลนี้ถูกใช้กับชื่ออื่นไปแล้ว — โปรดติดต่อ admin' };
+        }
+        if (masterRow) {
+          // ชื่อจาก dropdown — เติมอีเมลลงแถวที่มีอยู่
+          _phxGetSheet('PHX_Pharmacists_Master')
+            .getRange(masterRow.rowIndex, 2)
+            .setValue(claimEmail);
+        } else {
+          // ชื่อพิมพ์เอง — สร้างแถวใหม่ [name, approvedEmail, active, notes, role]
+          _phxGetSheet('PHX_Pharmacists_Master').appendRow([
+            found.name,
+            claimEmail,
+            true,
+            'auto-added from custom registration @ ' + new Date().toISOString(),
+            'user'
+          ]);
+        }
+      }
     }
 
     const pharmaSh = _phxGetSheet('PHX_Pharmacists');

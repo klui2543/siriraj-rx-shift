@@ -337,15 +337,8 @@ function phxStartRegistrationCustom(rawName, password, emailLocal) {
       };
     }
 
-    // 🆕 Auto-add to PHX_Pharmacists_Master
-    // Schema: [name, approvedEmail, active, notes, role]
-    _phxGetSheet('PHX_Pharmacists_Master').appendRow([
-      name,
-      fullEmail,
-      true,
-      'auto-added from custom registration @ ' + new Date().toISOString(),
-      'user'
-    ]);
+    // ไม่เขียน Master ตรงนี้ — phxVerifyToken สร้างแถวให้หลังคลิกลิงก์ยืนยันแล้ว
+    // (พิมพ์อีเมลผิดแล้วไม่ยืนยัน = ชื่อยังว่าง สมัครใหม่ได้ ไม่ต้องให้ admin ไปลบแถว)
 
     // Clear any stale pending (defensive)
     _phxClearPendingByName(name);
