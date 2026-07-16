@@ -883,6 +883,25 @@
     }
     .cal-badge { position: relative; }
 
+    /* v3.49 D3 — A→B→C ไดอะแกรมทิศทางแลก/รับเวร (สัมปทาน) ในกล่องยืนยัน */
+    .lww-diag-wrap { border:1px solid var(--border); border-radius:10px; padding:10px 8px 8px; margin:2px 0 13px; background:var(--accent-bg); }
+    .lww-diag-h { font-size:10px; font-weight:700; color:var(--sub); text-align:center; letter-spacing:.03em; margin-bottom:2px; }
+    #lwwDiagArea .pline { display:flex; align-items:flex-start; justify-content:center; gap:1px; flex-wrap:nowrap; overflow-x:auto; padding:6px 0 2px; }
+    #lwwDiagArea .pp { display:flex; flex-direction:column; align-items:center; gap:3px; min-width:56px; flex:none; }
+    #lwwDiagArea .pp .ic { width:34px; height:34px; color:var(--sub); }
+    #lwwDiagArea .pp.me .ic { color:var(--accent); }
+    #lwwDiagArea .pp .nm { font-size:12.5px; font-weight:700; color:var(--text); text-align:center; }
+    #lwwDiagArea .pp.me .nm { color:var(--accent); }
+    #lwwDiagArea .pp .sub { font-size:9px; color:var(--sub); white-space:nowrap; }
+    #lwwDiagArea .pp.now .nm::after { content:" ●"; color:#16a34a; font-size:8px; vertical-align:middle; }
+    #lwwDiagArea .par { display:flex; flex-direction:column; align-items:center; padding-top:8px; min-width:34px; flex:none; }
+    #lwwDiagArea .par .s { font-size:17px; line-height:1; color:var(--accent); font-weight:700; }
+    #lwwDiagArea .par .l { font-size:8px; color:var(--sub); margin-top:2px; white-space:nowrap; }
+    #lwwDiagArea .diag-result { font-size:11.5px; color:var(--sub); line-height:1.55; margin-top:7px; padding-top:7px; border-top:1px dashed var(--border); text-align:center; }
+    #lwwDiagArea .diag-result b { color:var(--text); }
+    #lwwDiagArea .diag-warn { color:#b45309; font-weight:600; }
+    body.dark-theme #lwwDiagArea .diag-warn { color:#fbbf24; }
+
     /* v3.45 SWF — transaction confirm dialog (draft → เสร็จสิ้น·เผยแพร่) */
     .swf-summary {
       background: var(--accent-bg); border: 1px solid var(--accent-border);
@@ -5858,7 +5877,7 @@ window.allPharmacistNames = [];
         const mine = findShiftByKey(actionState.shiftKey);
         if (!mine) return;
         const myKey = actionState.shiftKey, mineName = mine.name;
-        _lwwTransferConfirm({ kind: 'swap', targetKey: targetKey, targetShift: targetShift, defaultFrom: _curHolder,
+        _lwwTransferConfirm({ kind: 'swap', targetKey: targetKey, targetShift: targetShift, defaultFrom: _curHolder, mineShift: mine,
           onConfirm: function(fromName) {
             var stored = OverlayManager.addAction(mid, { action: 'swap', shiftKey: myKey, partnerShiftKey: targetKey, partnerName: fromName, originalOwner: mineName });
             closeActionModal(); triggerUpdate();
@@ -5918,6 +5937,42 @@ window.allPharmacistNames = [];
     // v3.44 Step 4b — transfer confirm dialog (Level-1 + editable "รับจาก/แลกกับ").
     function _lwwFmtAt2(iso) { try { var d = new Date(iso); return isNaN(d) ? '' : d.toLocaleString('th-TH', { dateStyle: 'short', timeStyle: 'short' }); } catch (e) { return ''; } }
     function _lwwTransferClose() { var e = document.getElementById('lwwTransferOverlay'); if (e) e.remove(); }
+    // ═══ v3.49 D3 — ไดอะแกรม A → B ⟷/→ C (ทิศทางแลก/รับ + สัมปทาน) ═══════════════════════
+    //   A = ชื่อในตาราง/เจ้าของเดิมของเวรเป้าหมาย · B = คนถือจริง/ผู้ให้จริง (ค่าในช่อง "แลกกับ/รับจาก")
+    //   C = เรา. โชว์ A→ ก็ต่อเมื่อ B ≠ A (มีสัมปทาน — คนถือจริงไม่ใช่ชื่อในตาราง). อัปเดตสดตอนแก้ชื่อ.
+    function _lwwUsrSvg() { return '<svg class="ic" viewBox="0 0 24 24" width="34" height="34" aria-hidden="true"><circle cx="12" cy="8" r="4.2" fill="currentColor"/><path d="M4 21c0-4.2 3.6-6.5 8-6.5s8 2.3 8 6.5z" fill="currentColor"/></svg>'; }
+    function _lwwDiagPeople(items) {
+      var e = (typeof _pbEsc === 'function') ? _pbEsc : function(s){ return String(s == null ? '' : s); };
+      return '<div class="pline">' + items.map(function(it){
+        if (it.a) return '<span class="par"><span class="s">' + it.a.sym + '</span>' + (it.a.label ? '<span class="l">' + e(it.a.label) + '</span>' : '') + '</span>';
+        var p = it.p;
+        return '<span class="pp' + (p.me ? ' me' : '') + (p.now ? ' now' : '') + '">' + _lwwUsrSvg() + '<span class="nm">' + e(p.name) + '</span>' + (p.sub ? '<span class="sub">' + e(p.sub) + '</span>' : '') + '</span>';
+      }).join('') + '</div>';
+    }
+    function _lwwDiagHtml(kind, fromName, opts) {
+      var e = (typeof _pbEsc === 'function') ? _pbEsc : function(s){ return String(s == null ? '' : s); };
+      var C = (typeof getCurrentUser === 'function' && getCurrentUser()) || (opts.mineShift && opts.mineShift.name) || 'คุณ';
+      var tgt = opts.targetShift || {};
+      var tgtOwner = tgt._ghostOrigOwner || tgt.name || '';      // ชื่อในตาราง / เจ้าของเดิม
+      var B = fromName || tgtOwner || '— เลือกชื่อ —';
+      var A = (B && tgtOwner && String(B) !== String(tgtOwner)) ? tgtOwner : null;
+      var isSwap = (kind === 'swap');
+      var items = [];
+      if (A) { items.push({ p: { name: A, sub: 'เจ้าของเดิม' } }); items.push({ a: { sym: '→', label: 'ยกให้' } }); }
+      items.push({ p: { name: B, sub: isSwap ? 'คนถือจริง' : 'ผู้ให้จริง', now: true } });
+      items.push({ a: { sym: isSwap ? '⟷' : '→', label: isSwap ? 'สลับ' : 'รับมา' } });
+      items.push({ p: { name: C, sub: 'เรา', me: true } });
+      var html = _lwwDiagPeople(items);
+      var res = '';
+      if (isSwap && opts.mineShift && tgt) {
+        res = 'คุณให้ <b>' + e(opts.mineShift.pos) + '</b> (' + e(opts.mineShift.date) + ') ⟷ ได้ <b>' + e(tgt.pos) + '</b> (' + e(tgt.date) + ')';
+      } else if (!isSwap && tgt) {
+        res = 'รับ <b>' + e(tgt.pos) + '</b> (' + e(tgt.date) + ') มาเป็นของคุณ';
+      }
+      if (A) res += (res ? '<br>' : '') + '<span class="diag-warn">' + (isSwap ? 'สลับกับ' : 'รับจาก') + ' ' + e(B) + ' (คนถือจริง) ไม่ใช่ ' + e(A) + ' (ชื่อในตาราง)</span>';
+      if (res) html += '<div class="diag-result">' + res + '</div>';
+      return html;
+    }
     function _lwwTransferConfirm(opts) {
       var kindLabel = opts.kind === 'swap' ? 'แลกกับ' : 'รับจาก';
       var curOwner = opts.defaultFrom || (opts.targetShift && opts.targetShift.name) || '';
@@ -5939,6 +5994,7 @@ window.allPharmacistNames = [];
         '<div style="display:flex; gap:8px; background:#fff7ed; border-radius:8px; padding:9px 11px; margin-bottom:14px;"><span>ℹ️</span><div style="font-size:12px; color:#9a3412; line-height:1.55;">' + lvl1 + '</div></div>' +
         '<label style="font-size:12px; color:var(--sub);">' + kindLabel + ' (แตะเพื่อเลือก/แก้ชื่อ)</label>' +
         '<div id="lwwFromField" data-val="' + String(initFrom).replace(/"/g, '&quot;') + '" style="width:100%; margin:5px 0 12px; padding:10px 12px; border:1px solid var(--border); border-radius:6px; font-family:inherit; font-size:15px; cursor:pointer; display:flex; justify-content:space-between; align-items:center; box-sizing:border-box;"><span id="lwwFromVal">' + (initFrom || '— เลือกชื่อ —') + '</span><span style="color:var(--sub);">▾</span></div>' +
+        '<div class="lww-diag-wrap"><div class="lww-diag-h">ผลของรายการนี้</div><div id="lwwDiagArea">' + _lwwDiagHtml(opts.kind, initFrom, opts) + '</div></div>' +
         '<div style="display:flex; gap:8px;"><button type="button" onclick="_lwwTransferClose()" style="flex:1; padding:9px; border:1px solid var(--border); border-radius:6px; background:var(--surface); color:var(--text); font-family:inherit; cursor:pointer;">ยกเลิก</button>' +
         '<button type="button" id="lwwTransferOk" style="flex:1; padding:9px; border:1px solid #2563eb; border-radius:6px; background:#2563eb; color:#fff; font-family:inherit; cursor:pointer;">ยืนยัน</button></div>' +
         '</div>';
@@ -5948,6 +6004,8 @@ window.allPharmacistNames = [];
         _lwwNamePicker(field.getAttribute('data-val'), function(nm) {
           field.setAttribute('data-val', nm);
           document.getElementById('lwwFromVal').textContent = nm || '— เลือกชื่อ —';
+          // v3.49 D3: อัปเดตไดอะแกรม A→B→C สดทันทีเมื่อเปลี่ยนชื่อผู้สัมปทาน
+          var _da = document.getElementById('lwwDiagArea'); if (_da) _da.innerHTML = _lwwDiagHtml(opts.kind, nm, opts);
         });
       });
       document.getElementById('lwwTransferOk').addEventListener('click', function() {
