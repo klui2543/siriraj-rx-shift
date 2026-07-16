@@ -1647,6 +1647,23 @@
       background-image: url("data:image/svg+xml;charset=utf-8,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 12 12'%3E%3Cpath fill='%23cbd5e1' d='M2.5 4.5L6 8l3.5-3.5z'/%3E%3C/svg%3E");
     }
 
+    /* v3.51: type-to-search dropdown for the register name field */
+    .phx-combo-wrap { position: relative; }
+    .phx-combo-list {
+      position: absolute; left: 0; right: 0; top: calc(100% + 4px);
+      max-height: 220px; overflow-y: auto;
+      background: var(--surface); border: 1.5px solid #cbd5e1; border-radius: 8px;
+      box-shadow: 0 8px 24px rgba(0,0,0,0.15);
+      z-index: 20;
+    }
+    .phx-combo-row {
+      padding: 9px 12px; font-size: 13px; font-family: 'Kanit', sans-serif;
+      color: var(--text); cursor: pointer;
+    }
+    .phx-combo-row:hover { background: var(--bg); }
+    .phx-combo-empty { padding: 12px; font-size: 12px; color: var(--sub); text-align: center; }
+    body.dark-theme .phx-combo-list { border-color: #475569; }
+
     /* Email field with @mahidol suffix */
     .phx-email-wrap {
       display: flex; align-items: stretch;
@@ -13233,7 +13250,7 @@ table.exp-tbl .tm{margin-left:3px;opacity:0.75;}
       phxClearFormMsg();
       // Focus first input
       setTimeout(function() {
-        const id = (initialTab === 'register') ? 'phxRegNameSelect'
+        const id = (initialTab === 'register') ? 'phxRegNameSearch'
                  : (initialTab === 'forgot') ? 'phxForgotEmailLocal' : 'phxLoginEmailLocal';
         const el = document.getElementById(id);
         if (el) el.focus();
@@ -13244,7 +13261,7 @@ table.exp-tbl .tm{margin-left:3px;opacity:0.75;}
       const m = document.getElementById('phxLoginModal');
       if (m) m.classList.add('hidden');
       // Reset form fields
-      const ids = ['phxLoginEmailLocal','phxLoginPw','phxForgotEmailLocal','phxRegEmailLocal','phxRegPw','phxRegPw2'];
+      const ids = ['phxLoginEmailLocal','phxLoginPw','phxForgotEmailLocal','phxRegNameSearch','phxRegEmailLocal','phxRegPw','phxRegPw2'];
       ids.forEach(function(id) { const el = document.getElementById(id); if (el) el.value = ''; });
       const selects = ['phxRegNameSelect'];
       selects.forEach(function(id) { const el = document.getElementById(id); if (el) el.value = ''; });
@@ -13306,30 +13323,75 @@ table.exp-tbl .tm{margin-left:3px;opacity:0.75;}
             opt.textContent = item.name + (item.inMaster ? '' : ' (ใหม่)');
             sel.appendChild(opt);
           });
-          // v3.19: append "ไม่พบชื่อ — ใส่เอง" option at the end
-          const sep = document.createElement('option');
-          sep.disabled = true; sep.textContent = '──────────';
-          sel.appendChild(sep);
+          // v3.51: keep a (hidden, never listed) "__custom__" option so sel.value = '__custom__'
+          // from the checkbox toggle actually sticks — a <select> silently ignores a .value with no matching <option>
           const custom = document.createElement('option');
           custom.value = '__custom__';
-          custom.textContent = 'ไม่พบชื่อ — ใส่เอง';
           sel.appendChild(custom);
         })
         .withFailureHandler(function(){ sel.dataset.loaded = ''; })
         .phxListRegistrableNames(extras);
     }
 
+    // v3.51: type-to-search dropdown for the name field — filters the hidden
+    // select's <option> list (kept as the value source so submit/enter-key/checkbox code is untouched)
+    function phxRegNameFilter() {
+      const sel = document.getElementById('phxRegNameSelect');
+      const inp = document.getElementById('phxRegNameSearch');
+      const list = document.getElementById('phxRegNameList');
+      if (!sel || !inp || !list) return;
+      const q = inp.value.trim().toLowerCase();
+      const opts = Array.from(sel.options).filter(o => o.value && o.value !== '__custom__');
+      const items = q ? opts.filter(o => o.textContent.toLowerCase().includes(q)) : opts;
+      if (items.length === 0) {
+        list.innerHTML = '<div class="phx-combo-empty">ไม่พบชื่อ</div>';
+      } else {
+        list.innerHTML = items.map(o =>
+          '<div class="phx-combo-row" data-value="' + encodeURIComponent(o.value) + '">' + o.textContent + '</div>'
+        ).join('');
+      }
+      list.style.display = 'block';
+    }
+    function phxRegNamePick(value) {
+      const sel = document.getElementById('phxRegNameSelect');
+      const inp = document.getElementById('phxRegNameSearch');
+      const list = document.getElementById('phxRegNameList');
+      if (sel) sel.value = value;
+      if (inp) inp.value = value;
+      if (list) { list.style.display = 'none'; list.innerHTML = ''; }
+      phxOnRegNameChange();
+    }
+    function phxRegNameSearchBlur() {
+      // delay so a click on a result row registers before the list hides
+      setTimeout(function() {
+        const list = document.getElementById('phxRegNameList');
+        if (list) list.style.display = 'none';
+      }, 150);
+    }
+    (function _phxRegNameListClickInit() {
+      document.addEventListener('click', function(e) {
+        const row = e.target.closest && e.target.closest('.phx-combo-row');
+        if (!row) return;
+        phxRegNamePick(decodeURIComponent(row.dataset.value));
+      });
+    })();
+
     // v3.19: reveal custom name input when "__custom__" selected
     function phxOnRegNameChange() {
       const sel = document.getElementById('phxRegNameSelect');
       const customInput = document.getElementById('phxRegCustomName');
       const hint = document.getElementById('phxRegCustomHint');
+      const searchInp = document.getElementById('phxRegNameSearch');
       if (!sel || !customInput || !hint) return;
       const isCustom = sel.value === '__custom__';
       customInput.style.display = isCustom ? 'block' : 'none';
       hint.style.display = isCustom ? 'block' : 'none';
       const chk = document.getElementById('phxRegCustomChk');   // v3.45: keep the checkbox in sync
       if (chk) chk.checked = isCustom;
+      if (searchInp) {
+        searchInp.disabled = isCustom;
+        searchInp.value = isCustom ? '' : sel.value;
+      }
       if (isCustom) {
         setTimeout(function() { customInput.focus(); }, 50);
       } else {
@@ -14980,7 +15042,7 @@ table.exp-tbl .tm{margin-left:3px;opacity:0.75;}
       }
       // v3.9: email login fields
       bindEnter(['phxLoginEmailLocal','phxLoginPw'], phxSubmitLogin);
-      bindEnter(['phxRegNameSelect','phxRegEmailLocal','phxRegPw','phxRegPw2'], phxSubmitRegister);
+      bindEnter(['phxRegNameSearch','phxRegEmailLocal','phxRegPw','phxRegPw2'], phxSubmitRegister);
       bindEnter(['phxForgotEmailLocal'], phxSubmitForgot);
       bindEnter(['phxChangeOldPw','phxChangeNewPw','phxChangeNewPw2'], phxSubmitChangePw);
       // ESC to close any open modal
@@ -15979,7 +16041,12 @@ table.exp-tbl .tm{margin-left:3px;opacity:0.75;}
         </button>
         <h3 style="font-size:15px; font-weight:600; margin:0 0 16px; color:var(--text); text-align:center;">ลงทะเบียน</h3>
         <label class="phx-flabel">ชื่อของท่าน <span class="req">*</span></label>
-        <select id="phxRegNameSelect" class="phx-select" onchange="phxOnRegNameChange()">
+        <div class="phx-combo-wrap">
+          <input type="text" id="phxRegNameSearch" class="phx-input" placeholder="พิมพ์ค้นหาชื่อของท่าน..." autocomplete="off"
+            oninput="phxRegNameFilter()" onfocus="phxRegNameFilter()" onblur="phxRegNameSearchBlur()">
+          <div id="phxRegNameList" class="phx-combo-list" style="display:none;"></div>
+        </div>
+        <select id="phxRegNameSelect" style="display:none" onchange="phxOnRegNameChange()">
           <option value="">เลือกชื่อของท่าน</option>
         </select>
         <!-- v3.45: clearer free-text trigger — a checkbox under the dropdown (reuses __custom__) -->
