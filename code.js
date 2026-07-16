@@ -248,7 +248,15 @@ function getScheduleData(monthId) {
       const pbMonthId = monthKeyFromLabel_(pbLabel);   // 'มิถุนายน 2569' → 'm_มิถุนายน_2569' (pbLabel trimmed แล้ว)
       const pbRes = phxGetAllActiveOverlaysForMonth(pbMonthId);
       if (pbRes && pbRes.ok && Array.isArray(pbRes.overlays)) {
-        pbOverlays = pbRes.overlays;
+        // v3.49 privacy root-fix: ส่งเฉพาะ overlay "สาธารณะ" ให้ client อื่น.
+        //   draft = สมุดส่วนตัวของเจ้าของ (ยังซิงค์ข้ามเครื่องตัวเองผ่าน phxPullAll ตาม column ชื่อ
+        //   ต่างหาก — ไม่กระทบ); private note = ส่วนตัว ห้ามหลุดไปคนอื่น. คงของเดิม (undefined = public,
+        //   backward-compat). นี่ทำให้ "แลกเวรของ A ไม่ไปขีดฆ่าเวรของ B" แม้ client ฝั่ง B จะเป็น
+        //   เวอร์ชันเก่า/แคชค้างที่ไม่มี gate ฝั่งหน้าจอ — เพราะ draft ไม่เคยออกจาก server อีกต่อไป.
+        pbOverlays = pbRes.overlays.filter(function(o) {
+          var vis = String((o && o._visibility) || 'public').trim();
+          return vis !== 'draft' && vis !== 'private';
+        });
       }
     }
   } catch (e) {
