@@ -1273,12 +1273,14 @@
     .phx-swap-act-btn .lbl { font-size: 14px; font-weight: 600; line-height: 1.3; }
     .phx-swap-act-btn .dsc { font-size: 10.5px; font-weight: 300; color: var(--sub); line-height: 1.45; }
     .phx-swap-act-btn.swap   .lbl { color: #1d4ed8; }
-    /* v3.50.3: สี "ยกเวร" — Klui ทักซ้ำรอบ 2 ว่าน้ำตาลเหลืองทึม/หดหู่ (นี่คือสีปุ่มเดิมของแอปเองที่
-       ยกมาตรง ๆ ตั้งแต่ v3.50 ไม่ใช่สีที่ผมคิด). ลองหาทางออก: เหลืองสดที่ "ดูเหลืองจริง" (hue 45-55°)
-       ไม่มีเฉดไหนผ่านมาตรฐานอ่านออก 4.5:1 บนพื้นขาวเลย (เหลืองสดต้องสว่าง ตัดกับขาวไม่พอ)
-       ต้องหรี่ให้เข้มพอจะอ่านออก ซึ่งเฉดจะเอียงไปมัสตาร์ด/น้ำตาลเสมอ (ข้อจำกัดทางฟิสิกส์ ไม่ใช่รสนิยม)
-       → ทำ swatch จริงให้ Klui เลือกเอง แทนเดามั่ว ๆ รอบที่ 3 (ดู artifact ที่แนบ) */
-    .phx-swap-act-btn.give   .lbl { color: #a16207; }
+    /* v3.50.4: สี "ยกเวร" — เดิม #a16207 (สีปุ่มเดิมของแอปเอง ยกมาจาก v3.50) Klui ทักซ้ำรอบ 2 ว่า
+       น้ำตาลเหลืองทึม/หดหู่. เหลืองสด (hue 45-55°) ไม่มีเฉดไหนผ่าน contrast 4.5:1 บนพื้นขาวเลย —
+       ต้องหรี่เข้มจนเอียงไปมัสตาร์ด/น้ำตาลเสมอ (ฟิสิกส์สี ไม่ใช่รสนิยม). เสนอ teal ก่อน → Klui ทักว่า
+       "คล้ายเขียวอีก" (จริง — teal อยู่กึ่งกลางพอดีระหว่างเขียว/รับเวร กับน้ำเงิน/แลกเวรบนวงล้อสี).
+       คำนวณ hue ที่ห่างจากน้ำเงิน(225°)/เขียว(140°)/แดง(355°)มากที่สุด → ตกที่โซนทอง (~65°) พอดี
+       (เหตุผลเดียวกับที่ไฟจราจรใช้เหลืองคู่กับน้ำเงิน-เขียว-แดงเสมอ) → ม่วง/คราม (hue ~280°) คือทาง
+       ที่ห่างจากทั้ง 3 สีจริง ไม่มีทางถูกทักว่าคล้ายปุ่มไหนอีก. Klui เลือก "ม่วง-คราม". */
+    .phx-swap-act-btn.give   .lbl { color: #7c24a8; }
     .phx-swap-act-btn.recv   .lbl { color: #15803d; }
     .phx-swap-act-btn.cancel .lbl { color: #dc2626; }
     /* v3.47: pending-draft manager banner on the แลกเวร tab */
@@ -1318,7 +1320,7 @@
       border-radius: 0 3px 3px 0;
     }
     .phx-tl-item.swap::before { background: #1d4ed8; }
-    .phx-tl-item.give::before { background: #a16207; }
+    .phx-tl-item.give::before { background: #7c24a8; }   /* v3.50.4: ตามสีปุ่ม "ยกเวร" ใหม่ */
     .phx-tl-item.add::before  { background: #15803d; }
     .phx-tl-item:last-child { border-bottom: 0; }
     .phx-tl-date { text-align: right; padding-top: 1px; }
@@ -15947,7 +15949,7 @@ table.exp-tbl .tm{margin-left:3px;opacity:0.75;}
           <input type="checkbox" id="phxRegCustomChk" onchange="phxRegToggleCustom(this)" style="width:16px; height:16px; flex:none;"> ไม่มีชื่อในรายการ — พิมพ์ชื่อเอง
         </label>
         <!-- v3.19: Custom name input (revealed when "ไม่พบชื่อ" selected) -->
-        <input type="text" id="phxRegCustomName" class="phx-input" placeholder="ชื่อและนามสกุล เช่น สมศรี ใจดี" style="display:none; margin-top:6px;" autocomplete="off">
+        <input type="text" id="phxRegCustomName" class="phx-input" placeholder="ชื่อและนามสกุล เช่น สุขภาพ ดีเลิศ" style="display:none; margin-top:6px;" autocomplete="off">
         <div id="phxRegCustomHint" style="display:none; font-size:10px; color:var(--sub); margin:4px 0 8px; line-height:1.5;">
           💡 ชื่อที่กรอกจะถูกนำเข้าระบบภายหลังลงทะเบียนในทันที
         </div>
@@ -15957,6 +15959,9 @@ table.exp-tbl .tm{margin-left:3px;opacity:0.75;}
         <div class="phx-email-wrap">
           <input type="text" id="phxRegEmailLocal" placeholder="กรุณากรอกอีเมลล์มหิดลของท่าน" autocomplete="off" spellcheck="false">
           <div class="phx-email-suffix">@mahidol.ac.th</div>
+        </div>
+        <div style="font-size:10px; color:var(--sub); margin:4px 0 8px; line-height:1.5;">
+          💡 แนะนำให้กรอกในรูปแบบ ชื่อจริง.นามสกุล 3 ตัวแรก
         </div>
         <label class="phx-flabel">รหัสผ่าน <span class="req">*</span></label>
         <input type="password" id="phxRegPw" class="phx-input" placeholder="ตั้งรหัสผ่าน (อย่างน้อย 4 ตัว)" autocomplete="new-password">
