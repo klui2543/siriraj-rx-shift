@@ -12482,11 +12482,16 @@ table.exp-tbl .tm{margin-left:3px;opacity:0.75;}
             return;
           }
 
-          // Non-clinic: v3.47 — ALL-DAY event (Klui: ICS/GCal ให้เป็น all-day event ไปเลย).
-          //   No exact times (clinic start is uncertain and rounds vary); export the whole day.
-          const dateStr = effYear + pad(effMonth) + pad(effDay);
-          const nextDay = new Date(effYear, effMonth - 1, effDay + 1);
-          const nextDateStr = nextDay.getFullYear() + pad(nextDay.getMonth() + 1) + pad(nextDay.getDate());
+          // Non-clinic — v3.49: กู้ "เวลาจริง" กลับมา (Klui: "ICS กลายเป็น 7AM ทุกอัน")
+          //   ต้นเหตุ: 8798e90 (14 ก.ค.) เปลี่ยนเวรปกติ timed → all-day โดยให้เหตุผลว่า "ให้เหมือน
+          //   branch คลินิกที่ all-day อยู่แล้ว" — แต่คลินิก all-day เพราะเวลา *ไม่แน่นอนจริงๆ*
+          //   ส่วนเวรปกติมีเวลาชัดเจน → เวลาหายฟรี + ปฏิทินตีความ VALUE=DATE เป็น UTC เที่ยงคืน
+          //   แล้วบวก +07 → โผล่ 7 โมงเช้าทุกอัน. ผลพลอยเสียอีกอย่าง: _buildSmartAlarms (เตือน
+          //   ตามเวลาเวรจริง + ตั้งค่าได้) กลายเป็นโค้ดตาย เหลือ TRIGGER:-P1D อันเดียว.
+          //   ตอนนี้: อ่านช่วงเวลาได้ → timed + smart alarm · อ่านไม่ได้ → all-day (กันเวรหาย —
+          //   ของเดิมก่อน 8798e90 `return` ทิ้งไปเลย ซึ่งแย่กว่า)
+          const _r = parseRangeToMinutes(s.range);
+          const _timed = !!_r;
 
           // UID: stable across day-picker selection / re-export
           //   Regular: sirx-<year>-<MMDD>-<safePos>@siriraj-rx-shift
@@ -12517,24 +12522,57 @@ table.exp-tbl .tm{margin-left:3px;opacity:0.75;}
             }
           }
           const description = descLines.join('\n');
+          // ส่วนกลางของ VEVENT (เหมือนกันทั้ง timed/all-day) — แยกไว้กันเขียนซ้ำ 2 ที่แล้วหลุดไม่ตรงกัน
+          const _icsBody = function() {
+            rawLines.push('SUMMARY:' + escICS(summary));
+            rawLines.push('DESCRIPTION:' + escICS(description));
+            rawLines.push('LOCATION:Siriraj Hospital');
+            rawLines.push('SEQUENCE:0');
+            rawLines.push('STATUS:CONFIRMED');
+          };
 
           rawLines.push('BEGIN:VEVENT');
           rawLines.push('UID:' + uid);
           rawLines.push('DTSTAMP:' + nowUTC);
-          rawLines.push('DTSTART;VALUE=DATE:' + dateStr);
-          rawLines.push('DTEND;VALUE=DATE:' + nextDateStr);
-          rawLines.push('SUMMARY:' + escICS(summary));
-          rawLines.push('DESCRIPTION:' + escICS(description));
-          rawLines.push('LOCATION:Siriraj Hospital');
-          rawLines.push('SEQUENCE:0');
-          rawLines.push('STATUS:CONFIRMED');
-          rawLines.push('TRANSP:TRANSPARENT');
-          // Day-relative alarms (all-day): 1 วันก่อน + คืนก่อน (12 ชม.ก่อนเที่ยงวันเวร)
-          rawLines.push('BEGIN:VALARM');
-          rawLines.push('ACTION:DISPLAY');
-          rawLines.push('DESCRIPTION:' + escICS('พรุ่งนี้มีเวร ' + (s.pos || '') + (shiftTypeLabel ? ' ' + shiftTypeLabel : '')));
-          rawLines.push('TRIGGER:-P1D');
-          rawLines.push('END:VALARM');
+          if (_timed) {
+            // ชม.อาจ >= 24 เมื่อเวรข้ามเที่ยงคืน (parseRangeToMinutes บวก 24*60 ให้: 21:30-2:30 → จบ 26:30)
+            //   new Date(y, m, d, 26, 30) → JS ทดเป็นวันถัดไป 02:30 ให้เอง = DTEND ไม่มาก่อน DTSTART
+            const startH = Math.floor(_r.start / 60), startM = _r.start % 60;
+            const endH   = Math.floor(_r.end / 60),   endM   = _r.end % 60;
+            // effDay = วันที่หลังเลื่อนรอบ 3 แล้ว (ถ้าเปิด toggle)
+            const startDate = new Date(effYear, effMonth - 1, effDay, startH, startM, 0);
+            const endDate   = new Date(effYear, effMonth - 1, effDay, endH, endM, 0);
+            rawLines.push('DTSTART;TZID=Asia/Bangkok:' + fmtLocal(startDate));
+            rawLines.push('DTEND;TZID=Asia/Bangkok:' + fmtLocal(endDate));
+            _icsBody();
+            rawLines.push('TRANSP:OPAQUE');   // timed = ติดธุระจริง (all-day ใช้ TRANSPARENT)
+            // v3.29: ป้ายแจ้งเตือนใส่ชื่อคู่ด้วย → "พรุ่งนี้เวร O11 จาก ณัชชพล เริ่ม 02:30"
+            const alarmLabel = (s._ghost && s._ghostPartnerName)
+              ? (s.pos || '') + ' จาก ' + stripPrefix(s._ghostPartnerName)
+              : (s.pos || '');
+            _buildSmartAlarms(startH, startM, alarmLabel, detectType(s.shift), false, _userReminderSettings)
+              .forEach(function(al) {
+                rawLines.push('BEGIN:VALARM');
+                rawLines.push('ACTION:DISPLAY');
+                rawLines.push('DESCRIPTION:' + escICS(al.desc));
+                rawLines.push('TRIGGER:' + al.trigger);
+                rawLines.push('END:VALARM');
+              });
+          } else {
+            // อ่านช่วงเวลาไม่ได้ → all-day + เตือน 1 วันก่อน (ดีกว่าทิ้งเวรหายจากปฏิทิน)
+            const dateStr = effYear + pad(effMonth) + pad(effDay);
+            const nextDay = new Date(effYear, effMonth - 1, effDay + 1);
+            const nextDateStr = nextDay.getFullYear() + pad(nextDay.getMonth() + 1) + pad(nextDay.getDate());
+            rawLines.push('DTSTART;VALUE=DATE:' + dateStr);
+            rawLines.push('DTEND;VALUE=DATE:' + nextDateStr);
+            _icsBody();
+            rawLines.push('TRANSP:TRANSPARENT');
+            rawLines.push('BEGIN:VALARM');
+            rawLines.push('ACTION:DISPLAY');
+            rawLines.push('DESCRIPTION:' + escICS('พรุ่งนี้มีเวร ' + (s.pos || '') + (shiftTypeLabel ? ' ' + shiftTypeLabel : '')));
+            rawLines.push('TRIGGER:-P1D');
+            rawLines.push('END:VALARM');
+          }
           rawLines.push('END:VEVENT');
           added++;
         } catch(e) { console.warn('[ICS] skip shift:', s, e); }
