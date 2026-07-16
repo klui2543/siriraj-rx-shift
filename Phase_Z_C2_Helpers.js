@@ -218,16 +218,26 @@ function phxStartRegistrationV2(rawName, password, emailLocal) {
       return { success: false, error: 'ชื่อนี้ถูกระงับ — โปรดติดต่อ admin' };
     }
 
-    // Email must match Master's approvedEmail (security: prevent random hijack)
+    // Master.approvedEmail ว่าง = ยังไม่มีใครจองชื่อนี้ → ให้ user จองด้วยอีเมลตัวเองได้
+    // ไม่เขียนลง Master ตรงนี้ — เขียนใน phxVerifyToken หลังคลิกลิงก์ยืนยันแล้วเท่านั้น
+    // (พิมพ์อีเมลผิดแล้วไม่ยืนยัน = ชื่อยังว่าง สมัครใหม่ได้ ไม่ล็อกตาย)
     const masterEmail = String(masterRow.approvedEmail || '').trim().toLowerCase();
-    if (!masterEmail) {
-      return { success: false, error: 'admin ยังไม่ได้ตั้งค่าอีเมลสำหรับ "' + name + '" — โปรดติดต่อ admin' };
-    }
-    if (masterEmail !== fullEmail) {
-      return {
-        success: false,
-        error: 'อีเมลไม่ตรงกับที่ admin ตั้งไว้สำหรับชื่อนี้ — โปรดตรวจสอบหรือติดต่อ admin'
-      };
+    if (masterEmail) {
+      if (masterEmail !== fullEmail) {
+        return {
+          success: false,
+          error: 'อีเมลไม่ตรงกับที่ระบบบันทึกไว้สำหรับชื่อนี้ — โปรดตรวจสอบหรือติดต่อ admin'
+        };
+      }
+    } else {
+      // First claim — อีเมลต้องไม่ถูกใช้กับชื่ออื่น (1 name : 1 email)
+      const takenBy = _phxFindNameByEmail_EL(fullEmail);
+      if (takenBy && takenBy !== name) {
+        return {
+          success: false,
+          error: 'อีเมล ' + _phxMaskEmail(fullEmail) + ' ถูกใช้กับชื่ออื่นแล้ว — โปรดตรวจสอบหรือติดต่อ admin'
+        };
+      }
     }
 
     // Must not be registered yet

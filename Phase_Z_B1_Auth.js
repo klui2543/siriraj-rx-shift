@@ -154,6 +154,23 @@ function phxVerifyToken(token) {
       return { success: false, error: 'ลิงก์หมดอายุแล้ว — โปรดสมัครใหม่' };
     }
 
+    // First claim: ผู้ใช้พิสูจน์แล้วว่าเปิดกล่องจดหมายนี้ได้จริง → บันทึกเป็น approvedEmail
+    // เขียนก่อนสร้าง user เพื่อว่าถ้าจองไม่ผ่านจะไม่มี user ค้างครึ่งทาง
+    const claimEmail = String(found.approvedEmail || '').trim().toLowerCase();
+    const masterRow = _phxFindMasterRow(found.name);
+    if (masterRow && !masterRow.approvedEmail && claimEmail) {
+      const takenBy = _phxFindNameByEmailInMaster(claimEmail);
+      if (takenBy && takenBy !== found.name) {
+        return {
+          success: false,
+          error: 'อีเมลนี้ถูกใช้กับชื่ออื่นไปแล้ว — โปรดติดต่อ admin'
+        };
+      }
+      _phxGetSheet('PHX_Pharmacists_Master')
+        .getRange(masterRow.rowIndex, 2)
+        .setValue(claimEmail);
+    }
+
     const pharmaSh = _phxGetSheet('PHX_Pharmacists');
     const now = new Date();
     pharmaSh.appendRow([found.name, found.passwordHash, now, now]);
@@ -304,6 +321,21 @@ function _phxFindMasterRow(name) {
         notes: String(data[i][3] || ''),
         role: (data[i].length >= 5 ? String(data[i][4] || 'user').trim().toLowerCase() : 'user') || 'user'
       };
+    }
+  }
+  return null;
+}
+
+// หาชื่อจาก approvedEmail ใน Master (col B) — ใช้กันจองอีเมลซ้ำตอน verify
+function _phxFindNameByEmailInMaster(email) {
+  const sh = _phxGetSheet('PHX_Pharmacists_Master');
+  if (sh.getLastRow() < 2) return null;
+  const target = String(email || '').trim().toLowerCase();
+  if (!target) return null;
+  const data = sh.getRange(2, 1, sh.getLastRow() - 1, 2).getValues();
+  for (let i = 0; i < data.length; i++) {
+    if (String(data[i][1] || '').trim().toLowerCase() === target) {
+      return String(data[i][0] || '').trim();
     }
   }
   return null;
