@@ -11363,7 +11363,7 @@ table.exp-tbl .tm{margin-left:3px;opacity:0.75;}
     #ecmPeoplePanel .ecm-prow { display:flex; align-items:center; gap:4px; }
     #ecmPeoplePanel .pr-cv { background:none; border:none; color:var(--sub); font-size:11px; cursor:pointer; padding:7px 5px; flex:none; }
     #ecmPeoplePanel .pr-name { flex:1; min-width:0; text-align:left; background:var(--surface); border:1px solid var(--border); border-radius:8px; font-family:inherit; font-size:12.5px; font-weight:600; color:var(--text); cursor:pointer; padding:8px 11px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
-    #ecmPeoplePanel .pr-name .co { color:var(--sub); font-size:10px; font-weight:600; }
+    #ecmPeoplePanel .pr-name .co { color:var(--sub); font-size:10px; font-weight:600; margin-left:8px; }
     #ecmPeoplePanel .pr-del { background:#fef2f2; border:1px solid #fecaca; color:#dc2626; border-radius:7px; font-size:12px; cursor:pointer; padding:7px 10px; flex:none; }
     body.dark-theme #ecmPeoplePanel .pr-del { background:#450a0a; border-color:#7f1d1d; color:#fca5a5; }
     #ecmPeoplePanel .pr-members { font-size:11px; color:var(--sub); padding:1px 10px 6px 27px; line-height:1.55; }
@@ -12408,10 +12408,13 @@ table.exp-tbl .tm{margin-left:3px;opacity:0.75;}
     function _ecmSavePresets(arr) {
       try { if (typeof phxSetPref === 'function') phxSetPref('exportPresets', Array.isArray(arr) ? arr : []); } catch (e) {}
     }
-    // v3.49 (feedback Klui): "คนที่จะปริ้น" แยกจากฟิลเตอร์แท็บหลัก — ไม่ auto-match ชื่อที่ค้นค้างไว้.
-    //   เริ่มว่างเปล่าครั้งแรก แล้วจำค่าที่ผู้ใช้เลือกไว้ทั้ง session (ไม่ reseed จาก selectedPharmacists).
+    // v3.49 (feedback Klui): "คนที่จะปริ้น" เริ่มด้วย "คนของหน้าที่กำลังดูอยู่" (เช่นอยู่หน้า ณรพล → มี ณรพล)
+    //   แล้วค่อยเพิ่มคนอื่นทีละคนเองได้. ไม่ยัดรายชื่อฟิลเตอร์หลายคน/ค้างเก่า (ใช้ตัวเดียว = คนปัจจุบัน).
     function _ecmSeedExportPeople() {
-      if (!Array.isArray(window._ecmExportPeople)) window._ecmExportPeople = [];
+      var me = null;
+      try { if (typeof getCurrentUser === 'function') me = getCurrentUser(); } catch (e) {}
+      if (!me) { try { if (typeof _getTargetPerson === 'function') me = _getTargetPerson(); } catch (e) {} }
+      window._ecmExportPeople = me ? [me] : [];
     }
     function _ecmEscHtml(s) { return String(s == null ? '' : s).replace(/[&<>"']/g, function(c){ return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]; }); }
     function _ecmPeopleList() { return Array.isArray(window._ecmExportPeople) ? window._ecmExportPeople : []; }
@@ -12451,7 +12454,7 @@ table.exp-tbl .tm{margin-left:3px;opacity:0.75;}
         var exp = !!window._ecmPresetExpanded[p.id], cnt = (p.people && p.people.length) || 0;
         h += '<div class="ecm-prow">' +
                '<button type="button" class="pr-cv" data-expand="' + _ecmEscHtml(p.id) + '">' + (exp ? '▾' : '▸') + '</button>' +
-               '<button type="button" class="pr-name" data-load="' + _ecmEscHtml(p.id) + '">' + _ecmEscHtml(p.name) + ' <span class="co">·' + cnt + '</span></button>' +
+               '<button type="button" class="pr-name" data-load="' + _ecmEscHtml(p.id) + '">' + _ecmEscHtml(p.name) + '<span class="co">·&nbsp;' + cnt + ' คน</span></button>' +
                (window._ecmPresetEdit ? '<button type="button" class="pr-del" data-del="' + _ecmEscHtml(p.id) + '" title="ลบพรีเซ็ต">✕</button>' : '') +
              '</div>' +
              (exp ? '<div class="pr-members">' + (cnt ? p.people.map(function(n){ return _ecmEscHtml(_ecmDisp(n)); }).join(' · ') : '<span style="color:var(--sub);">— ไม่มีชื่อ —</span>') + '</div>' : '');
