@@ -1319,9 +1319,10 @@
       content: ''; position: absolute; left: 0; top: 10px; bottom: 10px; width: 3px;
       border-radius: 0 3px 3px 0;
     }
-    .phx-tl-item.swap::before { background: #1d4ed8; }
-    .phx-tl-item.give::before { background: #7c24a8; }   /* v3.50.4: ตามสีปุ่ม "ยกเวร" ใหม่ */
-    .phx-tl-item.add::before  { background: #15803d; }
+    .phx-tl-item.swap::before   { background: #1d4ed8; }
+    .phx-tl-item.give::before   { background: #7c24a8; }   /* v3.50.4: ตามสีปุ่ม "ยกเวร" ใหม่ */
+    .phx-tl-item.add::before    { background: #15803d; }
+    .phx-tl-item.cancel::before { background: #dc2626; }   /* v3.51: ตามสีปุ่ม "ยกเลิกรายการ" */
     .phx-tl-item:last-child { border-bottom: 0; }
     .phx-tl-date { text-align: right; padding-top: 1px; }
     .phx-tl-date .dd { font-size: 15px; font-weight: 400; color: var(--text); line-height: 1.1; font-variant-numeric: tabular-nums; }
@@ -6051,6 +6052,29 @@ window.allPharmacistNames = [];
       triggerUpdate();
     }
 
+    // v3.51: จดรายการ "ยกเลิก" ลงประวัติก่อนลบตัวจริงทิ้ง (Klui สั่ง) — ต้องเรียก "ก่อน" removeAction
+    //   เสมอ เพราะหลังลบแล้วไม่เหลือข้อมูลให้จด. snapshot ฟิลด์ที่ประวัติต้องใช้ (ชนิดเดิม/เวร/คู่กรณี)
+    //   ไว้บน record ใหม่ เพราะตัวเดิมหายไปแล้ว หา referencing ไม่ได้อีก.
+    //   ⚠️ ปลอดภัยเพราะ getUsedMap / buildGhostRows / _resolveToReal แตกแขนงด้วย if เฉพาะ
+    //   swap/give/add → ชนิด 'cancel' ถูกข้ามทั้งหมด (แพตเทิร์นเดียวกับ action:'note' ที่มีมานานแล้ว)
+    //   → record นี้ "ไม่มีผลต่อตารางเวรเลย" เป็นแค่บรรทัดในสมุด
+    function _swfLogCancel(mid, aid, reason) {
+      try {
+        var bucket = (OverlayManager._data && OverlayManager._data[mid]) || {};
+        var act = (bucket.actions || []).find(function (a) { return a && a.id === aid; });
+        if (!act) return;                                   // หาไม่เจอ = ไม่จด ดีกว่าจดผิด
+        if (act.action === 'cancel' || act.action === 'note') return;   // ไม่จดการลบโน้ต/ลบตัวจด
+        OverlayManager.addAction(mid, {
+          action: 'cancel',
+          cancelOf: act.action,
+          shiftKey: act.shiftKey,
+          partnerShiftKey: act.partnerShiftKey,
+          partnerName: act.partnerName,
+          originalOwner: act.originalOwner,
+          reason: reason || ''
+        });
+      } catch (e) {}                                        // จดไม่ได้ ห้ามขวางการยกเลิก
+    }
     function confirmUndo() {
       const mid = getCurrentMonthId();
       const aid = actionState.usedInfo && actionState.usedInfo.actionId;
@@ -6063,6 +6087,7 @@ window.allPharmacistNames = [];
         if (typeof swfCancelPublished === 'function') swfCancelPublished(mid, aid);
         return;
       }
+      _swfLogCancel(mid, aid);
       OverlayManager.removeAction(mid, aid);
       triggerUpdate();
     }
@@ -6423,15 +6448,20 @@ window.allPharmacistNames = [];
       var partner = '<b>' + _pbEsc(displayName(act.partnerName || '?')) + '</b>';
       var code = function (s) { return you ? ('<code>' + _pbEsc(s) + '</code>') : ('<b>' + _pbEsc(s) + '</b>'); };
       var myPos = myShift ? myShift.pos : '?', tgtPos = tgtShift ? tgtShift.pos : '?';
-      if (act.action === 'swap') {
+      // v3.51: record ชนิด 'cancel' — ชนิดเดิมอยู่ที่ cancelOf, เติมคำว่า "ยกเลิกการ" นำหน้ากริยาเดิม
+      //   ("คุณยกเลิกการแลก NM5-24 กับ I-10 ของ พี่บีวอร์ด"). caller เดิมไม่ส่ง cancel = ผลลัพธ์เดิมเป๊ะ
+      var isCancel = (act.action === 'cancel');
+      var t = isCancel ? String(act.cancelOf || '') : act.action;
+      var v = function (verb) { return isCancel ? ('ยกเลิกการ' + verb) : verb; };
+      if (t === 'swap') {
         return you
-          ? me + sp + 'แลก ' + code(myPos) + ' กับ ' + code(tgtPos) + ' ของ ' + partner
-          : me + ' แลก ' + code(myPos) + ' ↔ ' + code(tgtPos) + ' กับ ' + partner;
+          ? me + sp + v('แลก') + ' ' + code(myPos) + ' กับ ' + code(tgtPos) + ' ของ ' + partner
+          : me + ' ' + v('แลก') + ' ' + code(myPos) + ' ↔ ' + code(tgtPos) + ' กับ ' + partner;
       }
-      if (act.action === 'give') {
-        return me + sp + 'ยก ' + code(myPos) + ' ให้ ' + partner;
+      if (t === 'give') {
+        return me + sp + v('ยก') + ' ' + code(myPos) + ' ให้ ' + partner;
       }
-      return me + sp + 'รับ ' + code(tgtPos) + ' จาก ' + partner;
+      return me + sp + v('รับ') + ' ' + code(tgtPos) + ' จาก ' + partner;
     }
     function _swfClose() { var e = document.getElementById('swfConfirmOverlay'); if (e) e.remove(); }
 
@@ -6525,8 +6555,11 @@ window.allPharmacistNames = [];
     function _swfPendingClose() { var e = document.getElementById('swfPendingOverlay'); if (e) e.remove(); }
     function _swfActionShifts(act) {
       var viewer = act.viewerName || getCurrentUser() || '';
-      if (act.action === 'swap') return { my: _swfResolveShift(act.shiftKey, viewer), tgt: _swfResolveShift(act.partnerShiftKey, viewer) };
-      if (act.action === 'give') return { my: _swfResolveShift(act.shiftKey, viewer), tgt: null };
+      // v3.51: record ชนิด 'cancel' เก็บชนิดเดิมไว้ที่ cancelOf → หาเวรแบบเดียวกับชนิดเดิม
+      //   (ไม่งั้นจะตกไปทาง 'add' ทั้งหมด แล้วเวรฝั่งเราหาย). caller เดิมไม่เคยส่ง cancel มา = ไม่กระทบ
+      var t = (act.action === 'cancel') ? String(act.cancelOf || '') : act.action;
+      if (t === 'swap') return { my: _swfResolveShift(act.shiftKey, viewer), tgt: _swfResolveShift(act.partnerShiftKey, viewer) };
+      if (t === 'give') return { my: _swfResolveShift(act.shiftKey, viewer), tgt: null };
       return { my: null, tgt: _swfResolveShift(act.shiftKey, act.partnerName || '') };
     }
     // Collect this login's pending drafts for `mid` (own actions + retro hops recorded for others).
@@ -6543,6 +6576,10 @@ window.allPharmacistNames = [];
       OverlayManager.load();
       var _all = ((OverlayManager._data && OverlayManager._data[mid]) || {}).actions || [];
       var acts = _all.filter(function(a) {
+        // v3.51: record 'cancel' เป็น draft โดยธรรมชาติ (addAction default) แต่มันคือ "บรรทัดในสมุด"
+        //   ไม่ใช่ธุรกรรมที่รอเผยแพร่ → กันไว้ไม่ให้ไปโผล่ในแบนเนอร์ "มีร่างค้าง N รายการ"
+        //   ถ้าวันไหนเปิด publish กลับมา (ตอนนี้ flag ปิด ฟังก์ชันนี้ return null อยู่แล้ว)
+        if (a && a.action === 'cancel') return false;
         return a && (String(a.viewerName || '') === String(bound) || String(a._retroBy || '') === String(bound));
       });
       // one entry per connected chain (same collapsing rule as the publish modal)
@@ -6703,6 +6740,7 @@ window.allPharmacistNames = [];
               if (!res.valid) return fail(res.error || 'รหัสผ่านไม่ถูกต้อง');
               // reason → permanent audit trail FIRST, then remove (local + server sync)
               try { phxAuditLog('cancel_published', actionId, act, { reason: reason }, 'web'); } catch (e) {}
+              _swfLogCancel(mid, actionId, reason);   // v3.51: + จดลงประวัติแลกเวรที่ผู้ใช้เห็น (audit log = ของแอดมิน คนละที่)
               OverlayManager.removeAction(mid, actionId);
               _swfCancelClose();
               if (typeof _pbReconcile === 'function') _pbReconcile(mid);
@@ -18513,7 +18551,8 @@ table.exp-tbl .tm{margin-left:3px;opacity:0.75;}
     function _swapTimelineHtml(mid, me){
       var acts = [];
       try { if (typeof OverlayManager !== 'undefined') acts = OverlayManager.getActions(mid, me) || []; } catch(e){}
-      acts = acts.filter(function(a){ return a && (a.action==='swap' || a.action==='give' || a.action==='add'); });
+      // v3.51: + 'cancel' (Klui สั่ง: ยกเลิกแล้วต้องเห็นในประวัติด้วย). 'note' ยังไม่นับ = "เฉพาะ Transaction"
+      acts = acts.filter(function(a){ return a && (a.action==='swap' || a.action==='give' || a.action==='add' || a.action==='cancel'); });
       if (!acts.length) return '';
       acts.sort(function(a,b){ return String(b.createdAt||'').localeCompare(String(a.createdAt||'')); });  // newest first
       var rows = acts.map(function(a){
@@ -18529,8 +18568,10 @@ table.exp-tbl .tm{margin-left:3px;opacity:0.75;}
         // v3.49 สมุดส่วนตัว: ไม่มีเรื่องเผยแพร่ → ไม่โชว์ป้าย "ร่าง/เผยแพร่แล้ว" (ทุกอย่างอยู่ในสมุดตัวเอง)
         var status = !window._publishEnabled ? ''
                    : (isDraft ? '<span class="phx-tl-status draft">ร่าง</span>' : '<span class="phx-tl-status pub">เผยแพร่แล้ว</span>');
-        // v3.50.2: class ชนิด (swap/give/add) กลับมา — แถบสีซ้ายใช้เลือกสี
-        var kind = (a.action==='swap') ? 'swap' : (a.action==='give' ? 'give' : 'add');
+        // v3.50.2: class ชนิด กลับมา — แถบสีซ้ายใช้เลือกสี. v3.51: + cancel (แดง ตามปุ่ม "ยกเลิกรายการ")
+        var kind = (a.action==='swap') ? 'swap'
+                 : (a.action==='give') ? 'give'
+                 : (a.action==='cancel') ? 'cancel' : 'add';
         // v3.50.3: เวลาย้ายไปท้ายชื่อ (Klui) — ทั้ง 3 รูปประโยคใน _swfSummaryHtml (แลก/ยก/รับ)
         //   ลงท้ายด้วยชื่อคู่กรณีเสมอ → ต่อท้าย summary ตรง ๆ ก็ตกท้ายชื่อพอดีทุกกรณี ไม่ต้องแยกชื่อออกมา.
         //   ".phx-tl-time" คุมระยะห่างด้วย margin-left (เทียบเท่าเว้นวรรค 1-2 ตัวอักษร) แทนเคาะ space
