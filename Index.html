@@ -1288,9 +1288,10 @@
        ไม่มีแถบสีบอกชนิดแล้ว — ข้อความบอกอยู่แล้ว ("คุณแลก/ยก/รับ") + แถบของแต่ละแถวชนกันสนิท
           จนกลายเป็นริบบิ้นหลากสีเส้นเดียว (Klui ทัก) */
     .phx-tl-scroll { max-height: 46vh; overflow-y: auto; }
+    /* v3.50.1: gap 8→16 — Klui: วันที่ชิดคำอธิบายเกินไป */
     .phx-tl-item {
-      display: grid; grid-template-columns: 28px 1fr; gap: 8px;
-      padding: 11px 13px 12px 10px; background: var(--surface);
+      display: grid; grid-template-columns: 30px 1fr; gap: 16px;
+      padding: 11px 13px 12px 12px; background: var(--surface);
       border-bottom: 1px solid var(--border);
     }
     .phx-tl-item:last-child { border-bottom: 0; }
@@ -18454,20 +18455,20 @@ table.exp-tbl .tm{margin-left:3px;opacity:0.75;}
         return p(d.getDate())+'/'+p(d.getMonth()+1)+' '+p(d.getHours())+':'+p(d.getMinutes());
       } catch(e){ return ''; }
     }
+    // v3.50.1: ประวัติเรียงตาม "วันที่ทำรายการ" (createdAt) ไม่ใช่วันที่ของเวร —
+    //   เดิมหัวแถวเป็นวันเวร (18) แต่ meta เป็นวันทำรายการ (14/07) = คนละวัน สับสน (Klui ทัก).
+    //   createdAt = new Date().toISOString() (UTC) → getDate/getDay/getHours = เวลาท้องถิ่น
+    //   คนไทยเห็นถูก (เหมือน _tlWhen ที่ใช้ getHours อยู่แล้ว). วันในสัปดาห์ index เดียวกับ code.js:603
+    var _TL_DAYS = ['อา.','จ.','อ.','พ.','พฤ.','ศ.','ส.'];
+    function _tlTxn(iso){
+      try {
+        var d = new Date(iso); if (isNaN(d.getTime())) return { dd:'', dw:'', time:'' };
+        var p = function(n){ return (n<10?'0':'')+n; };
+        return { dd:String(d.getDate()), dw:_TL_DAYS[d.getDay()]||'', time:p(d.getHours())+':'+p(d.getMinutes()) };
+      } catch(e){ return { dd:'', dw:'', time:'' }; }
+    }
     // v3.47: "ประวัติการแลกเวร" — my own transaction records (swap/give/receive) as a timeline,
     //   newest → oldest. Notes are excluded ("เฉพาะ Transaction"). Returns '' when there are none.
-    // v3.50: แยกวันที่ออกมาเป็นคอลัมน์ซ้าย. รูปแบบจริงของ field `date` = "14/07 (จ.)"
-    //   (code.js:604 = formatDate "dd/MM" + " (" + วัน + ")") · ของเก่ามี "15/3/2569 (จ.)" ปนอยู่ด้วย
-    //   → เอาเลขตัวแรก = วันที่ · เอาในวงเล็บ = ชื่อวัน · ตัดเดือน/ปีทิ้ง เพราะหัวแท็บบอกเดือนอยู่แล้ว
-    function _tlDateParts(s){
-      s = String(s || '').trim();
-      var dow = s.match(/\(([^)]+)\)/);
-      var day = s.match(/^\s*(\d{1,2})\b/);
-      return {
-        dd: day ? day[1] : s.replace(/\s*\([^)]*\)\s*/, '').trim(),
-        dw: dow ? dow[1] : ''
-      };
-    }
     function _swapTimelineHtml(mid, me){
       var acts = [];
       try { if (typeof OverlayManager !== 'undefined') acts = OverlayManager.getActions(mid, me) || []; } catch(e){}
@@ -18481,18 +18482,17 @@ table.exp-tbl .tm{margin-left:3px;opacity:0.75;}
         var viewer = a.viewerName || me;
         var summary = (typeof _swfSummaryHtml==='function')
           ? _swfSummaryHtml(a, viewer, sh.my, sh.tgt, { you: String(viewer) === String(me) }) : '';
-        var main = sh.my || sh.tgt;
-        var dp = _tlDateParts(main && main.date);
-        var when = _tlWhen(a.createdAt);
+        // v3.50.1: หัวแถว = วันที่ "ทำรายการ" (createdAt) · meta = เวลาอย่างเดียว
+        var tx = _tlTxn(a.createdAt);
         var isDraft = String(a._visibility)==='draft';
         // v3.49 สมุดส่วนตัว: ไม่มีเรื่องเผยแพร่ → ไม่โชว์ป้าย "ร่าง/เผยแพร่แล้ว" (ทุกอย่างอยู่ในสมุดตัวเอง)
         var status = !window._publishEnabled ? ''
                    : (isDraft ? '<span class="phx-tl-status draft">ร่าง</span>' : '<span class="phx-tl-status pub">เผยแพร่แล้ว</span>');
         return '<div class="phx-tl-item">' +
-            '<div class="phx-tl-date"><div class="dd">'+esc(dp.dd)+'</div><div class="dw">'+esc(dp.dw)+'</div></div>' +
+            '<div class="phx-tl-date"><div class="dd">'+esc(tx.dd)+'</div><div class="dw">'+esc(tx.dw)+'</div></div>' +
             '<div>' +
               '<div class="phx-tl-summary">'+summary+'</div>' +
-              '<div class="phx-tl-meta">'+(when||'')+status+'</div>' +
+              '<div class="phx-tl-meta">'+esc(tx.time)+status+'</div>' +
             '</div>' +
           '</div>';
       }).join('');
@@ -18504,13 +18504,17 @@ table.exp-tbl .tm{margin-left:3px;opacity:0.75;}
                '<div class="phx-sw-box"><div class="phx-tl-scroll">'+rows+'</div></div>' +
              '</div>';
     }
-    // v3.50: ชื่อเดือนบนหัวแท็บ — อ่านจาก selector ตัวเดียวกับที่ getCurrentMonthId ใช้ (4356)
-    //   ประวัติตัดเดือนออกจากคอลัมน์วันที่แล้ว → ต้องมีตรงนี้บอกว่ากำลังดูเดือนไหน
+    // v3.50: ชื่อเดือนบนหัวแท็บ. v3.50.1: อ่านจาก #customSelectText (ป้ายที่โชว์ชื่อเดือนบนจอจริง —
+    //   export ทุกตัวใช้อันนี้: 9077/9209/9311) แทน #mainMonthSelector ซึ่งเป็น overlay โปร่งใส
+    //   ที่ .value อาจยังว่างตอน render (เป็นเหตุที่เดือนหายในหน้า admin). ถ้ายัง "⏳ โหลด..." → ''
     function _swMonthLabel(){
       try {
-        var sel = document.getElementById('mainMonthSelector');
-        if (!sel || !sel.value) return '';
-        return (sel.options[sel.selectedIndex] ? sel.options[sel.selectedIndex].text : '').trim();
+        var el = document.getElementById('customSelectText');
+        var t = el ? String(el.innerText || '').replace(/⏳/g, '').trim() : '';
+        if (t && t.indexOf('โหลด') < 0) return t;
+        var sel = document.getElementById('mainMonthSelector');   // เผื่อไว้
+        if (sel && sel.value && sel.options[sel.selectedIndex]) return sel.options[sel.selectedIndex].text.trim();
+        return '';
       } catch(e){ return ''; }
     }
     window.phxRenderSwapView = function(){
