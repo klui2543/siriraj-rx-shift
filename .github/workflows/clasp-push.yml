@@ -1,0 +1,55 @@
+name: clasp push to GAS
+
+# ทำหน้าที่เดียวกับ Stop hook บนคอมบ้าน แต่รันบนคลาวด์ของ GitHub
+# → แก้โค้ดจากมือถือ แล้ว git push ขึ้น main พอเสร็จ CI จะ clasp push ขึ้น GAS ให้เอง
+# หมายเหตุ: push อย่างเดียว "ไม่สร้าง version" ใหม่ (ไม่กินเพดาน 200) — /exec ยังต้องกด deploy จาก UI เอง
+# กุญแจ (secret CLASPRC_JSON) เก็บในตู้เซฟ GitHub Secrets ไม่ได้อยู่ในตัว repo
+
+on:
+  push:
+    branches: [main]
+    paths:            # รันเฉพาะตอนไฟล์ที่ขึ้น GAS จริงเปลี่ยน (ลอกหลักจาก .claspignore)
+      - '**/*.js'
+      - '**/*.gs'
+      - '**/*.html'
+      - 'appsscript.json'
+      - '.clasp.json'
+      - '.claspignore'
+  workflow_dispatch:  # ปุ่มกดรันเอง (Actions tab → Run workflow) เผื่ออยากสั่งเดี๋ยวนั้น
+
+# กัน 2 รันชนกัน: ถ้ามี push ใหม่มาระหว่างรัน ให้ยกเลิกตัวเก่า เอาตัวล่าสุดพอ
+concurrency:
+  group: clasp-push
+  cancel-in-progress: true
+
+jobs:
+  push:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Install clasp (pin ให้ตรงกับเครื่องบ้าน)
+        run: npm install -g @google/clasp@3.3.0
+
+      - name: ตรวจว่ามีกุญแจในตู้เซฟหรือยัง
+        env:
+          CLASPRC_JSON: ${{ secrets.CLASPRC_JSON }}
+        run: |
+          if [ -z "$CLASPRC_JSON" ]; then
+            echo "‼️ ยังไม่ได้ตั้ง secret CLASPRC_JSON — ไปที่ Settings → Secrets and variables → Actions แล้วเพิ่มก่อน"
+            exit 1
+          fi
+
+      - name: เขียนกุญแจลงเครื่อง runner (ชั่วคราว หายเมื่อ job จบ)
+        env:
+          CLASPRC_JSON: ${{ secrets.CLASPRC_JSON }}
+        run: printf '%s' "$CLASPRC_JSON" > "$HOME/.clasprc.json"
+
+      - name: clasp push ขึ้น GAS
+        run: clasp push -f
