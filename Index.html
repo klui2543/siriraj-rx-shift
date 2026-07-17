@@ -1264,9 +1264,9 @@
     }
     /* เส้นแบ่งเป็น border จริงบนแต่ละปุ่ม — เฉพาะขอบ "ใน" ตาราง (ขอบนอกมี .phx-sw-box คุมอยู่แล้ว)
        ลำดับ DOM คงที่: swap(บนซ้าย) give(บนขวา) recv(ล่างซ้าย) cancel(ล่างขวา) */
-    .phx-swap-act-btn.swap { border-right: 2px solid #cbd5e1; border-bottom: 2px solid #cbd5e1; }
-    .phx-swap-act-btn.give { border-bottom: 2px solid #cbd5e1; }
-    .phx-swap-act-btn.recv { border-right: 2px solid #cbd5e1; }
+    .phx-swap-act-btn.swap { border-right: 1px solid var(--border); border-bottom: 1px solid var(--border); }
+    .phx-swap-act-btn.give { border-bottom: 1px solid var(--border); }
+    .phx-swap-act-btn.recv { border-right: 1px solid var(--border); }
     .phx-swap-act-btn:hover { filter: brightness(0.97); }
     .phx-swap-act-btn:active { filter: brightness(0.94); }
     .phx-swap-act-btn:focus-visible { outline: 2px solid var(--navy); outline-offset: -2px; }
