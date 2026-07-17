@@ -2328,8 +2328,8 @@
     <div id="phxViewSwap" class="phx-tabview">
       <div class="phx-sw-head">
         <div class="phx-tv-eyebrow" id="phxSwapMonth"></div>
-        <div class="phx-tv-title">แลกเวร</div>
-        <div class="phx-tv-sub">เลือกรายการที่ต้องการทำกับเวรของคุณ</div>
+        <div class="phx-tv-title">สมุดบันทึกเวร</div>
+        <div class="phx-tv-sub">จดการแลก ยก และรับเวรของคุณไว้ในสมุดเล่มนี้ — เป็นสมุดของคุณคนเดียว คนอื่นยังไม่เห็น</div>
       </div>
       <!-- v3.47b: action-first buttons (แลก/ยก/รับ/ยกเลิก) — launch straight into the flow.
            v3.50: id ย้ายมาอยู่ที่ "กล่องนอก" — phxRenderSwapView ซ่อนปุ่มชุดนี้ตอนยังไม่เลือกชื่อ
@@ -2338,13 +2338,13 @@
         <div class="phx-sw-box">
           <div class="phx-swap-actions">
             <button type="button" class="phx-swap-act-btn swap" onclick="phxSwapAction('swap')">
-              <span class="lbl">แลกเวร</span><span class="dsc">แลกเวรกับเพื่อน คนละหนึ่งเวร</span></button>
+              <span class="lbl">แลกเวร</span><span class="dsc">จดว่าแลกเวรกับเพื่อน คนละหนึ่งเวร</span></button>
             <button type="button" class="phx-swap-act-btn give" onclick="phxSwapAction('give')">
-              <span class="lbl">ยกเวร</span><span class="dsc">ให้เวรของคุณกับคนอื่น</span></button>
+              <span class="lbl">ยกเวร</span><span class="dsc">จดว่ายกเวรของคุณให้คนอื่น</span></button>
             <button type="button" class="phx-swap-act-btn recv" onclick="phxSwapAction('receive')">
-              <span class="lbl">รับเวร</span><span class="dsc">รับเวรที่คนอื่นยกให้</span></button>
+              <span class="lbl">รับเวร</span><span class="dsc">จดว่ารับเวรที่คนอื่นยกให้</span></button>
             <button type="button" class="phx-swap-act-btn cancel" onclick="phxSwapAction('cancel')">
-              <span class="lbl">ยกเลิกรายการ</span><span class="dsc">ย้อนรายการที่ทำไปแล้ว</span></button>
+              <span class="lbl">ยกเลิกรายการ</span><span class="dsc">ลบรายการที่จดไว้</span></button>
           </div>
         </div>
       </div>
@@ -16288,7 +16288,7 @@ table.exp-tbl .tm{margin-left:3px;opacity:0.75;}
     </button>
     <button class="phx-bn-item" data-tab="swap" onclick="phxSetTab('swap')" type="button">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="17 1 21 5 17 9"/><path d="M3 11V9a4 4 0 0 1 4-4h14"/><polyline points="7 23 3 19 7 15"/><path d="M21 13v2a4 4 0 0 1-4 4H3"/></svg>
-      <span>แลกเวร</span>
+      <span>สมุดเวร</span>
     </button>
     <button class="phx-bn-item" data-tab="me" onclick="phxSetTab('me')" type="button">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
@@ -18661,7 +18661,7 @@ table.exp-tbl .tm{margin-left:3px;opacity:0.75;}
       // ⚠️ .phx-tl-scroll ต้องเป็นตัวที่ scroll จริง — phxRenderSwapView จำ/คืน scrollTop จาก class นี้
       //    (fix "ประวัติเด้งขึ้นบนตอน poll", 6557b13). กล่องขอบอยู่นอกมัน ขอบจะได้ไม่เลื่อนหนี
       return '<div class="phx-sw-group">' +
-               '<div class="phx-swap-sec-label"><span class="t">ประวัติการแลกเวร</span>' +
+               '<div class="phx-swap-sec-label"><span class="t">รายการที่จดไว้</span>' +
                  '<span class="n">'+acts.length+' รายการ</span></div>' +
                '<div class="phx-sw-box"><div class="phx-tl-scroll">'+rows+'</div></div>' +
              '</div>';
@@ -18688,8 +18688,8 @@ table.exp-tbl .tm{margin-left:3px;opacity:0.75;}
       if (!me){
         var sa0 = document.getElementById('phxSwapActions'); if (sa0) sa0.style.display = 'none';
         body.removeAttribute('data-swf-fp');   // v3.49: reset fingerprint so login re-renders timeline
-        body.innerHTML = '<div class="phx-sw-group"><div class="phx-tv-empty">ยังไม่ได้เลือกชื่อของคุณ<br>' +
-          'ไปที่แท็บ <b>ตารางเวร</b> แล้วพิมพ์ชื่อ (หรือเข้าสู่ระบบ) เพื่อจัดการเวรของคุณ' +
+        body.innerHTML = '<div class="phx-sw-group"><div class="phx-tv-empty">สมุดของคุณยังไม่เปิด<br>' +
+          'ไปที่แท็บ <b>ตารางเวร</b> แล้วพิมพ์ชื่อ (หรือเข้าสู่ระบบ) เพื่อเปิดสมุดของคุณ' +
           '<div style="margin-top:18px;"><button class="phx-me-cta" style="max-width:220px;margin:0 auto;" onclick="phxSetTab(\'schedule\')">ไปที่ตารางเวร</button></div></div></div>';
         return;
       }
@@ -18700,7 +18700,7 @@ table.exp-tbl .tm{margin-left:3px;opacity:0.75;}
       var html = _swapTimelineHtml(mid, me);
       // v3.50: หน้านี้ไม่มี padding ที่ตัว container แล้ว (ขอบอยู่ที่ .phx-sw-group ทีละก้อน)
       //   → empty state กับแบนเนอร์ต้องห่อ group เอง ไม่งั้นชนขอบจอ
-      if (!html) html = '<div class="phx-sw-group"><div class="phx-tv-empty" style="padding:26px 12px;">ยังไม่มีการแลก / ยก / รับเวรเดือนนี้</div></div>';
+      if (!html) html = '<div class="phx-sw-group"><div class="phx-tv-empty" style="padding:26px 12px;">สมุดเดือนนี้ยังว่าง — ยังไม่ได้จดการแลก ยก หรือรับเวร</div></div>';
       // v3.47: pending-draft manager — if this login has unpublished ร่าง, surface a way to จัดการ
       //   (ทำต่อ / เผยแพร่ทั้งหมด) right here on the แลกเวร tab.
       var draftN = (typeof swfPendingDraftCount === 'function') ? swfPendingDraftCount(mid) : 0;
