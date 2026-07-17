@@ -9715,11 +9715,14 @@ async function _exportCalendarPDF_v2(personList) {
     // ICS GUIDE MODAL (v29) — instructions per platform
     // ============================================================
     function showExportCta() {
-      // v3.37: แสดงปุ่ม CTA ตราบใดที่มีชื่อให้ export (1+ chip หรือ filter เหลือ 1 คน)
-      var targets = (typeof _ecmGetExportTargets === 'function') ? _ecmGetExportTargets() : [];
+      // v3.52 (fix "ปุ่มบันทึก/Export หาย ต้อง refresh"): ปุ่ม CTA บนหน้าหลักต้องดูจาก selection ของหน้าหลักโดยตรง.
+      //   เดิมดูจาก _ecmGetExportTargets() ซึ่งอิง window._ecmExportPeople (สถานะภายในโมดัลที่ผู้ใช้แก้จนว่าง []
+      //   ได้) → พอว่างปุ่มหาย ต้อง refresh (reset เป็น null) ปุ่มถึงกลับมา. แยก 2 สถานะนี้ออกจากกันเด็ดขาด.
       var wrap = document.getElementById('exportCtaWrap');
       if (!wrap) return;
-      if (targets.length > 0) wrap.classList.remove('hidden');
+      var hasSel = Array.isArray(window.selectedPharmacists) && window.selectedPharmacists.length > 0;
+      var hasTarget = !hasSel && (typeof _getTargetPerson === 'function') && !!_getTargetPerson();
+      if (hasSel || hasTarget) wrap.classList.remove('hidden');
       else wrap.classList.add('hidden');
     }
     function openExportChoice(format) {
@@ -11721,6 +11724,8 @@ table.exp-tbl .tm{margin-left:3px;opacity:0.75;}
       try { _ecmUpdateExportInfo(); } catch(e) {}
       // v3.49 D1: วาดพาเนลพรีเซ็ต/คน (seed ทำที่ต้นฟังก์ชันแล้ว)
       try { _ecmRenderPeoplePanel(); } catch(e) {}
+      // v3.52: ล็อกอินอยู่ → ดึงพรีเซ็ตล่าสุดจาก server (ข้ามเครื่อง) แล้ววาดแถบพรีเซ็ตใหม่เมื่อได้ผล
+      try { _ecmPullPresets(); } catch(e) {}
     }
 
     // v3.15: device detection — Apple family (iPhone/iPad/iPod/Mac) vs everything else
@@ -11807,6 +11812,9 @@ table.exp-tbl .tm{margin-left:3px;opacity:0.75;}
 
     function closeExportCalendarModal() {
       document.getElementById('exportCalendarModal').style.display = 'none';
+      // v3.52 (fix "ปุ่มหาย"): ล้างสถานะลิสต์ในโมดัล → เปิดครั้งถัดไป seed ใหม่จากฟิลเตอร์หลัก
+      //   และไม่ให้ลิสต์ว่างค้าง ([]) ไปกวน logic อื่นหลังปิดโมดัล.
+      window._ecmExportPeople = null;
     }
     function ecmSwitchTab(n) {
       document.getElementById('ecmTab1').classList.toggle('active', n === 1);
@@ -11822,6 +11830,9 @@ table.exp-tbl .tm{margin-left:3px;opacity:0.75;}
     var APP_CHANGELOG = [
       // v3.49: `needs` = ฟีเจอร์ที่ entry นี้พูดถึง — ถ้าฟีเจอร์ถูกปิดอยู่ entry จะถูกซ่อน
       //   (กันผู้ใช้อ่านเจอแล้วไปหาปุ่มที่ไม่มี). เปิดฟีเจอร์กลับ = entry กลับมาเอง.
+      // v3.52 (Klui ตั้งชื่อเองได้): แก้ 3 ปัญหาหน้าบันทึกลงปฏิทิน — พรีเซ็ตซิงค์ข้ามเครื่อง + เลือกคนปริ้นตอนหลายชื่อ + ปุ่มไม่หาย
+      { v: 'v3.52', date: '2026-07-17', title: 'พรีเซ็ตซิงค์ข้ามเครื่อง + แก้ปุ่มบันทึกหาย',
+        detail: 'พรีเซ็ตคนที่จะปริ้นซิงค์ข้ามเครื่องอัตโนมัติเมื่อล็อกอิน + เปิด Export ตอนเลือกหลายคน ระบบใส่ทุกคนที่เลือกให้เลย + แก้ปุ่มบันทึก/Export หายที่ต้องรีเฟรช' },
       { v: 'v3.49', date: '2026-07-16', title: 'ตัวกรองรอบเวร + ไดอะแกรมแลกเวร',
         detail: 'กรองตารางตามรอบเวรได้ ติ๊กหลายรอบพร้อมกันก็ได้ + ก่อนกดยืนยันแลก/รับ/ยก/ยกเลิกเวร จะเห็นภาพว่าเวรกำลังจะไปอยู่กับใคร' },
       { v: 'v3.49', date: '2026-07-15', title: 'เก็บชุดคนที่ต้องปริ้น + โหลดไฟล์ต้นฉบับได้',
@@ -12793,11 +12804,60 @@ table.exp-tbl .tm{margin-left:3px;opacity:0.75;}
       catch (e) { return []; }
     }
     function _ecmSavePresets(arr) {
-      try { if (typeof phxSetPref === 'function') phxSetPref('exportPresets', Array.isArray(arr) ? arr : []); } catch (e) {}
+      arr = Array.isArray(arr) ? arr : [];
+      try { if (typeof phxSetPref === 'function') phxSetPref('exportPresets', arr); } catch (e) {}
+      // v3.52 (fix "พรีเซ็ตไม่ซิงค์ข้ามเครื่อง"): พรีเซ็ตซิงค์ทุกครั้งที่ล็อกอิน — ไม่ต้องเปิดสวิตช์ Prefs Sync ทั่วไป.
+      //   ถ้าสวิตช์เปิดอยู่ phxSetPref → _phxMaybePushPrefs ดันทั้งก้อนให้แล้ว (รวม presets) จึง push ซ้ำเฉพาะกรณีสวิตช์ปิด.
+      try {
+        if (typeof phxIsPrefsSyncEnabled !== 'function' || !phxIsPrefsSyncEnabled()) _ecmPushPresets(arr);
+      } catch (e) {}
     }
-    // v3.49 (feedback Klui): "คนที่จะปริ้น" เริ่มด้วย "คนของหน้าที่กำลังดูอยู่" (เช่นอยู่หน้า ณรพล → มี ณรพล)
-    //   แล้วค่อยเพิ่มคนอื่นทีละคนเองได้. ไม่ยัดรายชื่อฟิลเตอร์หลายคน/ค้างเก่า (ใช้ตัวเดียว = คนปัจจุบัน).
+    // v3.52 — push เฉพาะ exportPresets ขึ้น server แบบ read-modify-write (ไม่ทับ prefs คีย์อื่นบน server).
+    function _ecmPushPresets(presets) {
+      var u = (typeof phxAuthGetUser === 'function') ? phxAuthGetUser() : null;
+      if (!u || !u.name || !u.hash) return;   // ยังไม่ล็อกอิน → เก็บ local อย่างเดียว
+      try {
+        google.script.run
+          .withSuccessHandler(function(r) {
+            var serverPrefs = (r && r.success && r.prefs && typeof r.prefs === 'object') ? r.prefs : {};
+            serverPrefs = Object.assign({}, serverPrefs, { exportPresets: Array.isArray(presets) ? presets : [] });
+            try {
+              google.script.run
+                .withSuccessHandler(function(){})
+                .withFailureHandler(function(){})
+                .phxSetPreferences(u.name, u.hash, JSON.stringify(serverPrefs));
+            } catch (e) {}
+          })
+          .withFailureHandler(function(){})
+          .phxGetPreferences(u.name, u.hash);
+      } catch (e) {}
+    }
+    // v3.52 — pull exportPresets จาก server → เขียนทับเฉพาะคีย์ exportPresets ใน local (คีย์อื่นไม่แตะ).
+    //   เรียกตอนล็อกอินสำเร็จ + ตอนเปิดโมดัล export (ถ้าล็อกอินอยู่) → พรีเซ็ตสดข้ามเครื่องเสมอ.
+    function _ecmPullPresets() {
+      var u = (typeof phxAuthGetUser === 'function') ? phxAuthGetUser() : null;
+      if (!u || !u.name || !u.hash) return;
+      try {
+        google.script.run
+          .withSuccessHandler(function(r) {
+            if (!(r && r.success && r.prefs && Array.isArray(r.prefs.exportPresets))) return;
+            try {
+              var local = (typeof phxGetPrefs === 'function') ? phxGetPrefs() : {};
+              local.exportPresets = r.prefs.exportPresets;
+              if (typeof PHX_PREFS_KEY !== 'undefined') localStorage.setItem(PHX_PREFS_KEY, JSON.stringify(local));
+            } catch (e) {}
+            // โมดัลเปิดอยู่ → วาดแถบพรีเซ็ตใหม่ให้เห็นทันที
+            try { if (document.getElementById('ecmPresetWrap')) _ecmRenderPresetSection(); } catch (e) {}
+          })
+          .withFailureHandler(function(){})
+          .phxGetPreferences(u.name, u.hash);
+      } catch (e) {}
+    }
+    // v3.52 (fix ข้อ 2 — เลือกหลายคนในฟิลเตอร์): "คนที่จะปริ้น" เริ่มด้วย "ทุกคนที่เลือกไว้ในฟิลเตอร์หลัก" (ตามที่ Klui สั่ง)
+    //   — 1 คน→คนนั้น, หลายคน→ทุกคน. ถ้าฟิลเตอร์ว่าง (เช่น narrow ด้วยช่องค้นหา) ค่อย fallback เป็นคนปัจจุบันคนเดียว.
     function _ecmSeedExportPeople() {
+      var sel = Array.isArray(window.selectedPharmacists) ? window.selectedPharmacists.slice() : [];
+      if (sel.length > 0) { window._ecmExportPeople = sel; return; }
       var me = null;
       try { if (typeof getCurrentUser === 'function') me = getCurrentUser(); } catch (e) {}
       if (!me) { try { if (typeof _getTargetPerson === 'function') me = _getTargetPerson(); } catch (e) {} }
@@ -13159,6 +13219,10 @@ table.exp-tbl .tm{margin-left:3px;opacity:0.75;}
       // v3.14: pull preferences from server (if sync enabled)
       if (typeof phxPullPrefs === 'function') {
         setTimeout(function() { phxPullPrefs(); }, 500);
+      }
+      // v3.52: ดึงพรีเซ็ต export ข้ามเครื่องเสมอเมื่อล็อกอิน (ไม่ผูกกับสวิตช์ Prefs Sync ทั่วไป)
+      if (typeof _ecmPullPresets === 'function') {
+        setTimeout(function() { _ecmPullPresets(); }, 600);
       }
     }
 
