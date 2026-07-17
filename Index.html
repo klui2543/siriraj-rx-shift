@@ -13309,6 +13309,10 @@ table.exp-tbl .tm{margin-left:3px;opacity:0.75;}
       if (!sel) return;
       if (sel.dataset.loaded === '1') return;
       sel.dataset.loaded = '1';
+      // v3.52: 3 สถานะ — loading / ready / error. ก่อนหน้านี้ไม่มีธงนี้ → phxRegNameFilter
+      //   เห็น options ว่างตอนยังโหลดไม่เสร็จ แล้วขึ้น "ไม่พบชื่อ" (Klui: User ตกใจ)
+      sel.dataset.regState = 'loading';
+      _phxRegRedrawList();
       // Collect names from rawData (uploaded files) to pass to backend
       let extras = [];
       try {
@@ -13318,7 +13322,14 @@ table.exp-tbl .tm{margin-left:3px;opacity:0.75;}
       } catch(e) {}
       google.script.run
         .withSuccessHandler(function(r) {
-          if (!r || !r.success) return;
+          // v3.52: เดิม return เฉย ๆ → ธง loaded='1' ค้าง = "ไม่พบชื่อ" ถาวรจนกว่าจะรีเฟรชหน้า.
+          //   คืนธงให้ลองใหม่ได้ + บอกผู้ใช้ว่าโหลดไม่สำเร็จ (คนละเรื่องกับ "ไม่มีชื่อนี้")
+          if (!r || !r.success) {
+            sel.dataset.loaded = '';
+            sel.dataset.regState = 'error';
+            _phxRegRedrawList();
+            return;
+          }
           while (sel.options.length > 1) sel.remove(1);
           (r.names || []).forEach(function(item) {
             const opt = document.createElement('option');
@@ -13331,9 +13342,29 @@ table.exp-tbl .tm{margin-left:3px;opacity:0.75;}
           const custom = document.createElement('option');
           custom.value = '__custom__';
           sel.appendChild(custom);
+          // v3.52: รายชื่อมาถึงแล้ว — ถ้าลิสต์เปิดค้างอยู่ ("กำลังโหลด...") ต้องวาดใหม่เอง
+          //   ไม่งั้นข้อความค้างจนกว่าผู้ใช้จะพิมพ์อะไรสักตัว
+          sel.dataset.regState = 'ready';
+          _phxRegRedrawList();
         })
-        .withFailureHandler(function(){ sel.dataset.loaded = ''; })
+        .withFailureHandler(function(){
+          sel.dataset.loaded = '';
+          sel.dataset.regState = 'error';
+          _phxRegRedrawList();
+        })
         .phxListRegistrableNames(extras);
+    }
+    // v3.52: วาดลิสต์ใหม่ "เฉพาะตอนที่มันเปิดอยู่" — เรียกจาก handler ตอนโหลดเสร็จ/พัง
+    function _phxRegRedrawList() {
+      const list = document.getElementById('phxRegNameList');
+      if (list && list.style.display !== 'none') phxRegNameFilter();
+    }
+    // v3.52: ปุ่ม "แตะเพื่อลองใหม่" ตอนโหลดรายชื่อพัง — ล้างธง error ก่อน ไม่งั้น
+    //   phxLoadRegistrableNames เจอ loaded='' ก็จริง แต่ลิสต์จะกระพริบเป็น error ค้างไว้
+    function phxRegRetryNames() {
+      const sel = document.getElementById('phxRegNameSelect');
+      if (sel) { sel.dataset.loaded = ''; sel.dataset.regState = ''; }
+      phxLoadRegistrableNames();
     }
 
     // v3.51: type-to-search dropdown for the name field — filters the hidden
@@ -13347,7 +13378,23 @@ table.exp-tbl .tm{margin-left:3px;opacity:0.75;}
       const opts = Array.from(sel.options).filter(o => o.value && o.value !== '__custom__');
       const items = q ? opts.filter(o => o.textContent.toLowerCase().includes(q)) : opts;
       if (items.length === 0) {
-        list.innerHTML = '<div class="phx-combo-empty">ไม่พบชื่อ</div>';
+        // v3.52: "ไม่มีชื่อให้เลือก" เกิดได้ 3 เหตุ ต้องพูดคนละอย่าง — เดิมพูดว่า "ไม่พบชื่อ"
+        //   ทั้ง 3 แบบ ซึ่งตอนยังโหลดไม่เสร็จมันคือคำโกหกที่ทำให้ User ตกใจ (Klui ทัก).
+        //   ⚠️ ห้ามขึ้น "กำลังโหลด" ตอนโหลดพัง — Klui สั่งไว้ว่าต้องแยก bug/failed ออกจากกัน
+        const st = sel.dataset.regState || '';
+        if (st === 'error') {
+          // onmousedown ไม่ใช่ onclick — blur ของช่องพิมพ์ซ่อนลิสต์ใน 150ms (phxRegNameSearchBlur)
+          //   click จะไม่ทันลง เหตุผลเดียวกับที่ .phx-combo-row ใช้ mousedown
+          list.innerHTML = '<div class="phx-combo-empty">โหลดรายชื่อไม่สำเร็จ' +
+            '<br><b style="color:var(--accent); cursor:pointer;" onmousedown="event.preventDefault(); phxRegRetryNames();">แตะเพื่อลองใหม่</b></div>';
+        } else if (st === 'ready') {
+          list.innerHTML = '<div class="phx-combo-empty">ไม่พบชื่อ</div>';
+        } else {
+          // 'loading' หรือยังไม่เคยโหลด (st === '') — กรณีหลังเกิดตอน User แตะช่องเร็วมาก
+          //   phxLoadRegistrableNames มีธง loaded กันยิงซ้ำ → พิมพ์รัวก็ไม่ยิงซ้ำ
+          list.innerHTML = '<div class="phx-combo-empty">กำลังโหลดรายชื่อ...</div>';
+          if (st === '') phxLoadRegistrableNames();
+        }
       } else {
         list.innerHTML = items.map(o =>
           '<div class="phx-combo-row" data-value="' + encodeURIComponent(o.value) + '">' + o.textContent + '</div>'
