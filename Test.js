@@ -1,3 +1,4 @@
+// [ci-test 2026-07-18] จำลอง push จากมือถือ เพื่อยืนยันว่า GitHub Actions clasp push เด้งเองจาก event push
 function testE1_Round3Logic() {
   Logger.log('=== E1 Round 3 Logic Verification ===\n');
 
