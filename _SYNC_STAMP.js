@@ -18,9 +18,9 @@ function SYNC_STAMP() {
   return {
     version: 'v3.52',   // ← เลขเวอร์ชัน (bump เองตอนออกรุ่นใหม่) แสดงที่ footer เว็บ
     topic:   'แก้หน้าบันทึกลงปฏิทิน — พรีเซ็ตซิงค์ข้ามเครื่อง + เลือกคนปริ้นตอนหลายชื่อ + ปุ่มบันทึก/Export ไม่หาย',
-    updated: '2026-07-17 13:20 +0000',
+    updated: '2026-07-18 00:05 +0000',
     branch:  'main',
-    based_on_commit: 'f0dc386',
+    based_on_commit: '25dcdb2',
     note:    'เวลา updated ถูกปั๊มอัตโนมัติเป็นเวลา push จริงตอนขึ้น GAS'
   };
 }
