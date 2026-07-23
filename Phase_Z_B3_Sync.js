@@ -52,11 +52,11 @@ function phxPushActions(rawName, pwHash, actionsArg, actingAs) {
   try {
     const auth = _phxVerifyAuth(rawName, pwHash);
     if (!auth) return { success: false, error: _B3_AUTH_ERROR };
- 
+
     // 🆕 C1: determine target user (admin can act on others)
     const targetName = _phxResolveTarget(auth, actingAs);
     if (!targetName) return { success: false, error: 'permission denied — admin only' };
- 
+
     let actions;
     if (typeof actionsArg === 'string') {
       try { actions = JSON.parse(actionsArg); } catch (e) {
@@ -66,84 +66,98 @@ function phxPushActions(rawName, pwHash, actionsArg, actingAs) {
       actions = actionsArg;
     }
     if (!Array.isArray(actions)) return { success: false, error: 'actions ต้องเป็น array' };
-    if (actions.length === 0) return { success: true, added: 0, skipped: 0 };
- 
-    const sh = _phxGetSheet(_B3_TAB);
 
-    // v3.44 UPSERT — snapshot existing rows for the target user: actionId → { row, payload }.
-    //   Old behaviour skipped any actionId already on the server, so a draft→public flip
-    //   (or any edit) could never propagate. Now we overwrite the stored payload in place.
-    const existing = {};   // id → { row, payload, deleted }
-    if (sh.getLastRow() >= 2) {
-      const all = sh.getRange(2, 1, sh.getLastRow() - 1, _B3_COL_COUNT).getValues();
-      for (let i = 0; i < all.length; i++) {
-        if (String(all[i][1]).trim() === targetName) {
-          existing[String(all[i][0]).trim()] = {
-            row: i + 2,
-            payload: String(all[i][4]),
-            deleted: String(all[i][3]).trim() === _B3_TOMBSTONE   // type col == tombstone
-          };
-        }
-      }
-    }
-
-    const rows = [];        // new actions → append at the bottom
-    let updated = 0;        // existing actions whose payload changed → overwritten in place
-    let unchanged = 0;      // existing actions with identical payload → left untouched (no sheet write)
-    let tombstoned = 0;     // v3.47: incoming actions that were deleted server-side → refused (no resurrect)
-    let skipped = 0;        // malformed actions
-    const now = new Date();
-    for (let i = 0; i < actions.length; i++) {
-      const a = actions[i];
-      if (!a || typeof a !== 'object' || !a.id) { skipped++; continue; }
-      const id = String(a.id).trim();
-      const payloadStr = JSON.stringify(a);
-      const ex = existing[id];
-      if (ex) {
-        // v3.47: this id was deleted on another device — do NOT bring it back to life.
-        //   (actionIds are unique-per-creation, so a tombstoned id is never a legit new action.)
-        if (ex.deleted) { tombstoned++; continue; }
-        // Only rewrite when the payload actually differs — keeps steady-state refreshes
-        // (which re-push every unchanged action) from hammering the sheet.
-        if (ex.payload === payloadStr) { unchanged++; continue; }
-        // Overwrite cols 3-5 (monthId, type, payload); leave actionId/name/createdAt intact.
-        sh.getRange(ex.row, 3, 1, 3).setValues([[
-          String(a.monthId || ''),
-          String(a.type || ''),
-          payloadStr
-        ]]);
-        updated++;
-      } else {
-        rows.push([
-          id,
-          targetName,                    // 🆕 ใช้ target ไม่ใช่ auth.name
-          String(a.monthId || ''),
-          String(a.type || ''),
-          payloadStr,
-          now
-        ]);
-      }
-    }
-
-    if (rows.length > 0) {
-      sh.getRange(sh.getLastRow() + 1, 1, rows.length, _B3_COL_COUNT).setValues(rows);
-    }
-
+    const result = _phxWriteOverlayActionsInternal(targetName, actions);
     _phxTouchLastSeen(auth.row.rowIndex);
 
-    return {
-      success: true,
-      added: rows.length,
-      updated: updated,
-      unchanged: unchanged,
-      tombstoned: tombstoned,
-      skipped: skipped,
+    return Object.assign({}, result, {
       actedAs: targetName !== auth.name ? targetName : undefined
-    };
+    });
   } catch (e) {
     console.error('phxPushActions error: ' + e.message);
     return { success: false, error: 'เกิดข้อผิดพลาด: ' + e.message };
   }
+}
+
+// v3.54 (Phase F6 prep): the actual row-upsert logic, split out of phxPushActions so a
+// server-side caller that has already authenticated some other way (e.g. the LINE OA chat
+// flow in Phase_F6_LineChat.js, which authenticates via a linked lineUserId instead of a
+// password) can write overlay actions without duplicating this logic. Not auth-checked itself
+// — callers MUST authenticate/authorize before invoking this.
+function _phxWriteOverlayActionsInternal(targetName, actions) {
+  if (!Array.isArray(actions) || actions.length === 0) {
+    return { success: true, added: 0, updated: 0, unchanged: 0, tombstoned: 0, skipped: 0 };
+  }
+
+  const sh = _phxGetSheet(_B3_TAB);
+
+  // v3.44 UPSERT — snapshot existing rows for the target user: actionId → { row, payload }.
+  //   Old behaviour skipped any actionId already on the server, so a draft→public flip
+  //   (or any edit) could never propagate. Now we overwrite the stored payload in place.
+  const existing = {};   // id → { row, payload, deleted }
+  if (sh.getLastRow() >= 2) {
+    const all = sh.getRange(2, 1, sh.getLastRow() - 1, _B3_COL_COUNT).getValues();
+    for (let i = 0; i < all.length; i++) {
+      if (String(all[i][1]).trim() === targetName) {
+        existing[String(all[i][0]).trim()] = {
+          row: i + 2,
+          payload: String(all[i][4]),
+          deleted: String(all[i][3]).trim() === _B3_TOMBSTONE   // type col == tombstone
+        };
+      }
+    }
+  }
+
+  const rows = [];        // new actions → append at the bottom
+  let updated = 0;        // existing actions whose payload changed → overwritten in place
+  let unchanged = 0;      // existing actions with identical payload → left untouched (no sheet write)
+  let tombstoned = 0;     // v3.47: incoming actions that were deleted server-side → refused (no resurrect)
+  let skipped = 0;        // malformed actions
+  const now = new Date();
+  for (let i = 0; i < actions.length; i++) {
+    const a = actions[i];
+    if (!a || typeof a !== 'object' || !a.id) { skipped++; continue; }
+    const id = String(a.id).trim();
+    const payloadStr = JSON.stringify(a);
+    const ex = existing[id];
+    if (ex) {
+      // v3.47: this id was deleted on another device — do NOT bring it back to life.
+      //   (actionIds are unique-per-creation, so a tombstoned id is never a legit new action.)
+      if (ex.deleted) { tombstoned++; continue; }
+      // Only rewrite when the payload actually differs — keeps steady-state refreshes
+      // (which re-push every unchanged action) from hammering the sheet.
+      if (ex.payload === payloadStr) { unchanged++; continue; }
+      // Overwrite cols 3-5 (monthId, type, payload); leave actionId/name/createdAt intact.
+      sh.getRange(ex.row, 3, 1, 3).setValues([[
+        String(a.monthId || ''),
+        String(a.type || ''),
+        payloadStr
+      ]]);
+      updated++;
+    } else {
+      rows.push([
+        id,
+        targetName,
+        String(a.monthId || ''),
+        String(a.type || ''),
+        payloadStr,
+        now
+      ]);
+    }
+  }
+
+  if (rows.length > 0) {
+    sh.getRange(sh.getLastRow() + 1, 1, rows.length, _B3_COL_COUNT).setValues(rows);
+  }
+
+  return {
+    success: true,
+    added: rows.length,
+    updated: updated,
+    unchanged: unchanged,
+    tombstoned: tombstoned,
+    skipped: skipped
+  };
 }
 
 // ════════════════════════════════════════════════════════════

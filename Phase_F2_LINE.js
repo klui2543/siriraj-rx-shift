@@ -24,6 +24,36 @@ function _phxLineGetSecret() {
   return PropertiesService.getScriptProperties().getProperty('LINE_CHANNEL_SECRET') || '';
 }
 
+// v3.54 Phase 0: GAS doPost(e) cannot read HTTP headers (no e.headers), so LINE's
+// standard X-Line-Signature HMAC check is unreachable here. Use a shared secret embedded
+// in the webhook URL's query string instead — LINE calls the exact URL configured in the
+// Developers Console, querystring included, on every event.
+//   Setup: run devSetupLineWebhookSecret() once, then append "?wsec=<secret>" to the
+//   webhook URL in the LINE Developers Console.
+// If LINE_WEBHOOK_SECRET is not yet configured, this is a no-op (allow) so the existing
+// group broadcast keeps working until an admin opts in — configure it as soon as possible.
+function _phxLineWebhookSecretOk(e) {
+  var configured = PropertiesService.getScriptProperties().getProperty('LINE_WEBHOOK_SECRET') || '';
+  if (!configured) return true;
+  var got = (e && e.parameter && e.parameter.wsec) || '';
+  return got === configured;
+}
+
+function devSetupLineWebhookSecret() {
+  var props = PropertiesService.getScriptProperties();
+  var existing = props.getProperty('LINE_WEBHOOK_SECRET');
+  if (existing) {
+    Logger.log('LINE_WEBHOOK_SECRET already set. Webhook URL should be:');
+    Logger.log(ScriptApp.getService().getUrl() + '?wsec=' + existing);
+    return { ok: true, alreadySet: true };
+  }
+  var secret = Utilities.getUuid().replace(/-/g, '') + Utilities.getUuid().replace(/-/g, '');
+  props.setProperty('LINE_WEBHOOK_SECRET', secret);
+  Logger.log('✅ LINE_WEBHOOK_SECRET generated. Set this as the webhook URL in LINE Developers Console:');
+  Logger.log(ScriptApp.getService().getUrl() + '?wsec=' + secret);
+  return { ok: true, alreadySet: false };
+}
+
 function _phxLineGetGroupsSheet() {
   var ss = SpreadsheetApp.openById(_f2SpreadsheetId());
   var sheet = ss.getSheetByName(_F2_LINE_GROUPS_SHEET);
@@ -131,6 +161,14 @@ function _phxLineHandleEvents(events) {
       var id = src.groupId || src.roomId || src.userId;
       if (!id) return;
 
+      // v3.54: 1:1 chats (source.type === 'user') are handled by a dedicated path — identity
+      //   linking + personal commands — kept fully separate from the group/room broadcast logic
+      //   below so a private reply can never be triggered by, or leak into, a group context.
+      if (type === 'user') {
+        _phxLineHandleUserEvent(ev, id);
+        return;
+      }
+
       if (ev.type === 'join') {
         _phxLineAddGroup(id, type);
         if (ev.replyToken) {
@@ -160,6 +198,32 @@ function _phxLineHandleEvents(events) {
       Logger.log('[LINE webhook] event error: ' + e + ' | event: ' + JSON.stringify(ev));
     }
   });
+}
+
+// v3.54 Phase 1-3: 1:1 message handling — identity linking (unlinked userId) or
+// command routing (linked userId, delegated to Phase_F6_LineChat.js). Always replies via
+// replyToken (never push) since this is always a synchronous reply to an inbound message.
+function _phxLineHandleUserEvent(ev, userId) {
+  if (ev.type !== 'message' || !ev.message || ev.message.type !== 'text' || !ev.replyToken) return;
+  var text = String(ev.message.text || '').trim();
+  var replyToken = ev.replyToken;
+
+  var pharmacist = _phxFindPharmacistRowByLineUserId(userId);
+  var replyText;
+  if (!pharmacist) {
+    replyText = _phxLineHandleLinkAttempt(userId, text);
+  } else if (typeof _phxLineRouteCommand === 'function') {
+    replyText = _phxLineRouteCommand(pharmacist, text);
+  } else {
+    replyText = 'เชื่อมต่อบัญชีเรียบร้อยแล้ว ระบบยังไม่มีคำสั่งให้ใช้งานตอนนี้';
+  }
+
+  if (replyText) {
+    _phxLineCall('/message/reply', {
+      replyToken: replyToken,
+      messages: [{ type: 'text', text: String(replyText).substring(0, _F2_LINE_MAX_MSG_LEN) }]
+    });
+  }
 }
 
 function phxLineSendBroadcastToGroups(title, body) {
@@ -215,6 +279,11 @@ function devSetupLineGroupsSheet() {
 // doPost — handles LINE webhook events
 function doPost(e) {
   try {
+    if (!_phxLineWebhookSecretOk(e)) {
+      // Wrong/missing shared secret — reply 200 OK without doing anything, so an attacker
+      // scanning the endpoint learns nothing about why their request was ignored.
+      return ContentService.createTextOutput('OK');
+    }
     if (!e || !e.postData || !e.postData.contents) {
       return ContentService.createTextOutput('OK');
     }

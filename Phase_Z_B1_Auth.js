@@ -362,7 +362,9 @@ function _phxFindNameByEmailInMaster(email) {
 function _phxFindPharmacistRow(name) {
   const sh = _phxGetSheet('PHX_Pharmacists');
   if (sh.getLastRow() < 2) return null;
-  const data = sh.getRange(2, 1, sh.getLastRow() - 1, 4).getValues();
+  // v3.54: widened to 5 cols to read lineUserId (col E) — blank for rows created before the
+  // LINE OA linking feature, which is fine since getRange safely returns '' for unwritten cells.
+  const data = sh.getRange(2, 1, sh.getLastRow() - 1, 5).getValues();
   const target = String(name).trim();
   for (let i = 0; i < data.length; i++) {
     if (String(data[i][0]).trim() === target) {
@@ -371,7 +373,8 @@ function _phxFindPharmacistRow(name) {
         name: String(data[i][0]).trim(),
         passwordHash: String(data[i][1] || '').trim(),
         createdAt: data[i][2],
-        lastSeen: data[i][3]
+        lastSeen: data[i][3],
+        lineUserId: String(data[i][4] || '').trim()
       };
     }
   }

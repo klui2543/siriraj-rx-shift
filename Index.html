@@ -2049,7 +2049,11 @@
               <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 8A6 6 0 006 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 01-3.46 0"/></svg>
               การแจ้งเตือนผ่านอีเมล
             </button>
-            
+            <button onclick="phxOpenLineLinkModal()" class="phx-menu-item">
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 11.5a8.38 8.38 0 01-.9 3.8 8.5 8.5 0 01-7.6 4.7 8.38 8.38 0 01-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 01-.9-3.8 8.5 8.5 0 014.7-7.6 8.38 8.38 0 013.8-.9h.5a8.48 8.48 0 018 8v.5z"/></svg>
+              เชื่อมต่อ LINE
+            </button>
+
             <button onclick="phxLogout()" class="phx-menu-item danger">
               <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M9 21H5a2 2 0 01-2-2V5a2 2 0 012-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
               ออกจากระบบ
@@ -13356,6 +13360,85 @@ table.exp-tbl .tm{margin-left:3px;opacity:0.75;}
       if (m) m.classList.add('hidden');
     }
 
+    // ─── v3.54: LINE OA account linking (Phase F4) ───
+    let _phxLineLinkTimer = null;
+
+    function phxOpenLineLinkModal() {
+      phxCloseUserMenu();
+      const u = phxAuthGetUser();
+      if (!u) return;
+      const m = document.getElementById('phxLineLinkModal');
+      if (!m) return;
+      m.classList.remove('hidden');
+      document.getElementById('phxLineLinkBody').innerHTML =
+        '<button id="phxLineLinkGenBtn" onclick="phxGenerateLineLinkCode()" class="phx-btn-primary">ขอรหัสเชื่อมต่อ</button>';
+      const msg = document.getElementById('phxLineLinkMsg');
+      if (msg) msg.style.display = 'none';
+    }
+
+    function phxCloseLineLinkModal() {
+      const m = document.getElementById('phxLineLinkModal');
+      if (m) m.classList.add('hidden');
+      if (_phxLineLinkTimer) { clearInterval(_phxLineLinkTimer); _phxLineLinkTimer = null; }
+    }
+
+    function phxGenerateLineLinkCode() {
+      const u = phxAuthGetUser();
+      if (!u) { phxShowLineLinkMsg('กรุณา login ก่อน', false); return; }
+      const btn = document.getElementById('phxLineLinkGenBtn');
+      if (btn) { btn.disabled = true; btn.textContent = 'กำลังขอรหัส...'; }
+      google.script.run
+        .withSuccessHandler(function(r) {
+          if (!r || !r.success) {
+            phxShowLineLinkMsg((r && r.error) || 'เกิดข้อผิดพลาด', false);
+            if (btn) { btn.disabled = false; btn.textContent = 'ขอรหัสเชื่อมต่อ'; }
+            return;
+          }
+          _phxRenderLineLinkCode(r.code, r.ttlSeconds || 600);
+        })
+        .withFailureHandler(function(err) {
+          phxShowLineLinkMsg('เชื่อมต่อเซิร์ฟเวอร์ไม่สำเร็จ: ' + (err && err.message || err), false);
+          if (btn) { btn.disabled = false; btn.textContent = 'ขอรหัสเชื่อมต่อ'; }
+        })
+        .phxLineGenerateLinkCode(u.name, u.hash);
+    }
+
+    function _phxRenderLineLinkCode(code, ttlSeconds) {
+      const body = document.getElementById('phxLineLinkBody');
+      if (!body) return;
+      let remaining = ttlSeconds;
+      body.innerHTML =
+        '<div style="font-size:32px; font-weight:700; letter-spacing:6px; color:var(--accent); margin:8px 0 4px;">' + code + '</div>' +
+        '<div id="phxLineLinkCountdown" style="font-size:11px; color:var(--sub);"></div>';
+      if (_phxLineLinkTimer) clearInterval(_phxLineLinkTimer);
+      const tick = function() {
+        const cd = document.getElementById('phxLineLinkCountdown');
+        if (!cd) { clearInterval(_phxLineLinkTimer); _phxLineLinkTimer = null; return; }
+        if (remaining <= 0) {
+          cd.textContent = 'รหัสหมดอายุแล้ว — กรุณาขอรหัสใหม่';
+          clearInterval(_phxLineLinkTimer); _phxLineLinkTimer = null;
+          return;
+        }
+        const m = Math.floor(remaining / 60), s = remaining % 60;
+        cd.textContent = 'หมดอายุใน ' + m + ':' + (s < 10 ? '0' : '') + s;
+        remaining--;
+      };
+      tick();
+      _phxLineLinkTimer = setInterval(tick, 1000);
+    }
+
+    function phxShowLineLinkMsg(msg, isSuccess) {
+      const el = document.getElementById('phxLineLinkMsg');
+      if (!el) return;
+      el.textContent = msg;
+      el.style.display = 'block';
+      if (isSuccess) {
+        el.style.background = '#f0fdf4'; el.style.color = '#15803d'; el.style.border = '1px solid #86efac';
+      } else {
+        el.style.background = '#fef2f2'; el.style.color = '#b91c1c'; el.style.border = '1px solid #fca5a5';
+      }
+    }
+
     // v3.5: switch between login/register/forgot — populate dropdown for register only
     function phxSwitchTab(tab) {
       ['login','register','forgot'].forEach(function(t) {
@@ -16238,7 +16321,22 @@ table.exp-tbl .tm{margin-left:3px;opacity:0.75;}
     </div>
   </div>
 
-  
+  <!-- 💬 LINE LINK MODAL (v3.54 — Phase F4) -->
+  <div id="phxLineLinkModal" class="hidden" style="position:fixed; inset:0; background:rgba(0,0,0,0.55); backdrop-filter:blur(4px); z-index:5500; display:flex; align-items:center; justify-content:center; padding:20px;">
+    <div class="modal-box" style="background:var(--surface); border-radius:16px; padding:24px; max-width:380px; width:100%; box-shadow:0 20px 60px rgba(0,0,0,0.25); position:relative; text-align:center;">
+      <button onclick="phxCloseLineLinkModal()" style="position:absolute; top:14px; right:14px; background:none; border:none; color:#94a3b8; font-size:18px; cursor:pointer; padding:4px; line-height:1;">✕</button>
+      <h3 style="font-size:15px; font-weight:600; margin:0 0 8px; color:var(--text);">💬 เชื่อมต่อ LINE</h3>
+      <p style="font-size:11px; color:var(--sub); margin:0 0 16px; line-height:1.6;">
+        เพิ่มเพื่อน LINE OA ของระบบ แล้วส่งรหัสด้านล่างในแชท 1:1<br>เพื่อผูกบัญชี LINE ของคุณเข้ากับระบบ
+      </p>
+      <div id="phxLineLinkBody">
+        <button id="phxLineLinkGenBtn" onclick="phxGenerateLineLinkCode()" class="phx-btn-primary">ขอรหัสเชื่อมต่อ</button>
+      </div>
+      <div id="phxLineLinkMsg" style="margin-top:14px; padding:10px 12px; border-radius:8px; font-size:12px; display:none; line-height:1.5;"></div>
+    </div>
+  </div>
+
+
 
   <!-- 🔔 EMAIL NOTIFICATIONS MODAL — combines B3b pre-shift reminder + F1 announce email opt-in -->
   <div id="phxEmailNotifModal" class="hidden" style="position:fixed; inset:0; background:rgba(0,0,0,0.55); backdrop-filter:blur(4px); z-index:5500; display:flex; align-items:center; justify-content:center; padding:20px;">
