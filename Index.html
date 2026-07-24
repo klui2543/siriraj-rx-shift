@@ -2799,6 +2799,15 @@ window.allPharmacistNames = [];
       let start = dayMin + sH * 60 + sM;
       let end = dayMin + eH * 60 + eM;
       if (end <= start) end += 24 * 60;  // cross-day shift
+      // v3.53: รอบ 3 (02:30–08:30) is labeled on the shift-day but physically occurs the NEXT
+      //   calendar morning (เวรจริงบวกไป 1 วัน). Without advancing it, a รอบ 2 (…–02:30) on day N
+      //   is falsely flagged "ติดกัน/ชน" with a รอบ 3 (02:30–…) on day N+1 because they share the
+      //   02:30 boundary — e.g. 07/08 รอบ 2 vs 08/08 รอบ 3 (which really works on 09/08).
+      //   Shift รอบ 3 by one day so its absolute time reflects the real work time.
+      if (typeof _isRound3Shift === 'function' && _isRound3Shift(s)) {
+        start += 24 * 60;
+        end += 24 * 60;
+      }
       return { start, end };
     }
 
